@@ -15,24 +15,30 @@ enum EdgeRailGeometry {
 
 struct EdgeRailView: View {
     @Bindable var model: PacePresentationModel
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
 
     var body: some View {
         let providerIDs = Array(model.visibleProviderIDs.prefix(3))
+        let isExpanded = model.railPreviewState != .mini
         ZStack(alignment: .topLeading) {
             RailShellLayerRepresentable(
                 previewState: model.railPreviewState,
                 edge: model.preferences.railEdge,
                 detailCenterY: detailCenterY(providerIDs: providerIDs),
+                reducesMotion: accessibilityReduceMotion,
             )
 
-            if model.railPreviewState != .mini {
-                providerRows(providerIDs: providerIDs)
-                settingsMark
-            }
+            providerRows(providerIDs: providerIDs)
+                .opacity(isExpanded ? 1 : 0)
+                .animation(contentAnimation(isVisible: isExpanded), value: isExpanded)
+                .accessibilityHidden(!isExpanded)
 
-            if let providerID = model.railPreviewState.detailProviderID {
-                detailContent(providerID: providerID, providerIDs: providerIDs)
-            }
+            settingsMark
+                .opacity(isExpanded ? 1 : 0)
+                .animation(contentAnimation(isVisible: isExpanded), value: isExpanded)
+                .accessibilityHidden(!isExpanded)
+
+            detailContent(providerIDs: providerIDs)
         }
         .frame(
             width: EdgeRailGeometry.canvasSize.width,
@@ -72,17 +78,24 @@ struct EdgeRailView: View {
             .accessibilityLabel("Pace settings")
     }
 
-    private func detailContent(providerID: ProviderID, providerIDs: [ProviderID]) -> some View {
+    private func detailContent(providerIDs: [ProviderID]) -> some View {
+        let providerID = model.railPreviewState.detailProviderID
+        let account = providerID.flatMap { model.selectedAccount(for: $0) }
         let centerY = detailCenterY(providerIDs: providerIDs) ?? 92
         let panelY = min(max(centerY - 69.5, 0), 205)
-        return EdgeDetailPanel(
+        return RailDetailContentLayerRepresentable(
             providerID: providerID,
-            account: model.selectedAccount(for: providerID),
-            snapshots: model.selectedAccount(for: providerID)
-                .map { model.snapshots(for: $0.id) } ?? [],
+            account: account,
+            snapshots: account.map { model.snapshots(for: $0.id) } ?? [],
+            edge: model.preferences.railEdge,
+            panelY: panelY,
+            reducesMotion: accessibilityReduceMotion,
         )
-        .frame(width: EdgeRailGeometry.detailWidth, height: 139, alignment: .topLeading)
-        .offset(x: detailOriginX, y: panelY)
+        .frame(
+            width: EdgeRailGeometry.canvasSize.width,
+            height: EdgeRailGeometry.canvasSize.height,
+        )
+        .accessibilityHidden(providerID == nil)
     }
 
     private func detailCenterY(providerIDs: [ProviderID]) -> CGFloat? {
@@ -99,14 +112,20 @@ struct EdgeRailView: View {
         model.preferences.railEdge == .right ? EdgeRailGeometry.railOriginX : 0
     }
 
-    private var detailOriginX: CGFloat {
-        model.preferences.railEdge == .right
-            ? 0
-            : EdgeRailGeometry.canvasSize.width - EdgeRailGeometry.detailWidth
-    }
-
     private var settingsOriginX: CGFloat {
         model.preferences.railEdge == .right ? EdgeRailGeometry.railOriginX + 10 : 10
+    }
+
+    private func contentAnimation(isVisible: Bool) -> Animation {
+        let duration = accessibilityReduceMotion
+            ? RailMotion.reducedMotionFadeDuration
+            : isVisible
+            ? RailMotion.contentFadeDuration
+            : RailMotion.contentDismissDuration
+        let animation = Animation.easeOut(duration: duration)
+        return isVisible && !accessibilityReduceMotion
+            ? animation.delay(RailMotion.contentRevealDelay)
+            : animation
     }
 }
 
@@ -224,42 +243,62 @@ private struct EdgeDetailPanel: View {
     }
 }
 
-private struct RailShellLayerRepresentable: NSViewRepresentable {
-    let previewState: RailPreviewState
+private struct RailDetailContentLayerRepresentable: NSViewRepresentable {
+    let providerID: ProviderID?
+    let account: ProviderAccount?
+    let snapshots: [LimitSnapshot]
     let edge: RailEdge
-    let detailCenterY: CGFloat?
+    let panelY: CGFloat
+    let reducesMotion: Bool
 
-    func makeNSView(context _: Context) -> RailShellLayerView {
-        RailShellLayerView()
+    private var state: RailDetailContentState {
+        RailDetailContentState(
+            providerID: providerID,
+            account: account,
+            snapshots: snapshots,
+            edge: edge,
+            panelY: panelY,
+            reducesMotion: reducesMotion,
+        )
     }
 
-    func updateNSView(_ view: RailShellLayerView, context _: Context) {
-        view.update(
-            previewState: previewState,
-            edge: edge,
-            detailCenterY: detailCenterY,
-        )
+    func makeNSView(context _: Context) -> RailDetailContentLayerView {
+        RailDetailContentLayerView()
+    }
+
+    func updateNSView(_ view: RailDetailContentLayerView, context _: Context) {
+        view.update(state)
     }
 }
 
-private final class RailShellLayerView: NSView {
-    private let detailLayer = CAShapeLayer()
-    private let railLayer = CAShapeLayer()
-    private let settingsLayer = CAShapeLayer()
-    private var previewState: RailPreviewState = .rail
-    private var edge: RailEdge = .right
-    private var detailCenterY: CGFloat?
+private struct RailDetailContentState {
+    let providerID: ProviderID?
+    let account: ProviderAccount?
+    let snapshots: [LimitSnapshot]
+    let edge: RailEdge
+    let panelY: CGFloat
+    let reducesMotion: Bool
+}
+
+private final class RailDetailContentLayerView: NSView {
+    private let contentView = NSHostingView(rootView: AnyView(EmptyView()))
+    private var providerID: ProviderID?
+    private var hasReceivedState = false
+
+    override var isFlipped: Bool {
+        true
+    }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
-        layer?.addSublayer(detailLayer)
-        layer?.addSublayer(railLayer)
-        layer?.addSublayer(settingsLayer)
-        for item in [detailLayer, railLayer, settingsLayer] {
-            item.fillColor = NSColor.black.cgColor
-            item.actions = ["path": NSNull(), "opacity": NSNull()]
-        }
+        contentView.wantsLayer = true
+        contentView.layer?.actions = [
+            "position": NSNull(),
+            "opacity": NSNull(),
+        ]
+        contentView.layer?.opacity = 0
+        addSubview(contentView)
     }
 
     @available(*, unavailable)
@@ -267,150 +306,114 @@ private final class RailShellLayerView: NSView {
         nil
     }
 
-    override func layout() {
-        super.layout()
-        updatePaths()
-    }
+    func update(_ state: RailDetailContentState) {
+        let previousProviderID = providerID
+        let layer = contentView.layer
+        let currentPosition = layer?.presentation()?.position ?? layer?.position
+        let currentOpacity = layer?.presentation()?.opacity ?? layer?.opacity ?? 0
 
-    func update(
-        previewState: RailPreviewState,
-        edge: RailEdge,
-        detailCenterY: CGFloat?,
-    ) {
-        let changed = self.previewState != previewState || self.edge != edge ||
-            self.detailCenterY != detailCenterY
-        self.previewState = previewState
-        self.edge = edge
-        self.detailCenterY = detailCenterY
-        if changed {
-            updatePaths()
+        if let nextProviderID = state.providerID {
+            contentView.rootView = AnyView(
+                EdgeDetailPanel(
+                    providerID: nextProviderID,
+                    account: state.account,
+                    snapshots: state.snapshots,
+                ),
+            )
+            contentView.frame = targetFrame(edge: state.edge, panelY: state.panelY)
         }
+
+        let targetPosition = layer?.position
+        let isVisible = state.providerID != nil
+        let shouldAnimate = hasReceivedState && previousProviderID != state.providerID
+        providerID = state.providerID
+        hasReceivedState = true
+        setModelOpacity(isVisible ? 1 : 0, on: layer)
+
+        guard shouldAnimate, let layer else {
+            layer?.removeAnimation(forKey: "pace.detailPosition")
+            layer?.removeAnimation(forKey: "pace.detailOpacity")
+            return
+        }
+
+        let shouldAnimatePosition = !state.reducesMotion && isVisible &&
+            previousProviderID != nil && currentPosition != targetPosition
+        animatePosition(
+            on: layer,
+            from: currentPosition,
+            to: targetPosition,
+            enabled: shouldAnimatePosition,
+        )
+        animateOpacity(
+            on: layer,
+            from: currentOpacity,
+            isVisible: isVisible,
+            isReveal: previousProviderID == nil,
+            reducesMotion: state.reducesMotion,
+        )
     }
 
-    private func updatePaths() {
+    private func animatePosition(
+        on layer: CALayer,
+        from currentPosition: CGPoint?,
+        to targetPosition: CGPoint?,
+        enabled: Bool,
+    ) {
+        guard enabled, let currentPosition, let targetPosition else {
+            layer.removeAnimation(forKey: "pace.detailPosition")
+            return
+        }
+        let animation = CABasicAnimation(keyPath: "position")
+        animation.fromValue = currentPosition
+        animation.toValue = targetPosition
+        animation.duration = RailMotion.detailDuration
+        animation.timingFunction = RailMotion.timingFunction
+        layer.add(animation, forKey: "pace.detailPosition")
+    }
+
+    private func animateOpacity(
+        on layer: CALayer,
+        from currentOpacity: Float,
+        isVisible: Bool,
+        isReveal: Bool,
+        reducesMotion: Bool,
+    ) {
+        let targetOpacity: Float = isVisible ? 1 : 0
+        guard currentOpacity != targetOpacity else {
+            return
+        }
+        let animation = CABasicAnimation(keyPath: "opacity")
+        animation.fromValue = currentOpacity
+        animation.toValue = targetOpacity
+        animation.duration = reducesMotion
+            ? RailMotion.reducedMotionFadeDuration
+            : isVisible
+            ? RailMotion.contentFadeDuration
+            : RailMotion.contentDismissDuration
+        animation.timingFunction = RailMotion.timingFunction
+        if isVisible, isReveal, !reducesMotion {
+            animation.beginTime = CACurrentMediaTime() + RailMotion.contentRevealDelay
+            animation.fillMode = .backwards
+        }
+        layer.add(animation, forKey: "pace.detailOpacity")
+    }
+
+    private func setModelOpacity(_ opacity: Float, on layer: CALayer?) {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-
-        railLayer.frame = bounds
-        settingsLayer.frame = bounds
-        detailLayer.frame = bounds
-
-        if previewState == .mini {
-            railLayer.path = transformed(miniPath())
-            settingsLayer.opacity = 0
-            detailLayer.opacity = 0
-        } else {
-            railLayer.path = transformed(railPath())
-            settingsLayer.path = transformed(settingsPath())
-            settingsLayer.opacity = 1
-            updateDetailPath()
-        }
+        layer?.opacity = opacity
         CATransaction.commit()
     }
 
-    private func updateDetailPath() {
-        guard previewState.detailProviderID != nil else {
-            detailLayer.opacity = 0
-            return
-        }
-        let centerY = detailCenterY ?? 92
-        let panelY = min(max(centerY - 69.5, 0), 205)
-        let panelRect = CGRect(x: 0, y: panelY, width: EdgeRailGeometry.detailWidth, height: 139)
-        let path = CGMutablePath()
-        path.addRoundedRect(in: panelRect, cornerWidth: 16, cornerHeight: 16)
-        path.move(to: CGPoint(x: panelRect.maxX - 1, y: centerY - 17))
-        path.addLine(to: CGPoint(x: EdgeRailGeometry.railOriginX + 2, y: centerY))
-        path.addLine(to: CGPoint(x: panelRect.maxX - 1, y: centerY + 17))
-        path.closeSubpath()
-        detailLayer.path = transformed(path)
-        detailLayer.opacity = 1
-    }
-
-    private func transformed(_ path: CGPath) -> CGPath {
-        var verticalFlip = CGAffineTransform(
-            a: 1,
-            b: 0,
-            c: 0,
-            d: -1,
-            tx: 0,
-            ty: bounds.height,
+    private func targetFrame(edge: RailEdge, panelY: CGFloat) -> CGRect {
+        let originX = edge == .right
+            ? 0
+            : EdgeRailGeometry.canvasSize.width - EdgeRailGeometry.detailWidth
+        return CGRect(
+            x: originX,
+            y: panelY,
+            width: EdgeRailGeometry.detailWidth,
+            height: 139,
         )
-        let verticallyFlippedPath = path.copy(using: &verticalFlip) ?? path
-        guard edge == .left else {
-            return verticallyFlippedPath
-        }
-        var horizontalFlip = CGAffineTransform(
-            a: -1,
-            b: 0,
-            c: 0,
-            d: 1,
-            tx: bounds.width,
-            ty: 0,
-        )
-        return verticallyFlippedPath.copy(using: &horizontalFlip) ?? verticallyFlippedPath
-    }
-
-    private func miniPath() -> CGPath {
-        CGPath(
-            roundedRect: CGRect(
-                x: EdgeRailGeometry.canvasSize.width - 18,
-                y: 173,
-                width: 18,
-                height: 70,
-            ),
-            cornerWidth: 9,
-            cornerHeight: 9,
-            transform: nil,
-        )
-    }
-
-    private func railPath() -> CGPath {
-        let path = CGMutablePath()
-        let leftX = EdgeRailGeometry.railOriginX
-        let rightX = EdgeRailGeometry.canvasSize.width
-        let topY = EdgeRailGeometry.railTopY
-        path.move(to: CGPoint(x: rightX, y: topY))
-        path.addLine(to: CGPoint(x: leftX + 38, y: topY))
-        path.addCurve(
-            to: CGPoint(x: leftX, y: topY + 48),
-            control1: CGPoint(x: leftX + 38, y: topY + 20),
-            control2: CGPoint(x: leftX, y: topY + 20),
-        )
-        path.addLine(to: CGPoint(x: leftX, y: 322))
-        path.addCurve(
-            to: CGPoint(x: leftX + 36, y: 350),
-            control1: CGPoint(x: leftX, y: 338),
-            control2: CGPoint(x: leftX + 20, y: 348),
-        )
-        path.addCurve(
-            to: CGPoint(x: rightX, y: 368),
-            control1: CGPoint(x: leftX + 58, y: 350),
-            control2: CGPoint(x: rightX - 4, y: 356),
-        )
-        path.addLine(to: CGPoint(x: rightX, y: topY))
-        path.closeSubpath()
-        return path
-    }
-
-    private func settingsPath() -> CGPath {
-        let path = CGMutablePath()
-        let rightX = EdgeRailGeometry.canvasSize.width
-        path.move(to: CGPoint(x: rightX, y: 348))
-        path.addCurve(
-            to: CGPoint(x: rightX - 27, y: 370),
-            control1: CGPoint(x: rightX - 2, y: 359),
-            control2: CGPoint(x: rightX - 14, y: 366),
-        )
-        path.addCurve(
-            to: CGPoint(x: rightX, y: 416),
-            control1: CGPoint(x: rightX - 3, y: 386),
-            control2: CGPoint(x: rightX - 2, y: 404),
-        )
-        path.addLine(to: CGPoint(x: rightX, y: 348))
-        path.closeSubpath()
-        path.addEllipse(
-            in: CGRect(x: EdgeRailGeometry.railOriginX + 12, y: 370, width: 46, height: 46),
-        )
-        return path
     }
 }

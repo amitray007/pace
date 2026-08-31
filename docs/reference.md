@@ -119,6 +119,18 @@ PACE_REFERENCE_PREVIEW=claude PACE_REFERENCE_MENU=1 \
 `PACE_REFERENCE_MENU=1` to capture only the edge surface. These variables change presentation only;
 the data always comes from `SimulatedScenarios.visualReference()`.
 
+Set `PACE_REFERENCE_MOTION=1` with the mini preview to run a deterministic reveal, provider-switch,
+rapid-retarget, and dismissal sequence for frame capture. This harness does not enable pointer
+input or provider access. Set `PACE_REFERENCE_MOTION_DELAY` to the number of seconds that capture
+automation needs before the first reveal. The default is two seconds.
+
+The source recordings settle the rail reveal in about 0.30 seconds and a provider-panel switch in
+about 0.20 to 0.30 seconds. Pace therefore uses a 0.28-second reveal and a 0.22-second detail
+retarget with a cubic `(0.2, 0.8, 0.2, 1)` timing function. Content enters after a 0.08-second shell
+head start, fades over 0.14 seconds, and clears in 0.08 seconds on dismissal. Reduced Motion applies
+geometry directly and keeps a 0.10-second state fade. These are measured implementation tokens,
+not provider behavior.
+
 After saving a rail capture, generate normalized silhouette evidence with:
 
 ```sh

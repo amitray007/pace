@@ -69,6 +69,10 @@ Exit gate: static captures match the reference geometry and information hierarch
 
 ## Phase 5: Motion and pointer safety
 
+Status: in progress. The rail shell, attached panel, provider switches, rapid retargeting, dismissal,
+and reduced-motion path now use presentation-layer-aware Core Animation. Pointer activation and
+suppression, Instruments frame pacing, 120 Hz hardware checks, and explicit visual approval remain.
+
 - Implement rail path morphing and attached-panel movement with Core Animation.
 - Make every rapid transition interruptible and retargetable.
 - Add Shift-hover, click, and dwell activation.
