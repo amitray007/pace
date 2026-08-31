@@ -123,7 +123,7 @@ private struct EdgeDetailPanel: View {
 
     var body: some View {
         let style = ProviderStyle.resolve(providerID)
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 7) {
                 ProviderMark(providerID: providerID, color: .white, size: 10)
                 Text("\(style.name) Usage")
@@ -160,9 +160,22 @@ private struct EdgeDetailPanel: View {
                 }
             }
             Spacer(minLength: 0)
+
+            Divider()
+                .overlay(Color.white.opacity(0.14))
+
+            HStack(spacing: 8) {
+                Text(account?.planName ?? "Plan unavailable")
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                Text(observationText)
+                    .lineLimit(1)
+            }
+            .font(.system(size: 7.5, weight: .medium))
+            .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
         .foregroundStyle(.white)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(style.name) usage for \(account?.displayName ?? "no account")")
@@ -179,6 +192,14 @@ private struct EdgeDetailPanel: View {
             relativeTo: SimulatedScenarios.referenceDate,
         )
         return "Resets \(relativeReset)"
+    }
+
+    private var observationText: String {
+        guard let latestObservation = snapshots.map(\.observedAt).max() else {
+            return "Not observed"
+        }
+        let prefix = snapshots.allSatisfy { $0.freshness == .current } ? "Observed" : "Stale"
+        return "\(prefix) \(latestObservation.formatted(date: .omitted, time: .shortened))"
     }
 }
 

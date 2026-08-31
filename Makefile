@@ -9,9 +9,12 @@ benchmark:
 visual-benchmark:
 	@test -n "$(VISUAL_CAPTURE)" || (echo "Set VISUAL_CAPTURE to a rail screenshot." >&2; exit 1)
 	swift run -c release pace-benchmark visual \
-		--reference .local/references/frames/primary-claude-detail.png \
+		--reference .local/references/frames/settings-claude-detail.png \
 		--capture "$(VISUAL_CAPTURE)" \
-		--output-dir "$(VISUAL_OUTPUT)"
+		--output-dir "$(VISUAL_OUTPUT)" \
+		--reference-region-start 0.57 \
+		--reference-region-start-y 0.20 \
+		--reference-region-end-y 0.82
 
 generate:
 	xcodegen generate

@@ -29,10 +29,11 @@ requires Instruments and rendered 60 Hz and 120 Hz review.
 
 ## Visual benchmark
 
-The visual benchmark extracts near-black pixels from the right side of the canonical primary-video
-frame and from an app capture. It normalizes both silhouettes into the app's 324 x 416 point canvas
-without changing either aspect ratio. It reports bounding boxes, aspect-ratio difference,
-foreground coverage, silhouette intersection-over-union, and symmetric difference.
+The visual benchmark extracts near-black pixels from a bounded region of the later Claude-detail
+frame and from an app capture. That frame contains the final lower arc and settings control. It
+normalizes both silhouettes into the capture's canvas without changing either aspect ratio. It
+reports bounding boxes, aspect-ratio difference, foreground coverage, silhouette
+intersection-over-union, and symmetric difference.
 
 ```sh
 make visual-benchmark VISUAL_CAPTURE=.local/review/current/rail-claude.png

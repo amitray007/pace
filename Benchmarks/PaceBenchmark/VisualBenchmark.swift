@@ -8,6 +8,8 @@ private struct VisualConfiguration {
     let outputDirectoryURL: URL
     let threshold: UInt8
     let referenceRegionStart: Double
+    let referenceRegionStartY: Double
+    let referenceRegionEndY: Double
 
     init(arguments: ArraySlice<String>) throws {
         var values: [String: String] = [:]
@@ -24,6 +26,8 @@ private struct VisualConfiguration {
                 "--output-dir",
                 "--threshold",
                 "--reference-region-start",
+                "--reference-region-start-y",
+                "--reference-region-end-y",
             ].contains(option) else {
                 throw BenchmarkError.unknownOption(option)
             }
@@ -54,6 +58,9 @@ private struct VisualConfiguration {
                 value: values["--reference-region-start"] ?? "",
             )
         }
+        let verticalRegion = try Self.verticalRegion(values: values)
+        referenceRegionStartY = verticalRegion.start
+        referenceRegionEndY = verticalRegion.end
     }
 
     private static func fileURL(
@@ -69,61 +76,19 @@ private struct VisualConfiguration {
         }
         return url
     }
-}
 
-private struct PixelBounds: Encodable {
-    let originX: Int
-    let originY: Int
-    let width: Int
-    let height: Int
-
-    var aspectRatio: Double {
-        Double(width) / Double(height)
-    }
-}
-
-private struct VisualBenchmarkReport: Encodable {
-    let schemaVersion = 1
-    let benchmark = "normalized-black-silhouette"
-    let referencePath: String
-    let capturePath: String
-    let threshold: UInt8
-    let referenceRegionStart: Double
-    let normalizedWidth: Int
-    let normalizedHeight: Int
-    let referenceBounds: PixelBounds
-    let captureBounds: PixelBounds
-    let referenceAspectRatio: Double
-    let captureAspectRatio: Double
-    let aspectRatioDeltaPercent: Double
-    let silhouetteIntersectionOverUnion: Double
-    let symmetricDifferenceOverUnion: Double
-    let referenceForegroundCoverage: Double
-    let captureForegroundCoverage: Double
-    let foregroundCoverageDeltaPercent: Double
-    let outputDirectory: String
-}
-
-enum VisualBenchmarkError: Error, CustomStringConvertible {
-    case cannotCreateImageContext(String)
-    case cannotDecodeImage(String)
-    case cannotWriteImage(String)
-    case fileNotFound(String)
-    case noForeground(String)
-
-    var description: String {
-        switch self {
-        case let .cannotCreateImageContext(path):
-            "Cannot create an image context for \(path)"
-        case let .cannotDecodeImage(path):
-            "Cannot decode image: \(path)"
-        case let .cannotWriteImage(path):
-            "Cannot write image: \(path)"
-        case let .fileNotFound(path):
-            "Image file not found: \(path)"
-        case let .noForeground(path):
-            "No black silhouette found in image: \(path)"
+    private static func verticalRegion(
+        values: [String: String],
+    ) throws -> (start: Double, end: Double) {
+        let start = values["--reference-region-start-y"].flatMap(Double.init) ?? 0
+        let end = values["--reference-region-end-y"].flatMap(Double.init) ?? 1
+        guard (0 ..< 1).contains(start), (0 ... 1).contains(end), start < end else {
+            throw BenchmarkError.invalidValue(
+                option: "--reference-region-start-y/--reference-region-end-y",
+                value: "\(start)/\(end)",
+            )
         }
+        return (start, end)
     }
 }
 
@@ -172,15 +137,23 @@ private struct PixelImage {
         pixels = decodedPixels
     }
 
-    func mask(threshold: UInt8, regionStart: Double, path: String) throws -> PixelMask {
-        let startX = Int(Double(width) * regionStart)
+    func mask(
+        threshold: UInt8,
+        regionStartX: Double,
+        regionStartY: Double,
+        regionEndY: Double,
+        path: String,
+    ) throws -> PixelMask {
+        let startX = Int(Double(width) * regionStartX)
+        let startY = Int(Double(height) * regionStartY)
+        let endY = min(height, Int(ceil(Double(height) * regionEndY)))
         var values = [Bool](repeating: false, count: width * height)
         var minimumX = width
         var minimumY = height
         var maximumX = -1
         var maximumY = -1
 
-        for pixelY in 0 ..< height {
+        for pixelY in startY ..< endY {
             for pixelX in startX ..< width {
                 let pixelIndex = (pixelY * width + pixelX) * 4
                 let isForeground = pixels[pixelIndex] <= threshold &&
@@ -290,17 +263,21 @@ private func loadVisualMasks(configuration: VisualConfiguration) throws -> Visua
     let captureImage = try PixelImage(url: configuration.captureURL)
     let referenceMask = try referenceImage.mask(
         threshold: configuration.threshold,
-        regionStart: configuration.referenceRegionStart,
+        regionStartX: configuration.referenceRegionStart,
+        regionStartY: configuration.referenceRegionStartY,
+        regionEndY: configuration.referenceRegionEndY,
         path: configuration.referenceURL.path,
     )
     let captureMask = try captureImage.mask(
         threshold: configuration.threshold,
-        regionStart: 0,
+        regionStartX: 0,
+        regionStartY: 0,
+        regionEndY: 1,
         path: configuration.captureURL.path,
     )
 
-    let normalizedWidth = 324
-    let normalizedHeight = 416
+    let normalizedWidth = captureImage.width
+    let normalizedHeight = captureImage.height
     let normalizedReference = solidSilhouette(
         referenceMask.normalized(width: normalizedWidth, height: normalizedHeight),
         width: normalizedWidth,
@@ -336,6 +313,8 @@ private func visualReport(
         capturePath: configuration.captureURL.path,
         threshold: configuration.threshold,
         referenceRegionStart: configuration.referenceRegionStart,
+        referenceRegionStartY: configuration.referenceRegionStartY,
+        referenceRegionEndY: configuration.referenceRegionEndY,
         normalizedWidth: masks.width,
         normalizedHeight: masks.height,
         referenceBounds: masks.reference.bounds,

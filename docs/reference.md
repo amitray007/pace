@@ -124,5 +124,6 @@ After saving a rail capture, generate normalized silhouette evidence with:
 make visual-benchmark VISUAL_CAPTURE=.local/review/current/rail-claude.png
 ```
 
-The benchmark writes ignored local masks and difference images. Its numerical output is diagnostic;
-the visual acceptance matrix in `docs/design.md` remains authoritative.
+The default comparison uses the later Claude-detail frame because it includes the final lower arc
+and settings control. The benchmark writes ignored local masks and difference images. Its numerical
+output is diagnostic; the visual acceptance matrix in `docs/design.md` remains authoritative.
