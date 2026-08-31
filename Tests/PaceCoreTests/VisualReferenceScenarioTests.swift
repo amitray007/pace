@@ -23,6 +23,11 @@ struct VisualReferenceScenarioTests {
         #expect(try usage("All models", accountID: claudeWork.id, in: state) == 0.36)
         #expect(try usage("Monthly limit", accountID: codex.id, in: state) == 0.21)
         #expect(try usage("Included usage", accountID: cursor.id, in: state) == 0.52)
+        #expect(
+            state.snapshots
+                .filter { $0.id.accountID == cursor.id }
+                .map(\.label) == ["Included usage", "API usage"],
+        )
     }
 
     @Test

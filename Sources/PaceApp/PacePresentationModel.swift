@@ -99,12 +99,6 @@ final class PacePresentationModel {
     func snapshots(for accountID: AccountID) -> [LimitSnapshot] {
         state.snapshots
             .filter { $0.id.accountID == accountID }
-            .sorted { lhs, rhs in
-                if lhs.usedFraction == rhs.usedFraction {
-                    return lhs.label < rhs.label
-                }
-                return lhs.usedFraction > rhs.usedFraction
-            }
     }
 
     func headlineUsage(for providerID: ProviderID) -> Double? {
