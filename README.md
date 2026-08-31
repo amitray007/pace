@@ -31,12 +31,17 @@ The Cursor compatibility spike verifies identity directly with Cursor before rea
 supports the default Cursor Agent Keychain login and isolated Cursor Agent file profiles without
 reading Cursor Desktop state or browser cookies.
 
+The Grok compatibility spike uses xAI's officially supported `GROK_HOME` isolation. It verifies the
+session through Grok's `/user` endpoint before reading billing and never relies on a running Grok
+process.
+
 Run the feasibility spikes with the corresponding authenticated installation:
 
 ```sh
 swift spikes/codex-rate-limits.swift
 swift run claude-usage-spike
 swift run cursor-usage-spike
+swift run grok-usage-spike
 ```
 
 ## Development

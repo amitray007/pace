@@ -29,8 +29,8 @@ shared selection.
 
 ## Phase 2: Provider feasibility spikes
 
-Status: in progress. Claude and Cursor single-profile identity and usage reads are proven. Their
-two-account login and credential-rotation checks remain open.
+Status: in progress. Claude, Cursor, and Grok single-profile identity and usage reads are proven.
+Their two-account login and credential-rotation checks remain open.
 
 - Prove two-account profile isolation for Claude, Cursor, Grok, Codex, and GitHub Copilot where the
   provider supports it.

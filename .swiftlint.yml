@@ -5,6 +5,8 @@ included:
   - spikes/claude-usage/Tests
   - spikes/cursor-usage/Sources
   - spikes/cursor-usage/Tests
+  - spikes/grok-usage/Sources
+  - spikes/grok-usage/Tests
 
 excluded:
   - .build

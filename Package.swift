@@ -12,6 +12,7 @@ let package = Package(
         .executable(name: "PaceApp", targets: ["PaceApp"]),
         .executable(name: "claude-usage-spike", targets: ["ClaudeUsageSpike"]),
         .executable(name: "cursor-usage-spike", targets: ["CursorUsageSpike"]),
+        .executable(name: "grok-usage-spike", targets: ["GrokUsageSpike"]),
     ],
     dependencies: [
         .package(
@@ -63,6 +64,20 @@ let package = Package(
             name: "CursorUsageSpikeTests",
             dependencies: ["CursorUsageSpikeCore"],
             path: "spikes/cursor-usage/Tests/CursorUsageSpikeTests",
+        ),
+        .target(
+            name: "GrokUsageSpikeCore",
+            path: "spikes/grok-usage/Sources/GrokUsageSpikeCore",
+        ),
+        .executableTarget(
+            name: "GrokUsageSpike",
+            dependencies: ["GrokUsageSpikeCore"],
+            path: "spikes/grok-usage/Sources/GrokUsageSpike",
+        ),
+        .testTarget(
+            name: "GrokUsageSpikeTests",
+            dependencies: ["GrokUsageSpikeCore"],
+            path: "spikes/grok-usage/Tests/GrokUsageSpikeTests",
         ),
     ],
     swiftLanguageModes: [.v6],
