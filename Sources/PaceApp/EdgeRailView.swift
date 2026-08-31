@@ -9,32 +9,29 @@ enum EdgeRailGeometry {
     static let connectorWidth: CGFloat = 28
     static let railOriginX = detailWidth + connectorWidth
     static let railTopY: CGFloat = 30
-    static let providerCentersY: [ProviderID: CGFloat] = [
-        .claude: 92,
-        .codex: 194,
-        .cursor: 297,
-    ]
-    static let providerTopY: [ProviderID: CGFloat] = [
-        .claude: 60,
-        .codex: 162,
-        .cursor: 265,
-    ]
+    static let providerCentersY: [CGFloat] = [92, 194, 297]
+    static let providerTopY: [CGFloat] = [60, 162, 265]
 }
 
 struct EdgeRailView: View {
     @Bindable var model: PacePresentationModel
 
     var body: some View {
+        let providerIDs = Array(model.visibleProviderIDs.prefix(3))
         ZStack(alignment: .topLeading) {
-            RailShellLayerRepresentable(previewState: model.railPreviewState)
+            RailShellLayerRepresentable(
+                previewState: model.railPreviewState,
+                edge: model.preferences.railEdge,
+                detailCenterY: detailCenterY(providerIDs: providerIDs),
+            )
 
             if model.railPreviewState != .mini {
-                providerRows
+                providerRows(providerIDs: providerIDs)
                 settingsMark
             }
 
             if let providerID = model.railPreviewState.detailProviderID {
-                detailContent(providerID: providerID)
+                detailContent(providerID: providerID, providerIDs: providerIDs)
             }
         }
         .frame(
@@ -45,17 +42,17 @@ struct EdgeRailView: View {
         .accessibilityLabel("Pace edge usage rail")
     }
 
-    private var providerRows: some View {
+    private func providerRows(providerIDs: [ProviderID]) -> some View {
         ZStack(alignment: .topLeading) {
-            ForEach([ProviderID.claude, .codex, .cursor], id: \.self) { providerID in
+            ForEach(Array(providerIDs.enumerated()), id: \.element) { index, providerID in
                 EdgeProviderRow(
                     providerID: providerID,
                     usage: model.headlineUsage(for: providerID) ?? 0,
                 )
                 .frame(width: EdgeRailGeometry.railWidth, height: 64)
                 .offset(
-                    x: EdgeRailGeometry.railOriginX,
-                    y: EdgeRailGeometry.providerTopY[providerID] ?? 60,
+                    x: railContentOriginX,
+                    y: EdgeRailGeometry.providerTopY[index],
                 )
             }
         }
@@ -71,12 +68,12 @@ struct EdgeRailView: View {
             .font(.system(size: 19, weight: .medium))
             .foregroundStyle(.white.opacity(0.9))
             .frame(width: 50, height: 50)
-            .offset(x: EdgeRailGeometry.railOriginX + 10, y: 367)
+            .offset(x: settingsOriginX, y: 367)
             .accessibilityLabel("Pace settings")
     }
 
-    private func detailContent(providerID: ProviderID) -> some View {
-        let centerY = EdgeRailGeometry.providerCentersY[providerID] ?? 92
+    private func detailContent(providerID: ProviderID, providerIDs: [ProviderID]) -> some View {
+        let centerY = detailCenterY(providerIDs: providerIDs) ?? 92
         let panelY = min(max(centerY - 69.5, 0), 205)
         return EdgeDetailPanel(
             providerID: providerID,
@@ -85,7 +82,31 @@ struct EdgeRailView: View {
                 .map { model.snapshots(for: $0.id) } ?? [],
         )
         .frame(width: EdgeRailGeometry.detailWidth, height: 139, alignment: .topLeading)
-        .offset(x: 0, y: panelY)
+        .offset(x: detailOriginX, y: panelY)
+    }
+
+    private func detailCenterY(providerIDs: [ProviderID]) -> CGFloat? {
+        guard let providerID = model.railPreviewState.detailProviderID,
+              let index = providerIDs.firstIndex(of: providerID),
+              EdgeRailGeometry.providerCentersY.indices.contains(index)
+        else {
+            return nil
+        }
+        return EdgeRailGeometry.providerCentersY[index]
+    }
+
+    private var railContentOriginX: CGFloat {
+        model.preferences.railEdge == .right ? EdgeRailGeometry.railOriginX : 0
+    }
+
+    private var detailOriginX: CGFloat {
+        model.preferences.railEdge == .right
+            ? 0
+            : EdgeRailGeometry.canvasSize.width - EdgeRailGeometry.detailWidth
+    }
+
+    private var settingsOriginX: CGFloat {
+        model.preferences.railEdge == .right ? EdgeRailGeometry.railOriginX + 10 : 10
     }
 }
 
@@ -205,13 +226,19 @@ private struct EdgeDetailPanel: View {
 
 private struct RailShellLayerRepresentable: NSViewRepresentable {
     let previewState: RailPreviewState
+    let edge: RailEdge
+    let detailCenterY: CGFloat?
 
     func makeNSView(context _: Context) -> RailShellLayerView {
         RailShellLayerView()
     }
 
     func updateNSView(_ view: RailShellLayerView, context _: Context) {
-        view.update(previewState: previewState)
+        view.update(
+            previewState: previewState,
+            edge: edge,
+            detailCenterY: detailCenterY,
+        )
     }
 }
 
@@ -220,6 +247,8 @@ private final class RailShellLayerView: NSView {
     private let railLayer = CAShapeLayer()
     private let settingsLayer = CAShapeLayer()
     private var previewState: RailPreviewState = .rail
+    private var edge: RailEdge = .right
+    private var detailCenterY: CGFloat?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -243,9 +272,16 @@ private final class RailShellLayerView: NSView {
         updatePaths()
     }
 
-    func update(previewState: RailPreviewState) {
-        let changed = self.previewState != previewState
+    func update(
+        previewState: RailPreviewState,
+        edge: RailEdge,
+        detailCenterY: CGFloat?,
+    ) {
+        let changed = self.previewState != previewState || self.edge != edge ||
+            self.detailCenterY != detailCenterY
         self.previewState = previewState
+        self.edge = edge
+        self.detailCenterY = detailCenterY
         if changed {
             updatePaths()
         }
@@ -260,12 +296,12 @@ private final class RailShellLayerView: NSView {
         detailLayer.frame = bounds
 
         if previewState == .mini {
-            railLayer.path = flipped(miniPath())
+            railLayer.path = transformed(miniPath())
             settingsLayer.opacity = 0
             detailLayer.opacity = 0
         } else {
-            railLayer.path = flipped(railPath())
-            settingsLayer.path = flipped(settingsPath())
+            railLayer.path = transformed(railPath())
+            settingsLayer.path = transformed(settingsPath())
             settingsLayer.opacity = 1
             updateDetailPath()
         }
@@ -273,11 +309,11 @@ private final class RailShellLayerView: NSView {
     }
 
     private func updateDetailPath() {
-        guard let providerID = previewState.detailProviderID else {
+        guard previewState.detailProviderID != nil else {
             detailLayer.opacity = 0
             return
         }
-        let centerY = EdgeRailGeometry.providerCentersY[providerID] ?? 92
+        let centerY = detailCenterY ?? 92
         let panelY = min(max(centerY - 69.5, 0), 205)
         let panelRect = CGRect(x: 0, y: panelY, width: EdgeRailGeometry.detailWidth, height: 139)
         let path = CGMutablePath()
@@ -286,12 +322,12 @@ private final class RailShellLayerView: NSView {
         path.addLine(to: CGPoint(x: EdgeRailGeometry.railOriginX + 2, y: centerY))
         path.addLine(to: CGPoint(x: panelRect.maxX - 1, y: centerY + 17))
         path.closeSubpath()
-        detailLayer.path = flipped(path)
+        detailLayer.path = transformed(path)
         detailLayer.opacity = 1
     }
 
-    private func flipped(_ path: CGPath) -> CGPath {
-        var transform = CGAffineTransform(
+    private func transformed(_ path: CGPath) -> CGPath {
+        var verticalFlip = CGAffineTransform(
             a: 1,
             b: 0,
             c: 0,
@@ -299,7 +335,19 @@ private final class RailShellLayerView: NSView {
             tx: 0,
             ty: bounds.height,
         )
-        return path.copy(using: &transform) ?? path
+        let verticallyFlippedPath = path.copy(using: &verticalFlip) ?? path
+        guard edge == .left else {
+            return verticallyFlippedPath
+        }
+        var horizontalFlip = CGAffineTransform(
+            a: -1,
+            b: 0,
+            c: 0,
+            d: 1,
+            tx: bounds.width,
+            ty: 0,
+        )
+        return verticallyFlippedPath.copy(using: &horizontalFlip) ?? verticallyFlippedPath
     }
 
     private func miniPath() -> CGPath {
@@ -364,60 +412,5 @@ private final class RailShellLayerView: NSView {
             in: CGRect(x: EdgeRailGeometry.railOriginX + 12, y: 370, width: 46, height: 46),
         )
         return path
-    }
-}
-
-private struct ProgressRingLayerRepresentable: NSViewRepresentable {
-    let fraction: Double
-    let color: NSColor
-
-    func makeNSView(context _: Context) -> ProgressRingLayerView {
-        ProgressRingLayerView()
-    }
-
-    func updateNSView(_ view: ProgressRingLayerView, context _: Context) {
-        view.update(fraction: fraction, color: color)
-    }
-}
-
-private final class ProgressRingLayerView: NSView {
-    private let progressLayer = CAShapeLayer()
-    private let trackLayer = CAShapeLayer()
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = true
-        for item in [trackLayer, progressLayer] {
-            item.fillColor = nil
-            item.lineCap = .round
-            item.lineWidth = 5
-            item.actions = ["strokeEnd": NSNull(), "path": NSNull()]
-            layer?.addSublayer(item)
-        }
-        trackLayer.strokeColor = NSColor(white: 0.17, alpha: 1).cgColor
-    }
-
-    @available(*, unavailable)
-    required init?(coder _: NSCoder) {
-        nil
-    }
-
-    override func layout() {
-        super.layout()
-        let rect = bounds.insetBy(dx: 3, dy: 3)
-        let path = CGPath(ellipseIn: rect, transform: nil)
-        trackLayer.frame = bounds
-        trackLayer.path = path
-        progressLayer.frame = bounds
-        progressLayer.path = path
-        progressLayer.transform = CATransform3DMakeRotation(-.pi / 2, 0, 0, 1)
-    }
-
-    func update(fraction: Double, color: NSColor) {
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        progressLayer.strokeColor = color.cgColor
-        progressLayer.strokeEnd = min(max(fraction, 0), 1)
-        CATransaction.commit()
     }
 }

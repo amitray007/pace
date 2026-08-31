@@ -114,7 +114,8 @@ PACE_REFERENCE_PREVIEW=claude PACE_REFERENCE_MENU=1 \
   .build/xcode-derived-data/Build/Products/Debug/Pace.app/Contents/MacOS/Pace
 ```
 
-`PACE_REFERENCE_PREVIEW` accepts `mini`, `rail`, `claude`, `codex`, or `cursor`. Omit
+`PACE_REFERENCE_PREVIEW` accepts `mini`, `rail`, `claude`, `codex`, or `cursor`. Set
+`PACE_REFERENCE_EDGE=left` to verify the mirrored edge treatment; right is the default. Omit
 `PACE_REFERENCE_MENU=1` to capture only the edge surface. These variables change presentation only;
 the data always comes from `SimulatedScenarios.visualReference()`.
 

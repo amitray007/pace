@@ -6,6 +6,7 @@ import SwiftUI
 final class EdgePanelController {
     private let model: PacePresentationModel
     private let panel: ClickThroughEdgePanel
+    private var screenParametersObserver: NSObjectProtocol?
 
     init(model: PacePresentationModel) {
         self.model = model
@@ -18,7 +19,14 @@ final class EdgePanelController {
 
         configurePanel()
         observeModel()
+        observeScreenParameters()
         synchronizeVisibility()
+    }
+
+    isolated deinit {
+        if let screenParametersObserver {
+            NotificationCenter.default.removeObserver(screenParametersObserver)
+        }
     }
 
     private func configurePanel() {
@@ -40,13 +48,30 @@ final class EdgePanelController {
     }
 
     private func positionPanel() {
-        guard let screen = NSScreen.main else {
+        guard let screen = PaceDisplayCatalog.selectedScreen(
+            identifier: model.preferences.selectedDisplayID,
+        ) else {
             return
         }
         let size = EdgeRailGeometry.canvasSize
+        let xPosition = switch model.preferences.railEdge {
+        case .left:
+            screen.frame.minX
+        case .right:
+            screen.frame.maxX - size.width
+        }
+        let availableTravel = max(screen.visibleFrame.height - size.height, 0)
+        let positionFraction: CGFloat = switch model.preferences.railVerticalPosition {
+        case .top:
+            1
+        case .center:
+            0.5
+        case .bottom:
+            0
+        }
         let origin = NSPoint(
-            x: screen.frame.maxX - size.width,
-            y: screen.visibleFrame.midY - size.height / 2,
+            x: xPosition,
+            y: screen.visibleFrame.minY + availableTravel * positionFraction,
         )
         panel.setFrame(NSRect(origin: origin, size: size), display: false)
     }
@@ -54,10 +79,25 @@ final class EdgePanelController {
     private func observeModel() {
         withObservationTracking {
             _ = model.isRailVisible
+            _ = model.preferences.railEdge
+            _ = model.preferences.selectedDisplayID
+            _ = model.preferences.railVerticalPosition
         } onChange: { [weak self] in
             Task { @MainActor in
                 self?.synchronizeVisibility()
                 self?.observeModel()
+            }
+        }
+    }
+
+    private func observeScreenParameters() {
+        screenParametersObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main,
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.synchronizeVisibility()
             }
         }
     }

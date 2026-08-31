@@ -31,24 +31,50 @@ enum RailPreviewState: String, CaseIterable, Identifiable {
 @Observable
 final class PacePresentationModel {
     private(set) var state = PaceState()
+    private(set) var preferences: PacePreferences
     private(set) var loadingError: String?
+    private(set) var preferencesError: String?
     var activeProviderID: ProviderID = .claude
-    var isRailVisible: Bool
     var railPreviewState: RailPreviewState
 
+    private let isReferencePreview: Bool
+    private let preferencesPersistence: any PacePreferencesPersistence
     private var hasStarted = false
+    private var preferencesStore: PacePreferencesStore?
     private var store: PaceStore?
 
-    init(environment: [String: String] = ProcessInfo.processInfo.environment) {
+    init(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        preferencesPersistence: any PacePreferencesPersistence =
+            InMemoryPacePreferencesPersistence(),
+    ) {
         let previewState = environment["PACE_REFERENCE_PREVIEW"]
             .flatMap(RailPreviewState.init(rawValue:))
-        isRailVisible = previewState != nil
+        var initialPreferences = PacePreferences()
+        if previewState != nil {
+            initialPreferences.surfaceMode = .both
+        }
+        if let previewEdge = environment["PACE_REFERENCE_EDGE"].flatMap(RailEdge.init(rawValue:)) {
+            initialPreferences.railEdge = previewEdge
+        }
+        preferences = initialPreferences
         railPreviewState = previewState ?? .rail
+        isReferencePreview = previewState != nil
+        self.preferencesPersistence = preferencesPersistence
+    }
+
+    var isRailVisible: Bool {
+        preferences.surfaceMode.showsEdgeRail
+    }
+
+    var availableDisplays: [PaceDisplayDescriptor] {
+        PaceDisplayCatalog.availableDisplays
     }
 
     var visibleProviderIDs: [ProviderID] {
         let available = Set(state.accounts.map(\.providerID))
-        return [.claude, .codex, .cursor].filter(available.contains)
+        let ordered = preferences.providerOrder.filter(available.contains)
+        return ordered + available.subtracting(ordered).sorted()
     }
 
     var selectedAccount: ProviderAccount? {
@@ -67,6 +93,18 @@ final class PacePresentationModel {
             return
         }
         hasStarted = true
+
+        if !isReferencePreview {
+            do {
+                let preferencesStore = try await PacePreferencesStore.open(
+                    persistence: preferencesPersistence,
+                )
+                self.preferencesStore = preferencesStore
+                preferences = await preferencesStore.currentPreferences()
+            } catch {
+                preferencesError = "Settings could not be loaded. Defaults are active."
+            }
+        }
 
         do {
             let store = try await PaceStore.open(
@@ -140,7 +178,7 @@ final class PacePresentationModel {
     }
 
     func toggleRail() {
-        isRailVisible.toggle()
+        setRailVisible(!isRailVisible)
     }
 
     func toggleRailDetails() {
@@ -148,6 +186,64 @@ final class PacePresentationModel {
             railPreviewState = RailPreviewState(providerID: activeProviderID) ?? .rail
         } else {
             railPreviewState = .rail
+        }
+    }
+
+    func setRailVisible(_ isVisible: Bool) {
+        updatePreferences { preferences in
+            preferences.surfaceMode = isVisible ? .both : .menuBar
+        }
+    }
+
+    func setRailEdge(_ edge: RailEdge) {
+        updatePreferences { $0.railEdge = edge }
+    }
+
+    func setSelectedDisplayID(_ displayID: String?) {
+        updatePreferences { $0.selectedDisplayID = displayID }
+    }
+
+    func setRailVerticalPosition(_ position: RailVerticalPosition) {
+        updatePreferences { $0.railVerticalPosition = position }
+    }
+
+    func moveProvider(_ providerID: ProviderID, by offset: Int) {
+        let visibleProviderIDs = visibleProviderIDs
+        guard let sourceVisibleIndex = visibleProviderIDs.firstIndex(of: providerID) else {
+            return
+        }
+        let destinationVisibleIndex = sourceVisibleIndex + offset
+        guard visibleProviderIDs.indices.contains(destinationVisibleIndex),
+              let sourceIndex = preferences.providerOrder.firstIndex(of: providerID),
+              let destinationIndex = preferences.providerOrder.firstIndex(
+                  of: visibleProviderIDs[destinationVisibleIndex],
+              )
+        else {
+            return
+        }
+        updatePreferences { preferences in
+            preferences.providerOrder.swapAt(sourceIndex, destinationIndex)
+        }
+    }
+
+    private func updatePreferences(_ update: (inout PacePreferences) -> Void) {
+        var nextPreferences = preferences
+        update(&nextPreferences)
+        guard nextPreferences != preferences else {
+            return
+        }
+        preferences = nextPreferences
+
+        guard !isReferencePreview, let preferencesStore else {
+            return
+        }
+        Task {
+            do {
+                try await preferencesStore.replace(with: nextPreferences)
+                preferencesError = nil
+            } catch {
+                preferencesError = "Settings could not be saved."
+            }
         }
     }
 }
