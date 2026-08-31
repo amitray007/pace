@@ -26,3 +26,23 @@ swift run -c release pace-benchmark core --samples 50 --iterations 50
 This benchmark does not prove UI frame pacing, idle energy use, provider network latency, or disk
 persistence speed. Add those measurements when their implementations exist. Rail animation still
 requires Instruments and rendered 60 Hz and 120 Hz review.
+
+## Visual benchmark
+
+The visual benchmark extracts near-black pixels from the right side of the canonical primary-video
+frame and from an app capture. It normalizes both silhouettes into the app's 324 x 416 point canvas
+without changing either aspect ratio. It reports bounding boxes, aspect-ratio difference,
+foreground coverage, silhouette intersection-over-union, and symmetric difference.
+
+```sh
+make visual-benchmark VISUAL_CAPTURE=.local/review/current/rail-claude.png
+```
+
+The command writes `metrics.json`, `reference-mask.png`, `capture-mask.png`, `overlay.png`, and
+`difference.png` to `.local/review/visual-benchmark/`. Reference-only pixels are red. Capture-only
+pixels are cyan. Matching foreground pixels are white in the overlay. The analyzer fills enclosed
+text and icon holes before comparison so the score describes the outer black silhouette.
+
+The measurement intentionally has no pass threshold. Text, pointer position, wallpaper, video
+compression, and unpublished source geometry affect the score. Use it to locate drift and track
+large regressions. The matched screenshot and human silhouette review remain the acceptance gate.

@@ -65,6 +65,7 @@ make generate       # create Pace.xcodeproj
 make format         # format Swift sources
 make check          # format check, lint, tests, and macOS app build
 make benchmark      # measure the release-mode simulated refresh pipeline
+make visual-benchmark VISUAL_CAPTURE=path/to/capture.png  # compare the rail silhouette
 make reference-fetch  # download the public reference media into ignored local storage
 make reference-frames # verify and extract the canonical visual-review frames
 ```

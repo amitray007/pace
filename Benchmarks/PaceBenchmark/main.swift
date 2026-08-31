@@ -64,7 +64,7 @@ private struct BenchmarkReport: Encodable {
     let passed: Bool
 }
 
-private enum BenchmarkError: Error, CustomStringConvertible {
+enum BenchmarkError: Error, CustomStringConvertible {
     case invalidCommand(String?)
     case invalidValue(option: String, value: String)
     case missingValue(String)
@@ -74,7 +74,7 @@ private enum BenchmarkError: Error, CustomStringConvertible {
     var description: String {
         switch self {
         case let .invalidCommand(command):
-            "Unknown benchmark command: \(command ?? "none"). Use `pace-benchmark core`."
+            "Unknown benchmark command: \(command ?? "none"). Use `core` or `visual`."
         case let .invalidValue(option, value):
             "Invalid value for \(option): \(value)"
         case let .missingValue(option):
@@ -92,17 +92,24 @@ private enum PaceBenchmark {
     static func main() async {
         do {
             let arguments = CommandLine.arguments.dropFirst()
-            guard arguments.first == "core" else {
+            guard let command = arguments.first else {
                 throw BenchmarkError.invalidCommand(arguments.first)
             }
-            let configuration = try BenchmarkConfiguration(arguments: arguments.dropFirst())
-            let report = try await benchmarkCore(configuration: configuration)
-            try write(report)
-            guard report.passed else {
-                throw BenchmarkError.regression(
-                    p95Milliseconds: report.p95MillisecondsPerOperation,
-                    maximumMilliseconds: configuration.maximumP95Milliseconds ?? 0,
-                )
+            switch command {
+            case "core":
+                let configuration = try BenchmarkConfiguration(arguments: arguments.dropFirst())
+                let report = try await benchmarkCore(configuration: configuration)
+                try write(report)
+                guard report.passed else {
+                    throw BenchmarkError.regression(
+                        p95Milliseconds: report.p95MillisecondsPerOperation,
+                        maximumMilliseconds: configuration.maximumP95Milliseconds ?? 0,
+                    )
+                }
+            case "visual":
+                try write(runVisualBenchmark(arguments: arguments.dropFirst()))
+            default:
+                throw BenchmarkError.invalidCommand(command)
             }
         } catch {
             FileHandle.standardError.write(Data("\(error)\n".utf8))
@@ -169,7 +176,7 @@ private enum PaceBenchmark {
         return values[max(0, min(rank, values.count - 1))]
     }
 
-    private static func write(_ report: BenchmarkReport) throws {
+    private static func write(_ report: some Encodable) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(report)

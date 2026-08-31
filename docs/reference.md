@@ -117,3 +117,12 @@ PACE_REFERENCE_PREVIEW=claude PACE_REFERENCE_MENU=1 \
 `PACE_REFERENCE_PREVIEW` accepts `mini`, `rail`, `claude`, `codex`, or `cursor`. Omit
 `PACE_REFERENCE_MENU=1` to capture only the edge surface. These variables change presentation only;
 the data always comes from `SimulatedScenarios.visualReference()`.
+
+After saving a rail capture, generate normalized silhouette evidence with:
+
+```sh
+make visual-benchmark VISUAL_CAPTURE=.local/review/current/rail-claude.png
+```
+
+The benchmark writes ignored local masks and difference images. Its numerical output is diagnostic;
+the visual acceptance matrix in `docs/design.md` remains authoritative.
