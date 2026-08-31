@@ -59,6 +59,8 @@ the only project-generation command.
 make generate       # create Pace.xcodeproj
 make format         # format Swift sources
 make check          # format check, lint, tests, and macOS app build
+make reference-fetch  # download the public reference media into ignored local storage
+make reference-frames # verify and extract the canonical visual-review frames
 ```
 
 The current deployment target is macOS 15 for the core foundation. The oldest supported macOS
@@ -68,6 +70,7 @@ version remains subject to the reference rail's AppKit and Core Animation verifi
 
 - [Product requirements](docs/product.md)
 - [Visual design contract](docs/design.md)
+- [Reference media and measurements](docs/reference.md)
 - [Interaction and motion](docs/interactions.md)
 - [Technical architecture](docs/architecture.md)
 - [Delivery roadmap](docs/roadmap.md)

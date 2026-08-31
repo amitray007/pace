@@ -1,4 +1,4 @@
-.PHONY: build check format format-check generate lint test
+.PHONY: build check format format-check generate lint reference-fetch reference-frames test
 
 generate:
 	xcodegen generate
@@ -11,6 +11,12 @@ format-check:
 
 lint:
 	swift package plugin --allow-writing-to-package-directory swiftlint --strict
+
+reference-fetch:
+	Scripts/fetch-reference-media.sh
+
+reference-frames: reference-fetch
+	Scripts/extract-reference-frames.sh
 
 test:
 	swift test
