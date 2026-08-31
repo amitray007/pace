@@ -27,11 +27,16 @@ without copying account tokens or calling private web endpoints.
 A separate Claude compatibility spike verifies OAuth identity before reading usage, supports
 explicit isolated profile directories, and keeps all credential and endpoint code outside the app.
 
+The Cursor compatibility spike verifies identity directly with Cursor before reading usage. It
+supports the default Cursor Agent Keychain login and isolated Cursor Agent file profiles without
+reading Cursor Desktop state or browser cookies.
+
 Run the feasibility spikes with the corresponding authenticated installation:
 
 ```sh
 swift spikes/codex-rate-limits.swift
 swift run claude-usage-spike
+swift run cursor-usage-spike
 ```
 
 ## Development

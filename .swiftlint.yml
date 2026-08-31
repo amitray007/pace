@@ -3,6 +3,8 @@ included:
   - Tests
   - spikes/claude-usage/Sources
   - spikes/claude-usage/Tests
+  - spikes/cursor-usage/Sources
+  - spikes/cursor-usage/Tests
 
 excluded:
   - .build

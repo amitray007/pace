@@ -85,7 +85,7 @@ all providers expose the same window names or reset behavior.
 | --- | --- | --- | --- |
 | Codex | Supported local `codex app-server` JSON-RPC | High | Use `account/rateLimits/read` and `account/rateLimits/updated`. Keep each account in a separate `CODEX_HOME`. |
 | Claude Code | Source-verified OAuth compatibility adapter | Medium | Verify identity before calling the OAuth usage endpoint. Keep each account in a separate `CLAUDE_CONFIG_DIR`. |
-| Cursor | Source-verified compatibility adapter | Medium-low | Prove two isolated CLI credential profiles before product integration. Do not read browser cookies. |
+| Cursor | Source-verified compatibility adapter | Medium | Direct identity and usage reads are proven for one default CLI account. Prove two isolated CLI file profiles before product integration. |
 | Grok | Source-verified Grok Build compatibility adapter | Medium-high | Keep each account in a separate `GROK_HOME`; verify personal and team behavior separately. |
 | GitHub Copilot | GitHub-authenticated usage adapter | Medium-high | Bind every credential to an explicit GitHub identity; never depend on whichever `gh` account happens to be active. |
 
@@ -119,6 +119,27 @@ The default profile and a fresh signed-out custom profile were verified on 2026-
 Code 2.1.251. The default profile returned Session, Weekly, and a model-scoped Fable bucket. A
 second distinct live account, refresh-token rotation, and Team or Enterprise response shapes remain
 unverified. The spike never refreshes or writes credentials.
+
+### Cursor
+
+The isolated `cursor-usage-spike` supports two credential bindings. The default binding reads the
+Cursor Agent Keychain service without allowing an authentication prompt. Additional accounts use a
+profile-specific home directory and Cursor Agent's file credential store. Cursor Agent owns login,
+reauthentication, and token rotation. Pace stores only the profile path and verified identity.
+
+For every refresh, the spike reads the selected profile only, matches the access-token JWT subject
+to `authInfo.authId` in that profile's CLI config, then calls Cursor's
+`DashboardService/GetMe`. It requires the server response to return the same authentication ID and
+checks the returned user and team against the registered Pace identity. Only then does it call
+`DashboardService/GetCurrentPeriodUsage`; `GetPlanInfo` is optional and cannot discard valid usage.
+No Cursor process or harness must remain running.
+
+The direct default-profile path was verified on 2026-08-31 with Cursor Agent
+2026.07.01-41b2de7. It returned a Team plan and Total Usage, Cursor Models, and Other Models
+buckets. A fresh isolated home reported signed out instead of inheriting the default login. Two
+distinct live file profiles, file-profile token rotation, request-based Enterprise fallbacks, and
+long-running polling remain unverified. The spike never reads Cursor Desktop SQLite state or
+browser cookies, and it never refreshes or writes credentials.
 
 ### Compatibility adapters
 
@@ -183,4 +204,6 @@ hit-testing control.
 - Verify multi-account capabilities independently for every provider.
 - Prove two live Claude config directories and safe credential rotation before promoting the
   Claude spike.
+- Prove two live Cursor Agent file profiles and safe CLI-owned credential rotation before
+  promoting the Cursor spike.
 - Measure reference paths, timings, and colors from the source media during the visual phase.

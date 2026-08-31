@@ -11,6 +11,7 @@ let package = Package(
         .library(name: "PaceCore", targets: ["PaceCore"]),
         .executable(name: "PaceApp", targets: ["PaceApp"]),
         .executable(name: "claude-usage-spike", targets: ["ClaudeUsageSpike"]),
+        .executable(name: "cursor-usage-spike", targets: ["CursorUsageSpike"]),
     ],
     dependencies: [
         .package(
@@ -48,6 +49,20 @@ let package = Package(
             name: "ClaudeUsageSpikeTests",
             dependencies: ["ClaudeUsageSpikeCore"],
             path: "spikes/claude-usage/Tests/ClaudeUsageSpikeTests",
+        ),
+        .target(
+            name: "CursorUsageSpikeCore",
+            path: "spikes/cursor-usage/Sources/CursorUsageSpikeCore",
+        ),
+        .executableTarget(
+            name: "CursorUsageSpike",
+            dependencies: ["CursorUsageSpikeCore"],
+            path: "spikes/cursor-usage/Sources/CursorUsageSpike",
+        ),
+        .testTarget(
+            name: "CursorUsageSpikeTests",
+            dependencies: ["CursorUsageSpikeCore"],
+            path: "spikes/cursor-usage/Tests/CursorUsageSpikeTests",
         ),
     ],
     swiftLanguageModes: [.v6],
