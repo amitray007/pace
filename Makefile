@@ -1,4 +1,7 @@
-.PHONY: build check format format-check generate lint reference-fetch reference-frames test
+.PHONY: benchmark build check format format-check generate lint reference-fetch reference-frames test
+
+benchmark:
+	swift run -c release pace-benchmark core --samples 25 --iterations 20 --max-p95-ms 5
 
 generate:
 	xcodegen generate

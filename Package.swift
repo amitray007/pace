@@ -10,6 +10,7 @@ let package = Package(
     products: [
         .library(name: "PaceCore", targets: ["PaceCore"]),
         .executable(name: "PaceApp", targets: ["PaceApp"]),
+        .executable(name: "pace-benchmark", targets: ["PaceBenchmark"]),
         .executable(name: "claude-usage-spike", targets: ["ClaudeUsageSpike"]),
         .executable(name: "cursor-usage-spike", targets: ["CursorUsageSpike"]),
         .executable(name: "grok-usage-spike", targets: ["GrokUsageSpike"]),
@@ -43,6 +44,11 @@ let package = Package(
         .testTarget(
             name: "PaceCoreTests",
             dependencies: ["PaceCore"],
+        ),
+        .executableTarget(
+            name: "PaceBenchmark",
+            dependencies: ["PaceCore"],
+            path: "Benchmarks/PaceBenchmark",
         ),
         .target(
             name: "ClaudeUsageSpikeCore",

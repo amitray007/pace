@@ -1,4 +1,5 @@
 included:
+  - Benchmarks
   - Sources
   - Tests
   - spikes/claude-usage/Sources
