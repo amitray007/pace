@@ -74,7 +74,8 @@ enum BenchmarkError: Error, CustomStringConvertible {
     var description: String {
         switch self {
         case let .invalidCommand(command):
-            "Unknown benchmark command: \(command ?? "none"). Use `core` or `visual`."
+            "Unknown benchmark command: \(command ?? "none"). " +
+                "Use `core`, `activation`, or `visual`."
         case let .invalidValue(option, value):
             "Invalid value for \(option): \(value)"
         case let .missingValue(option):
@@ -100,12 +101,12 @@ private enum PaceBenchmark {
                 let configuration = try BenchmarkConfiguration(arguments: arguments.dropFirst())
                 let report = try await benchmarkCore(configuration: configuration)
                 try write(report)
-                guard report.passed else {
-                    throw BenchmarkError.regression(
-                        p95Milliseconds: report.p95MillisecondsPerOperation,
-                        maximumMilliseconds: configuration.maximumP95Milliseconds ?? 0,
-                    )
-                }
+                try requirePassing(report, configuration: configuration)
+            case "activation":
+                let configuration = try BenchmarkConfiguration(arguments: arguments.dropFirst())
+                let report = benchmarkActivation(configuration: configuration)
+                try write(report)
+                try requirePassing(report, configuration: configuration)
             case "visual":
                 try write(runVisualBenchmark(arguments: arguments.dropFirst()))
             default:
@@ -159,6 +160,114 @@ private enum PaceBenchmark {
         )
     }
 
+    private static func benchmarkActivation(
+        configuration: BenchmarkConfiguration,
+    ) -> BenchmarkReport {
+        var checksum = 0
+        for _ in 0 ..< 10 {
+            checksum &+= runActivationReplay()
+        }
+
+        let clock = ContinuousClock()
+        var millisecondsPerOperation: [Double] = []
+        millisecondsPerOperation.reserveCapacity(configuration.samples)
+
+        for _ in 0 ..< configuration.samples {
+            let start = clock.now
+            for _ in 0 ..< configuration.iterations {
+                checksum &+= runActivationReplay()
+            }
+            let elapsed = start.duration(to: clock.now)
+            millisecondsPerOperation.append(
+                elapsed.milliseconds / Double(configuration.iterations),
+            )
+        }
+
+        let sorted = millisecondsPerOperation.sorted()
+        let median = percentile(0.5, values: sorted)
+        let p95 = percentile(0.95, values: sorted)
+        let maximumP95 = configuration.maximumP95Milliseconds
+        return BenchmarkReport(
+            benchmark: "rail-activation-120hz-replay",
+            buildConfiguration: "release",
+            samples: configuration.samples,
+            iterationsPerSample: configuration.iterations,
+            medianMillisecondsPerOperation: median,
+            p95MillisecondsPerOperation: p95,
+            minimumMillisecondsPerOperation: sorted[0],
+            maximumMillisecondsPerOperation: sorted[sorted.count - 1],
+            checksum: checksum,
+            maximumP95Milliseconds: maximumP95,
+            passed: maximumP95.map { p95 <= $0 } ?? true,
+        )
+    }
+
+    private static func runActivationReplay() -> Int {
+        let configuration = RailActivationConfiguration(
+            mode: .modifierHover,
+            dwellDelay: 0.6,
+            dismissalDelay: 0.4,
+        )
+        var engine = RailActivationEngine(configuration: configuration)
+        var checksum = 0
+        var time: TimeInterval = 0
+
+        for frame in 0 ..< 120 {
+            time += 1 / 120
+            let sample = RailPointerSample(
+                horizontalPosition: Double(frame % 8),
+                verticalPosition: Double(200 + (frame % 12)),
+                region: activationRegion(for: frame),
+            )
+            checksum &+= engine.handle(.pointerMoved(sample), at: time).count
+            checksum &+= engine.handle(.tick, at: time).count
+            if let event = activationEvent(for: frame) {
+                checksum &+= engine.handle(event, at: time).count
+            }
+        }
+        let phaseChecksum = switch engine.phase {
+        case .collapsed:
+            1
+        case .intentPending:
+            2
+        case .revealed:
+            3
+        case .dismissalPending:
+            4
+        }
+        return checksum &+ phaseChecksum
+    }
+
+    private static func activationRegion(for frame: Int) -> RailPointerRegion {
+        switch frame {
+        case 0 ..< 18:
+            .hotspot
+        case 18 ..< 72:
+            .rail(providerIndex: (frame / 18) % 3)
+        case 72 ..< 92:
+            .travelCorridor
+        default:
+            .outside
+        }
+    }
+
+    private static func activationEvent(for frame: Int) -> RailActivationEvent? {
+        switch frame {
+        case 2:
+            .modifierChanged(isActive: true)
+        case 70:
+            .modifierChanged(isActive: false)
+        case 88:
+            .scroll
+        case 96:
+            .mouseButtonsChanged(isDown: true)
+        case 100:
+            .mouseButtonsChanged(isDown: false)
+        default:
+            nil
+        }
+    }
+
     private static func runVisualReferencePipeline() async throws -> Int {
         let scenario = try SimulatedScenarios.visualReference()
         let store = try await PaceStore.open(
@@ -174,6 +283,18 @@ private enum PaceBenchmark {
     private static func percentile(_ percentile: Double, values: [Double]) -> Double {
         let rank = Int(ceil(percentile * Double(values.count))) - 1
         return values[max(0, min(rank, values.count - 1))]
+    }
+
+    private static func requirePassing(
+        _ report: BenchmarkReport,
+        configuration: BenchmarkConfiguration,
+    ) throws {
+        guard report.passed else {
+            throw BenchmarkError.regression(
+                p95Milliseconds: report.p95MillisecondsPerOperation,
+                maximumMilliseconds: configuration.maximumP95Milliseconds ?? 0,
+            )
+        }
     }
 
     private static func write(_ report: some Encodable) throws {

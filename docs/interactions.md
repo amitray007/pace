@@ -56,6 +56,18 @@ underneath.
 The implementation must test traditional scrollbars, overlay scrollbars, scroll thumbs, page
 tracks, horizontal scrolling, browser content, editors, and multiple displays.
 
+The current native adapter keeps the 324 x 416 pt visual panel permanently click-through. It uses a
+permission-free global mouse monitor and polls the selected modifier only while activation intent
+is pending or the rail is open. It does not install a keyboard event tap and does not request
+Accessibility or Input Monitoring permission. Separate nonactivating input panels exist only over
+the visible 18 x 70 pt click handle in click mode, or over the visible rail, settings control, and
+attached detail while expanded. Modifier-hover and dwell-hover have no collapsed input window.
+
+This window footprint is implementation evidence, not the physical pointer exit gate. Rounded
+corners still use bounded rectangular input regions, and scrolling directly over an expanded
+interactive surface is handled by Pace. Verify real scrollbars, resize handles, dragging, momentum,
+Spaces, Stage Manager, full-screen applications, and every selected display before approval.
+
 ## Rail states
 
 ```text

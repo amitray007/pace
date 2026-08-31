@@ -57,8 +57,13 @@ final class PacePresentationModel {
         if let previewEdge = environment["PACE_REFERENCE_EDGE"].flatMap(RailEdge.init(rawValue:)) {
             initialPreferences.railEdge = previewEdge
         }
+        let previewActivation = environment["PACE_REFERENCE_ACTIVATION"]
+            .flatMap(RailActivationMode.init(rawValue:))
+        if let previewActivation {
+            initialPreferences.activationMode = previewActivation
+        }
         preferences = initialPreferences
-        railPreviewState = previewState ?? .rail
+        railPreviewState = previewState ?? .mini
         isReferencePreview = previewState != nil
         self.preferencesPersistence = preferencesPersistence
     }
@@ -189,6 +194,19 @@ final class PacePresentationModel {
         }
     }
 
+    func showRail() {
+        railPreviewState = .rail
+    }
+
+    func showRailDetails(for providerID: ProviderID) {
+        activeProviderID = providerID
+        railPreviewState = RailPreviewState(providerID: providerID) ?? .rail
+    }
+
+    func collapseRail() {
+        railPreviewState = .mini
+    }
+
     func setRailVisible(_ isVisible: Bool) {
         updatePreferences { preferences in
             preferences.surfaceMode = isVisible ? .both : .menuBar
@@ -205,6 +223,26 @@ final class PacePresentationModel {
 
     func setRailVerticalPosition(_ position: RailVerticalPosition) {
         updatePreferences { $0.railVerticalPosition = position }
+    }
+
+    func setActivationMode(_ mode: RailActivationMode) {
+        updatePreferences { $0.activationMode = mode }
+    }
+
+    func setActivationModifier(_ modifier: RailActivationModifier) {
+        updatePreferences { $0.activationModifier = modifier }
+    }
+
+    func setDwellDelay(_ delay: TimeInterval) {
+        updatePreferences { $0.dwellDelay = delay }
+    }
+
+    func setDismissalDelay(_ delay: TimeInterval) {
+        updatePreferences { $0.dismissalDelay = delay }
+    }
+
+    func setHideRailInFullScreen(_ isHidden: Bool) {
+        updatePreferences { $0.hideRailInFullScreen = isHidden }
     }
 
     func moveProvider(_ providerID: ProviderID, by offset: Int) {

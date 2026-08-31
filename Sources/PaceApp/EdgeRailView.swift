@@ -16,6 +16,7 @@ enum EdgeRailGeometry {
 struct EdgeRailView: View {
     @Bindable var model: PacePresentationModel
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         let providerIDs = Array(model.visibleProviderIDs.prefix(3))
@@ -46,6 +47,9 @@ struct EdgeRailView: View {
         )
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Pace edge usage rail")
+        .onReceive(NotificationCenter.default.publisher(for: .paceOpenSettings)) { _ in
+            openSettings()
+        }
     }
 
     private func providerRows(providerIDs: [ProviderID]) -> some View {
@@ -54,6 +58,9 @@ struct EdgeRailView: View {
                 EdgeProviderRow(
                     providerID: providerID,
                     usage: model.headlineUsage(for: providerID) ?? 0,
+                    action: {
+                        model.showRailDetails(for: providerID)
+                    },
                 )
                 .frame(width: EdgeRailGeometry.railWidth, height: 64)
                 .offset(
@@ -70,12 +77,17 @@ struct EdgeRailView: View {
     }
 
     private var settingsMark: some View {
-        Image(systemName: "gearshape")
-            .font(.system(size: 19, weight: .medium))
-            .foregroundStyle(.white.opacity(0.9))
-            .frame(width: 50, height: 50)
-            .offset(x: settingsOriginX, y: 367)
-            .accessibilityLabel("Pace settings")
+        Button {
+            openSettings()
+        } label: {
+            Image(systemName: "gearshape")
+                .font(.system(size: 19, weight: .medium))
+                .foregroundStyle(.white.opacity(0.9))
+                .frame(width: 50, height: 50)
+        }
+        .buttonStyle(.plain)
+        .offset(x: settingsOriginX, y: 367)
+        .accessibilityLabel("Pace settings")
     }
 
     private func detailContent(providerIDs: [ProviderID]) -> some View {
@@ -132,24 +144,27 @@ struct EdgeRailView: View {
 private struct EdgeProviderRow: View {
     let providerID: ProviderID
     let usage: Double
+    let action: () -> Void
 
     var body: some View {
         let style = ProviderStyle.resolve(providerID)
-        VStack(spacing: 8) {
-            ZStack {
-                ProgressRingLayerRepresentable(
-                    fraction: usage,
-                    color: style.accentColor,
-                )
-                .frame(width: 40, height: 40)
+        Button(action: action) {
+            VStack(spacing: 8) {
+                ZStack {
+                    ProgressRingLayerRepresentable(
+                        fraction: usage,
+                        color: style.accentColor,
+                    )
+                    .frame(width: 40, height: 40)
 
-                ProviderMark(providerID: providerID, color: .white, size: 13)
+                    ProviderMark(providerID: providerID, color: .white, size: 13)
+                }
+                Text(usage, format: .percent.precision(.fractionLength(0)))
+                    .font(.system(size: 13, weight: .bold).monospacedDigit())
+                    .foregroundStyle(.white)
             }
-            Text(usage, format: .percent.precision(.fractionLength(0)))
-                .font(.system(size: 13, weight: .bold).monospacedDigit())
-                .foregroundStyle(.white)
         }
-        .accessibilityElement(children: .ignore)
+        .buttonStyle(.plain)
         .accessibilityLabel(
             "\(style.name), \(Int(usage * 100)) percent used",
         )

@@ -1,10 +1,13 @@
-.PHONY: benchmark build check format format-check generate lint reference-fetch reference-frames test visual-benchmark
+.PHONY: benchmark build check format format-check generate interaction-benchmark lint reference-fetch reference-frames test visual-benchmark
 
 VISUAL_CAPTURE ?=
 VISUAL_OUTPUT ?= .local/review/visual-benchmark
 
 benchmark:
 	swift run -c release pace-benchmark core --samples 25 --iterations 20 --max-p95-ms 5
+
+interaction-benchmark:
+	swift run -c release pace-benchmark activation --samples 25 --iterations 200 --max-p95-ms 0.5
 
 visual-benchmark:
 	@test -n "$(VISUAL_CAPTURE)" || (echo "Set VISUAL_CAPTURE to a rail screenshot." >&2; exit 1)

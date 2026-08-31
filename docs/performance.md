@@ -27,6 +27,22 @@ This benchmark does not prove UI frame pacing, idle energy use, provider network
 persistence speed. Add those measurements when their implementations exist. Rail animation still
 requires Instruments and rendered 60 Hz and 120 Hz review.
 
+## Interaction benchmark
+
+`make interaction-benchmark` measures the pointer-intent engine separately from AppKit event
+delivery. One operation replays 120 pointer samples and timer ticks at 120 Hz, including deliberate
+activation, provider travel, outside dismissal, scroll suppression, and mouse-button suppression.
+The runner warms the release build, then records 25 samples with 200 complete replays per sample.
+
+The local regression ceiling is 0.5 ms at p95 for one complete 120-sample replay. This reserves the
+large majority of an 8.33 ms 120 Hz frame for event delivery, view updates, animation, and the
+underlying application. The initial local baseline was 0.0044 ms at p95. Treat this value as a
+machine-specific observation, not a cross-machine promise.
+
+This benchmark proves deterministic engine cost only. It does not measure the global AppKit event
+monitor, target-window updates, Core Animation commits, or physical pointer and scrollbar behavior.
+Those remain running-application and Instruments checks.
+
 ## Visual benchmark
 
 The visual benchmark extracts near-black pixels from a bounded region of the later Claude-detail

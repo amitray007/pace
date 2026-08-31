@@ -24,6 +24,17 @@ struct RailActivationEngineTests {
     }
 
     @Test
+    func `repeated input snapshots do not reset pending deadlines`() {
+        var engine = makeEngine(mode: .dwellHover, dwellDelay: 0.6)
+
+        _ = engine.handle(.pointerMoved(hotspot(verticalPosition: 100)), at: 1)
+        _ = engine.handle(.modifierChanged(isActive: false), at: 1.2)
+        _ = engine.handle(.mouseButtonsChanged(isDown: false), at: 1.4)
+
+        #expect(engine.handle(.tick, at: 1.6) == [.reveal])
+    }
+
+    @Test
     func `scroll drag and fast edge motion suppress accidental activation`() {
         var engine = makeEngine(mode: .dwellHover, dwellDelay: 0.2)
         _ = engine.handle(.scroll, at: 1)
@@ -96,6 +107,16 @@ struct RailActivationEngineTests {
         #expect(
             engine.handle(.primaryClick(region: .settings), at: 3) == [.openSettings],
         )
+    }
+
+    @Test
+    func `external presentation changes keep interaction phase aligned`() {
+        var engine = makeEngine(mode: .modifierHover)
+
+        engine.synchronizePresentation(isRevealed: true)
+        #expect(engine.phase == .revealed)
+        engine.synchronizePresentation(isRevealed: false)
+        #expect(engine.phase == .collapsed)
     }
 
     private func makeEngine(

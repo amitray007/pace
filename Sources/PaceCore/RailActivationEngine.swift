@@ -110,8 +110,22 @@ public struct RailActivationEngine: Sendable {
     }
 
     public mutating func replaceConfiguration(_ configuration: RailActivationConfiguration) {
+        guard self.configuration != configuration else {
+            return
+        }
         self.configuration = configuration
         resetPendingIntent()
+    }
+
+    public mutating func synchronizePresentation(isRevealed: Bool) {
+        if isRevealed {
+            if phase == .collapsed || phase == .intentPending {
+                phase = .revealed
+                intentStartedAt = nil
+            }
+        } else if phase != .collapsed {
+            _ = dismiss()
+        }
     }
 
     public mutating func handle(
@@ -122,7 +136,13 @@ public struct RailActivationEngine: Sendable {
         case let .pointerMoved(sample):
             return handlePointerMoved(sample, at: time)
         case let .modifierChanged(isActive):
+            guard modifierActive != isActive else {
+                return []
+            }
             modifierActive = isActive
+            guard phase == .collapsed || phase == .intentPending else {
+                return []
+            }
             return evaluateCollapsedActivation(at: time)
         case let .mouseButtonsChanged(isDown):
             return handleMouseButtonsChanged(isDown: isDown, at: time)
@@ -171,6 +191,9 @@ public struct RailActivationEngine: Sendable {
         isDown: Bool,
         at time: TimeInterval,
     ) -> [RailActivationAction] {
+        guard mouseButtonDown != isDown else {
+            return []
+        }
         mouseButtonDown = isDown
         resetPendingIntent()
         if !isDown {

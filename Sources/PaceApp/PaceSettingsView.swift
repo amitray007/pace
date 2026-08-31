@@ -82,6 +82,62 @@ struct PaceSettingsView: View {
                 }
             }
 
+            Section("Activation") {
+                Picker(
+                    "Open rail",
+                    selection: Binding(
+                        get: { model.preferences.activationMode },
+                        set: model.setActivationMode,
+                    ),
+                ) {
+                    ForEach(RailActivationMode.allCases, id: \.self) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+
+                if model.preferences.activationMode == .modifierHover {
+                    Picker(
+                        "Modifier key",
+                        selection: Binding(
+                            get: { model.preferences.activationModifier },
+                            set: model.setActivationModifier,
+                        ),
+                    ) {
+                        ForEach(RailActivationModifier.allCases, id: \.self) { modifier in
+                            Text(modifier.label).tag(modifier)
+                        }
+                    }
+                }
+
+                if model.preferences.activationMode == .dwellHover {
+                    delayControl(
+                        "Hover delay",
+                        value: Binding(
+                            get: { model.preferences.dwellDelay },
+                            set: model.setDwellDelay,
+                        ),
+                        range: 0.2 ... 2,
+                    )
+                }
+
+                delayControl(
+                    "Dismissal grace",
+                    value: Binding(
+                        get: { model.preferences.dismissalDelay },
+                        set: model.setDismissalDelay,
+                    ),
+                    range: 0.1 ... 2,
+                )
+
+                Toggle(
+                    "Hide in full-screen apps",
+                    isOn: Binding(
+                        get: { model.preferences.hideRailInFullScreen },
+                        set: model.setHideRailInFullScreen,
+                    ),
+                )
+            }
+
             Section("Data") {
                 LabeledContent("Source", value: "Deterministic simulation")
                 Text(
@@ -97,9 +153,60 @@ struct PaceSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 500, height: 430)
+        .frame(width: 500, height: 590)
         .task {
             await model.start()
+        }
+    }
+
+    private func delayControl(
+        _ label: String,
+        value: Binding<TimeInterval>,
+        range: ClosedRange<TimeInterval>,
+    ) -> some View {
+        HStack(spacing: 10) {
+            Text(label)
+            Spacer()
+            Slider(value: value, in: range, step: 0.1)
+                .frame(width: 170)
+                .accessibilityLabel(label)
+                .accessibilityValue(
+                    Text("\(value.wrappedValue, specifier: "%.1f") seconds"),
+                )
+            Text(value.wrappedValue, format: .number.precision(.fractionLength(1)))
+                .monospacedDigit()
+                .frame(width: 24, alignment: .trailing)
+            Text("s")
+                .foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .contain)
+    }
+}
+
+private extension RailActivationMode {
+    var label: String {
+        switch self {
+        case .modifierHover:
+            "Modifier + hover"
+        case .clickHandle:
+            "Click handle"
+        case .dwellHover:
+            "Dwell hover"
+        }
+    }
+}
+
+private extension RailActivationModifier {
+    var label: String {
+        switch self {
+        case .shift:
+            "Shift"
+        case .option:
+            "Option"
+        case .control:
+            "Control"
+        case .command:
+            "Command"
         }
     }
 }

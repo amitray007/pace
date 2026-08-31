@@ -56,8 +56,8 @@ Exit gate: every required visual state has a named reference frame and determini
 
 Status: in progress. The status item, menu panel, shared simulated selection, click-through edge
 panel, static rail states, attached detail, rings, settings control, mirrored edges, display and
-position selection, provider ordering, and diagnostic reference overlays now run. Activation
-settings, final visual approval, and remaining platform-size checks are still open.
+position selection, provider ordering, activation settings, and diagnostic reference overlays now
+run. Final visual approval and remaining platform-size checks are still open.
 
 - Create the macOS application target.
 - Build the menu-bar status item and static details panel.
@@ -69,9 +69,12 @@ Exit gate: static captures match the reference geometry and information hierarch
 
 ## Phase 5: Motion and pointer safety
 
-Status: in progress. The rail shell, attached panel, provider switches, rapid retargeting, dismissal,
-and reduced-motion path now use presentation-layer-aware Core Animation. Pointer activation and
-suppression, Instruments frame pacing, 120 Hz hardware checks, and explicit visual approval remain.
+Status: in progress. The rail shell, attached panel, provider switches, rapid retargeting,
+dismissal, and reduced-motion path now use presentation-layer-aware Core Animation. The
+deterministic intent engine and permission-free AppKit adapter now implement modifier-hover,
+click-handle, dwell, provider travel, dismissal grace, and scroll, drag, fast-motion, and full-screen
+suppression. Physical scrollbar and drag checks, Instruments frame pacing, 120 Hz hardware checks,
+and explicit visual approval remain.
 
 - Implement rail path morphing and attached-panel movement with Core Animation.
 - Make every rapid transition interruptible and retargetable.

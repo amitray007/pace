@@ -6,9 +6,14 @@ import SwiftUI
 final class EdgePanelController {
     private let model: PacePresentationModel
     private let panel: ClickThroughEdgePanel
+    private var interactionController: RailInteractionController?
     private var screenParametersObserver: NSObjectProtocol?
+    private var workspaceObservers: [NSObjectProtocol] = []
 
-    init(model: PacePresentationModel) {
+    init(
+        model: PacePresentationModel,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+    ) {
         self.model = model
         panel = ClickThroughEdgePanel(
             contentRect: NSRect(origin: .zero, size: EdgeRailGeometry.canvasSize),
@@ -18,14 +23,23 @@ final class EdgePanelController {
         )
 
         configurePanel()
+        let enablesInteraction = environment["PACE_REFERENCE_PREVIEW"] == nil ||
+            environment["PACE_REFERENCE_INTERACTION"] == "1"
+        if enablesInteraction {
+            interactionController = RailInteractionController(model: model, visualPanel: panel)
+        }
         observeModel()
         observeScreenParameters()
+        observeWorkspace()
         synchronizeVisibility()
     }
 
     isolated deinit {
         if let screenParametersObserver {
             NotificationCenter.default.removeObserver(screenParametersObserver)
+        }
+        for observer in workspaceObservers {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
         }
     }
 
@@ -78,10 +92,16 @@ final class EdgePanelController {
 
     private func observeModel() {
         withObservationTracking {
+            _ = model.state
             _ = model.isRailVisible
             _ = model.preferences.railEdge
             _ = model.preferences.selectedDisplayID
             _ = model.preferences.railVerticalPosition
+            _ = model.preferences.activationMode
+            _ = model.preferences.activationModifier
+            _ = model.preferences.dwellDelay
+            _ = model.preferences.dismissalDelay
+            _ = model.railPreviewState
         } onChange: { [weak self] in
             Task { @MainActor in
                 self?.synchronizeVisibility()
@@ -102,13 +122,52 @@ final class EdgePanelController {
         }
     }
 
+    private func observeWorkspace() {
+        guard interactionController != nil else {
+            return
+        }
+        let notificationCenter = NSWorkspace.shared.notificationCenter
+        let notificationNames: [Notification.Name] = [
+            NSWorkspace.didActivateApplicationNotification,
+            NSWorkspace.activeSpaceDidChangeNotification,
+        ]
+        workspaceObservers = notificationNames.map { notificationName in
+            notificationCenter.addObserver(
+                forName: notificationName,
+                object: nil,
+                queue: .main,
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    self?.synchronizeVisibility()
+                }
+            }
+        }
+    }
+
     private func synchronizeVisibility() {
-        if model.isRailVisible {
+        let isFullScreenExcluded = isFullScreenExcluded
+        interactionController?.screenAvailabilityChanged(
+            isFullScreenExcluded: isFullScreenExcluded,
+        )
+        if model.isRailVisible, !isFullScreenExcluded {
             positionPanel()
             panel.orderFrontRegardless()
         } else {
             panel.orderOut(nil)
         }
+        interactionController?.synchronize()
+    }
+
+    private var isFullScreenExcluded: Bool {
+        guard interactionController != nil,
+              model.preferences.hideRailInFullScreen,
+              let screen = PaceDisplayCatalog.selectedScreen(
+                  identifier: model.preferences.selectedDisplayID,
+              )
+        else {
+            return false
+        }
+        return PaceFullScreenDetector.frontmostApplicationCovers(screen)
     }
 }
 

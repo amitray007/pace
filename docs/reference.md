@@ -124,6 +124,10 @@ rapid-retarget, and dismissal sequence for frame capture. This harness does not 
 input or provider access. Set `PACE_REFERENCE_MOTION_DELAY` to the number of seconds that capture
 automation needs before the first reveal. The default is two seconds.
 
+For pointer regression checks, set `PACE_REFERENCE_INTERACTION=1` to leave the real activation
+adapter enabled in a reference preview. `PACE_REFERENCE_ACTIVATION` accepts `modifierHover`,
+`clickHandle`, or `dwellHover`. These switches do not bypass the intent or suppression engine.
+
 The source recordings settle the rail reveal in about 0.30 seconds and a provider-panel switch in
 about 0.20 to 0.30 seconds. Pace therefore uses a 0.28-second reveal and a 0.22-second detail
 retarget with a cubic `(0.2, 0.8, 0.2, 1)` timing function. Content enters after a 0.08-second shell
