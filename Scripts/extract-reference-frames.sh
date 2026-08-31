@@ -34,6 +34,7 @@ extract_frame "$primary_video" 0.50 "$frame_directory/primary-mini.png"
 extract_frame "$primary_video" 2.50 "$frame_directory/primary-cursor-detail.png"
 extract_frame "$primary_video" 3.50 "$frame_directory/primary-claude-detail.png"
 extract_frame "$primary_video" 5.50 "$frame_directory/primary-codex-detail.png"
+extract_frame "$primary_video" 12.75 "$frame_directory/primary-dismissal.png"
 
 extract_frame "$settings_video" 0.50 "$frame_directory/settings-mini.png"
 extract_frame "$settings_video" 2.50 "$frame_directory/settings-cursor-detail.png"

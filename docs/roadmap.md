@@ -54,6 +54,10 @@ Exit gate: every required visual state has a named reference frame and determini
 
 ## Phase 4: Static native surfaces
 
+Status: in progress. The status item, menu panel, shared simulated selection, click-through edge
+panel, static rail states, attached detail, rings, and settings control now run. Reference overlays,
+the complete settings model, and remaining platform-size checks are still open.
+
 - Create the macOS application target.
 - Build the menu-bar status item and static details panel.
 - Build the mini handle, rail silhouette, provider rings, attached panel, and settings control.
@@ -111,6 +115,5 @@ Exit gate: a signed build passes clean-machine installation and privacy checks.
 
 - Default rail activation after permission and scrollbar testing.
 - Oldest supported macOS version.
-- `NSPopover` or custom menu-bar panel.
 - Exact multi-account support for each provider.
 - Public licensing and use of provider marks.

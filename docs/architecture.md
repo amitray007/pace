@@ -167,9 +167,9 @@ isolated provider profile. Pace never silently converts an ambient login into a 
 
 ### Menu bar
 
-`NSStatusItem` owns the status icon. A native panel or popover presents one provider and one account
-at a time. Its model derives provider tabs, account selection, quota rows, and the headline value
-from the shared snapshot store.
+`NSStatusItem` owns the status icon. A semitransient `NSPopover` hosts the SwiftUI menu panel and
+keeps provider and account selection open during internal interaction. Its model derives provider
+tabs, account selection, quota rows, and the headline value from the shared snapshot store.
 
 ### Edge rail
 
@@ -199,8 +199,6 @@ hit-testing control.
 - Verify whether modifier-hover detection can remain permission-free while the panel ignores mouse
   events.
 - Select the oldest supported macOS version after the visual prototype proves required APIs.
-- Decide whether the menu-bar details use `NSPopover` or a custom non-activating panel after testing
-  focus, keyboard access, and size transitions.
 - Verify multi-account capabilities independently for every provider.
 - Prove two live Claude config directories and safe credential rotation before promoting the
   Claude spike.

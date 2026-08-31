@@ -33,6 +33,9 @@ let package = Package(
         .executableTarget(
             name: "PaceApp",
             dependencies: ["PaceCore"],
+            resources: [
+                .process("Resources"),
+            ],
             swiftSettings: [
                 .defaultIsolation(MainActor.self),
             ],

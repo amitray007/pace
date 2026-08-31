@@ -21,6 +21,11 @@ accounts, normalized quota snapshots, deterministic simulated data, shared selec
 orchestration, and local persistence. Live provider adapters remain behind the simulated-data visual
 approval gate.
 
+The first static native surfaces now run against a dedicated visual-reference fixture. AppKit owns
+the menu-bar status item and click-through edge panel. Core Animation draws the rail, connector,
+settings attachment, and progress rings. The menu panel and rail share provider and account
+selection. Motion and pointer activation remain deliberately unimplemented.
+
 A Swift spike proves that Codex limits can be read through the supported local app-server protocol
 without copying account tokens or calling private web endpoints.
 

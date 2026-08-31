@@ -28,6 +28,7 @@ durations.
 | Cursor detail | Primary | 2.50 s | `primary-cursor-detail.png` |
 | Claude detail | Primary | 3.50 s | `primary-claude-detail.png` |
 | Codex detail | Primary | 5.50 s | `primary-codex-detail.png` |
+| Dismissal transition | Primary | 12.75 s | `primary-dismissal.png` |
 | Refined mini handle | Settings | 0.50 s | `settings-mini.png` |
 | Refined Cursor detail | Settings | 2.50 s | `settings-cursor-detail.png` |
 | Refined Claude detail | Settings | 4.00 s | `settings-claude-detail.png` |
@@ -53,6 +54,46 @@ is overlaid at the same desktop scale.
 | Detail panel corner radius | about 32 px | 16 pt |
 | Settings circle diameter | about 90 px | 45 pt |
 
+## Initial implementation tokens
+
+The first static shell uses a 324 x 416 pt transparent canvas. The rail starts at x = 254 pt. Its
+visible contour starts 30 pt below the canvas top so the attached panel can sit above the rail as it
+does in the refinement video. Provider group centers are y = 92, 194, and 297 pt. The attached
+panel is 226 x 139 pt, and its connector extends 28 pt to the active provider center. The connector
+spans 17 pt above and below that center.
+
+| Token | Value |
+| --- | --- |
+| Shell | `#000000` |
+| Ring track | `#2B2B2B` |
+| Claude accent | `#F75C33` |
+| Codex accent | `#2BF09E` |
+| Cursor accent | `#C7FF1A` |
+| Menu-panel background | approximately `#09090A` |
+| Ring percentage | 13 pt bold monospaced digits |
+| Detail title | 11 pt semibold |
+| Detail labels | 8.5 pt medium |
+| Menu panel | 326 pt wide; 204-291 pt high for current simulated providers |
+
+These are recorded implementation inputs, not claimed source design values. Screenshot overlays must
+still correct them when a visible difference appears.
+
+## Provider-mark provenance
+
+Pace vendors monochrome SVG marks and renders them as template images. It does not redraw provider
+marks with SwiftUI primitives or substitute unrelated system symbols.
+
+| Provider | Asset source | Local SHA-256 |
+| --- | --- | --- |
+| Claude | Anthropic's official [media resources](https://www.anthropic.com/press-kit), `Claude Spark - Clay.svg` | `6d53db4be375e899c937c26cf16684a80d6e869b1928d72b37748bef2560e219` |
+| Codex | OpenUsage's pinned OpenAI mark at commit `05c40a1dc50a16ecdc7b55d2e4fadf26827b4f61`, checked against [OpenAI's brand guide](https://openai.com/brand/) | `f48c19561ddb2ce3be624c428acea98d07d8924d5e91c07a57b85d555c61a13b` |
+| Cursor | Cursor's official [brand asset pack](https://cursor.com/brand), `CUBE_2D_LIGHT.svg` | `9e8ae47a4e41c3475cd119e761f868f75b27e382c71023fb985123fe0a8f9a25` |
+| GitHub Copilot | GitHub's official Primer Octicons `copilot-24.svg` at commit `0e21a4c2d8449102f10e533d241f04797af0914c` | `ca6cd98b226e71deae14ab2134a68a9a6d8807e1a351ff7d6ac668dbedfe2b22` |
+| Grok | OpenUsage's corrected Grok mark from [change `c3777d5`](https://github.com/robinebers/openusage/commit/c3777d5929d14ea4b736939692c2dff7cc9e138e), pinned in Pace to commit `05c40a1dc50a16ecdc7b55d2e4fadf26827b4f61` | `4df0f1ffa82bc3c0f155b84617d349c28745b18a211a4066a7f591ef4704c1ad` |
+
+The marks identify the corresponding provider inside Pace. Their owners retain all trademark and
+artwork rights. Re-check the providers' current brand terms before public distribution.
+
 The rail is flush with the right screen edge. The app must derive the organic top, inner, and lower
 curves from the media instead of rounding a rectangle. The attached detail is one persistent panel,
 not a sequence of detached popovers.
@@ -62,3 +103,17 @@ not a sequence of detached popovers.
 The static review fixture uses Claude 73%, Codex 21%, and Cursor 52% for the rail. Claude exposes
 `Current session` at 73% and `All models` at 7%. Account-specific values remain isolated when the
 user switches between Personal and Work. These values are review inputs, not provider assumptions.
+
+## Running deterministic captures
+
+Build the native app, then set a static state when launching its executable:
+
+```sh
+make build
+PACE_REFERENCE_PREVIEW=claude PACE_REFERENCE_MENU=1 \
+  .build/xcode-derived-data/Build/Products/Debug/Pace.app/Contents/MacOS/Pace
+```
+
+`PACE_REFERENCE_PREVIEW` accepts `mini`, `rail`, `claude`, `codex`, or `cursor`. Omit
+`PACE_REFERENCE_MENU=1` to capture only the edge surface. These variables change presentation only;
+the data always comes from `SimulatedScenarios.visualReference()`.
