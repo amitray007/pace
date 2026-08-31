@@ -13,6 +13,10 @@ let package = Package(
         .executable(name: "claude-usage-spike", targets: ["ClaudeUsageSpike"]),
         .executable(name: "cursor-usage-spike", targets: ["CursorUsageSpike"]),
         .executable(name: "grok-usage-spike", targets: ["GrokUsageSpike"]),
+        .executable(
+            name: "github-copilot-usage-spike",
+            targets: ["GitHubCopilotUsageSpike"],
+        ),
     ],
     dependencies: [
         .package(
@@ -78,6 +82,20 @@ let package = Package(
             name: "GrokUsageSpikeTests",
             dependencies: ["GrokUsageSpikeCore"],
             path: "spikes/grok-usage/Tests/GrokUsageSpikeTests",
+        ),
+        .target(
+            name: "GitHubCopilotUsageSpikeCore",
+            path: "spikes/github-copilot-usage/Sources/GitHubCopilotUsageSpikeCore",
+        ),
+        .executableTarget(
+            name: "GitHubCopilotUsageSpike",
+            dependencies: ["GitHubCopilotUsageSpikeCore"],
+            path: "spikes/github-copilot-usage/Sources/GitHubCopilotUsageSpike",
+        ),
+        .testTarget(
+            name: "GitHubCopilotUsageSpikeTests",
+            dependencies: ["GitHubCopilotUsageSpikeCore"],
+            path: "spikes/github-copilot-usage/Tests/GitHubCopilotUsageSpikeTests",
         ),
     ],
     swiftLanguageModes: [.v6],

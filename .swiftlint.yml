@@ -7,6 +7,8 @@ included:
   - spikes/cursor-usage/Tests
   - spikes/grok-usage/Sources
   - spikes/grok-usage/Tests
+  - spikes/github-copilot-usage/Sources
+  - spikes/github-copilot-usage/Tests
 
 excluded:
   - .build

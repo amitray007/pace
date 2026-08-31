@@ -35,6 +35,10 @@ The Grok compatibility spike uses xAI's officially supported `GROK_HOME` isolati
 session through Grok's `/user` endpoint before reading billing and never relies on a running Grok
 process.
 
+The GitHub Copilot compatibility spike binds each account through an explicit GitHub CLI username,
+verifies its durable identity with GitHub's documented `/user` API, and then reads its personal
+Copilot quota. It does not depend on a running editor, Copilot CLI, or coding harness.
+
 Run the feasibility spikes with the corresponding authenticated installation:
 
 ```sh
@@ -42,6 +46,7 @@ swift spikes/codex-rate-limits.swift
 swift run claude-usage-spike
 swift run cursor-usage-spike
 swift run grok-usage-spike
+swift run github-copilot-usage-spike
 ```
 
 ## Development
