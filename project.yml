@@ -1,0 +1,68 @@
+name: Pace
+
+options:
+  bundleIdPrefix: com.amitray
+  createIntermediateGroups: true
+  deploymentTarget:
+    macOS: "15.0"
+  developmentLanguage: en
+  indentWidth: 4
+  tabWidth: 4
+  usesTabs: false
+
+settings:
+  base:
+    CLANG_ENABLE_MODULES: YES
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+
+targets:
+  PaceCore:
+    type: framework
+    platform: macOS
+    sources:
+      - Sources/PaceCore
+    settings:
+      base:
+        DEFINES_MODULE: YES
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.amitray.PaceCore
+
+  Pace:
+    type: application
+    platform: macOS
+    sources:
+      - Sources/PaceApp
+    dependencies:
+      - target: PaceCore
+    settings:
+      base:
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        INFOPLIST_KEY_LSUIElement: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.amitray.Pace.dev
+        PRODUCT_NAME: Pace
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+
+  PaceCoreTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests/PaceCoreTests
+    dependencies:
+      - target: PaceCore
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.amitray.PaceCoreTests
+
+schemes:
+  Pace:
+    build:
+      targets:
+        Pace: all
+        PaceCore: all
+    test:
+      targets:
+        - PaceCoreTests

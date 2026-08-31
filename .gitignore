@@ -1,0 +1,10 @@
+.DS_Store
+.build/
+DerivedData/
+Pace.xcodeproj/
+.swiftpm/
+*.xcuserstate
+xcuserdata/
+
+# Uncommitted reference captures and visual-comparison output.
+.local/

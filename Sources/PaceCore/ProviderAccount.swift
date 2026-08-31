@@ -1,0 +1,107 @@
+import Foundation
+
+public struct ProviderIdentity: Codable, Equatable, Hashable, Sendable {
+    public let subjectID: String
+    public let email: String?
+    public let organizationID: String?
+
+    public init(
+        subjectID: String,
+        email: String? = nil,
+        organizationID: String? = nil,
+    ) {
+        self.subjectID = subjectID
+        self.email = email
+        self.organizationID = organizationID
+    }
+}
+
+public enum ProfileOwnership: String, Codable, Sendable {
+    case existing
+    case paceManaged
+}
+
+public enum CredentialBinding: Codable, Equatable, Sendable {
+    case providerProfile(directory: URL, ownership: ProfileOwnership)
+    case keychain(service: String, account: String)
+    case simulated
+}
+
+public enum AccountConnectionState: Codable, Equatable, Sendable {
+    case connected(lastVerifiedAt: Date)
+    case needsAuthentication
+    case identityMismatch
+    case rateLimited(retryAt: Date?)
+    case unavailable(code: String)
+    case failed(code: String)
+}
+
+public struct ProviderAccount: Codable, Equatable, Identifiable, Sendable {
+    public let id: AccountID
+    public let providerID: ProviderID
+    public let identity: ProviderIdentity
+    public let credentialBinding: CredentialBinding
+    public let addedAt: Date
+    public var displayName: String
+    public var planName: String?
+    public var isEnabled: Bool
+    public var order: Int
+    public var connectionState: AccountConnectionState
+
+    public init(
+        id: AccountID,
+        providerID: ProviderID,
+        identity: ProviderIdentity,
+        credentialBinding: CredentialBinding,
+        addedAt: Date,
+        displayName: String,
+        planName: String?,
+        isEnabled: Bool,
+        order: Int,
+        connectionState: AccountConnectionState,
+    ) {
+        self.id = id
+        self.providerID = providerID
+        self.identity = identity
+        self.credentialBinding = credentialBinding
+        self.addedAt = addedAt
+        self.displayName = displayName
+        self.planName = planName
+        self.isEnabled = isEnabled
+        self.order = order
+        self.connectionState = connectionState
+    }
+}
+
+public struct DiscoveredAccount: Codable, Equatable, Sendable {
+    public let providerID: ProviderID
+    public let identity: ProviderIdentity
+    public let suggestedDisplayName: String
+    public let planName: String?
+    public let credentialBinding: CredentialBinding
+
+    public init(
+        providerID: ProviderID,
+        identity: ProviderIdentity,
+        suggestedDisplayName: String,
+        planName: String? = nil,
+        credentialBinding: CredentialBinding,
+    ) {
+        self.providerID = providerID
+        self.identity = identity
+        self.suggestedDisplayName = suggestedDisplayName
+        self.planName = planName
+        self.credentialBinding = credentialBinding
+    }
+}
+
+public enum AccountMutationError: Error, Equatable, Sendable {
+    case duplicateDisplayName(providerID: ProviderID, displayName: String)
+    case duplicateIdentity(providerID: ProviderID, subjectID: String)
+    case emptyDisplayName
+    case invalidOrder(providerID: ProviderID)
+    case unknownAccount(AccountID)
+    case accountDisabled(AccountID)
+    case providerMismatch(AccountID)
+    case invalidSnapshots(AccountID)
+}
