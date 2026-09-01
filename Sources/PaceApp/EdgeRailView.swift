@@ -16,6 +16,7 @@ enum EdgeRailGeometry {
 struct EdgeRailView: View {
     @Bindable var model: PacePresentationModel
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
@@ -61,6 +62,7 @@ struct EdgeRailView: View {
                     providerID: providerID,
                     usage: model.headlineUsage(for: providerID),
                     status: status,
+                    increasedContrast: usesIncreasedContrast,
                     action: {
                         model.showRailDetails(for: providerID)
                     },
@@ -107,6 +109,7 @@ struct EdgeRailView: View {
             edge: model.preferences.railEdge,
             panelY: panelY,
             reducesMotion: accessibilityReduceMotion,
+            increasedContrast: usesIncreasedContrast,
         )
         .frame(
             width: EdgeRailGeometry.canvasSize.width,
@@ -133,6 +136,10 @@ struct EdgeRailView: View {
         model.preferences.railEdge == .right ? EdgeRailGeometry.railOriginX + 10 : 10
     }
 
+    private var usesIncreasedContrast: Bool {
+        colorSchemeContrast == .increased || model.forcesIncreasedContrast
+    }
+
     private func contentAnimation(isVisible: Bool) -> Animation {
         let duration = accessibilityReduceMotion
             ? RailMotion.reducedMotionFadeDuration
@@ -150,6 +157,7 @@ private struct EdgeProviderRow: View {
     let providerID: ProviderID
     let usage: Double?
     let status: AccountUsageStatus?
+    let increasedContrast: Bool
     let action: () -> Void
 
     var body: some View {
@@ -163,6 +171,7 @@ private struct EdgeProviderRow: View {
                         color: usage == nil
                             ? NSColor.secondaryLabelColor
                             : style.accentColor,
+                        increasedContrast: increasedContrast,
                     )
                     .frame(width: 40, height: 40)
 

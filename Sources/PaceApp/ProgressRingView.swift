@@ -4,13 +4,18 @@ import SwiftUI
 struct ProgressRingLayerRepresentable: NSViewRepresentable {
     let fraction: Double
     let color: NSColor
+    let increasedContrast: Bool
 
     func makeNSView(context _: Context) -> ProgressRingLayerView {
         ProgressRingLayerView()
     }
 
     func updateNSView(_ view: ProgressRingLayerView, context _: Context) {
-        view.update(fraction: fraction, color: color)
+        view.update(
+            fraction: fraction,
+            color: color,
+            increasedContrast: increasedContrast,
+        )
     }
 }
 
@@ -47,9 +52,13 @@ final class ProgressRingLayerView: NSView {
         progressLayer.transform = CATransform3DMakeRotation(-.pi / 2, 0, 0, 1)
     }
 
-    func update(fraction: Double, color: NSColor) {
+    func update(fraction: Double, color: NSColor, increasedContrast: Bool) {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
+        trackLayer.strokeColor = NSColor(
+            white: increasedContrast ? 0.36 : 0.17,
+            alpha: 1,
+        ).cgColor
         progressLayer.strokeColor = color.cgColor
         progressLayer.strokeEnd = min(max(fraction, 0), 1)
         CATransaction.commit()

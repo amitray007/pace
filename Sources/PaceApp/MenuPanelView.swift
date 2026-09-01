@@ -3,12 +3,14 @@ import SwiftUI
 
 struct MenuPanelView: View {
     @Bindable var model: PacePresentationModel
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+    @FocusState private var focusedProviderID: ProviderID?
     @State private var showsAllAccounts = false
 
     var body: some View {
         VStack(spacing: 0) {
             providerTabs
-            Divider().overlay(Color.white.opacity(0.10))
+            Divider().overlay(Color.white.opacity(dividerOpacity))
 
             if let loadingError = model.loadingError {
                 ContentUnavailableView(
@@ -34,7 +36,7 @@ struct MenuPanelView: View {
                 selectedAccountContent
             }
 
-            Divider().overlay(Color.white.opacity(0.10))
+            Divider().overlay(Color.white.opacity(dividerOpacity))
             footer
         }
         .frame(width: 326, height: panelHeight)
@@ -47,7 +49,8 @@ struct MenuPanelView: View {
 
     private var providerTabs: some View {
         HStack(spacing: 0) {
-            ForEach(model.visibleProviderIDs, id: \.self) { providerID in
+            ForEach(Array(model.visibleProviderIDs.enumerated()), id: \.element) { item in
+                let (index, providerID) = item
                 let style = ProviderStyle.resolve(providerID)
                 Button {
                     showsAllAccounts = false
@@ -73,7 +76,7 @@ struct MenuPanelView: View {
                                     ? style.accent
                                     : Color.clear,
                             )
-                            .frame(height: 2)
+                            .frame(height: usesIncreasedContrast ? 3 : 2)
                     }
                     .foregroundStyle(
                         model.activeProviderID == providerID ? style.accent : Color.secondary,
@@ -82,11 +85,15 @@ struct MenuPanelView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .focused($focusedProviderID, equals: providerID)
+                .keyboardShortcut(providerShortcut(index), modifiers: .command)
                 .accessibilityLabel("Show \(style.name) usage")
+                .accessibilityHint("Keyboard shortcut Command \(index + 1)")
             }
         }
         .padding(.horizontal, 10)
         .padding(.top, 7)
+        .onMoveCommand(perform: moveProviderFocus)
     }
 
     private var selectedAccountContent: some View {
@@ -102,6 +109,7 @@ struct MenuPanelView: View {
                             snapshot: snapshot,
                             referenceDate: SimulatedScenarios.referenceDate,
                             accent: ProviderStyle.resolve(model.activeProviderID).accent,
+                            increasedContrast: usesIncreasedContrast,
                         )
                     }
                 }
@@ -173,6 +181,7 @@ struct MenuPanelView: View {
             .accessibilityLabel(
                 "\(ProviderStyle.resolve(model.activeProviderID).name) account",
             )
+            .accessibilityHint("Option Left Arrow or Option Right Arrow switches accounts")
         }
     }
 
@@ -196,6 +205,7 @@ struct MenuPanelView: View {
                     snapshots: model.snapshots(for: account.id),
                     status: model.usageStatus(for: account),
                     accent: ProviderStyle.resolve(model.activeProviderID).accent,
+                    increasedContrast: usesIncreasedContrast,
                 )
             }
             Spacer()
@@ -205,6 +215,19 @@ struct MenuPanelView: View {
 
     private var footer: some View {
         HStack(spacing: 12) {
+            Button {
+                Task {
+                    await model.refreshAll()
+                }
+            } label: {
+                Label(
+                    model.isRefreshing ? "Refreshing" : "Refresh",
+                    systemImage: "arrow.clockwise",
+                )
+            }
+            .disabled(model.isRefreshing)
+            .keyboardShortcut("r", modifiers: .command)
+
             Button {
                 model.toggleRail()
             } label: {
@@ -237,6 +260,15 @@ struct MenuPanelView: View {
         .foregroundStyle(.secondary)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
+        .overlay(alignment: .topLeading) {
+            if let refreshError = model.refreshError {
+                Text(refreshError)
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+                    .accessibilityLabel(refreshError)
+                    .offset(x: 14, y: -17)
+            }
+        }
     }
 
     private var accountDetail: String {
@@ -285,137 +317,41 @@ struct MenuPanelView: View {
     }
 }
 
-private struct MenuQuotaRow: View {
-    let snapshot: LimitSnapshot
-    let referenceDate: Date
-    let accent: Color
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(snapshot.label)
-                    .font(.system(size: 11.5, weight: .medium))
-                Spacer()
-                Text(snapshot.usedFraction, format: .percent.precision(.fractionLength(0)))
-                    .font(.system(size: 11.5, weight: .semibold).monospacedDigit())
-            }
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.11))
-                    Capsule()
-                        .fill(accent)
-                        .frame(width: proxy.size.width * min(snapshot.usedFraction, 1))
-                }
-            }
-            .frame(height: 4)
-
-            HStack {
-                Text(resetDescription)
-                Spacer()
-                Text(observationDescription)
-            }
-            .font(.system(size: 9))
-            .foregroundStyle(.secondary)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityDescription)
+private extension MenuPanelView {
+    var dividerOpacity: Double {
+        usesIncreasedContrast ? 0.28 : 0.10
     }
 
-    private var resetDescription: String {
-        guard let resetsAt = snapshot.resetsAt else {
-            return "Reset unavailable"
-        }
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .full
-        return "Resets \(formatter.localizedString(for: resetsAt, relativeTo: referenceDate))"
+    var usesIncreasedContrast: Bool {
+        colorSchemeContrast == .increased || model.forcesIncreasedContrast
     }
 
-    private var accessibilityDescription: String {
-        "\(snapshot.label), \(Int(snapshot.usedFraction * 100)) percent used, " +
-            "\(resetDescription), \(observationDescription)"
+    func providerShortcut(_ index: Int) -> KeyEquivalent {
+        guard index < 9 else {
+            return "0"
+        }
+        return KeyEquivalent(Character(String(index + 1)))
     }
 
-    private var observationDescription: String {
-        let observation = snapshot.observedAt.formatted(date: .omitted, time: .shortened)
-        switch snapshot.freshness {
-        case .current:
-            return "Observed \(observation)"
-        case .aging:
-            return "Aging · \(observation)"
-        case .failed:
-            return "Failed · \(observation)"
-        case .signedOut:
-            return "Signed out · \(observation)"
-        case .stale:
-            return "Stale · \(observation)"
-        case .unavailable:
-            return "Unavailable · \(observation)"
+    func moveProviderFocus(_ direction: MoveCommandDirection) {
+        let providers = model.visibleProviderIDs
+        guard let currentIndex = providers.firstIndex(of: model.activeProviderID) else {
+            return
         }
-    }
-}
-
-private struct MenuUsageStateView: View {
-    let presentation: UsageStatusPresentation
-
-    var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: presentation.symbolName)
-                .font(.system(size: 19, weight: .medium))
-                .foregroundStyle(presentation.color)
-            Text(presentation.title)
-                .font(.system(size: 12, weight: .semibold))
-            Text(presentation.detail)
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+        let nextIndex = switch direction {
+        case .left:
+            currentIndex - 1
+        case .right:
+            currentIndex + 1
+        default:
+            currentIndex
         }
-        .frame(maxWidth: .infinity, minHeight: 70)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(presentation.title). \(presentation.detail)")
-    }
-}
-
-private struct AllAccountsRow: View {
-    let account: ProviderAccount
-    let snapshots: [LimitSnapshot]
-    let status: AccountUsageStatus
-    let accent: Color
-
-    var body: some View {
-        let urgent = snapshots.max { $0.usedFraction < $1.usedFraction }
-        let presentation = UsageStatusPresentation.resolve(status)
-        HStack(spacing: 12) {
-            Circle()
-                .fill(accent.opacity(0.16))
-                .frame(width: 30, height: 30)
-                .overlay {
-                    Text(account.displayName.prefix(1))
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(accent)
-                }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(account.displayName)
-                    .font(.system(size: 12, weight: .semibold))
-                Text("\(account.planName ?? "Plan unavailable") · \(presentation.title)")
-                    .font(.system(size: 10))
-                    .foregroundStyle(presentation.color)
-            }
-            Spacer()
-            if let urgent {
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(urgent.usedFraction, format: .percent.precision(.fractionLength(0)))
-                        .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                    Text(urgent.label)
-                        .font(.system(size: 9))
-                        .foregroundStyle(.secondary)
-                }
-            }
+        guard providers.indices.contains(nextIndex) else {
+            return
         }
-        .padding(11)
-        .background(Color.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 10))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "\(account.displayName), \(presentation.title). \(presentation.detail)",
-        )
+        let providerID = providers[nextIndex]
+        showsAllAccounts = false
+        model.selectProvider(providerID)
+        focusedProviderID = providerID
     }
 }

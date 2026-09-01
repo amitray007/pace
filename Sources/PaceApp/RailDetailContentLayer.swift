@@ -3,10 +3,12 @@ import PaceCore
 import SwiftUI
 
 private struct EdgeDetailPanel: View {
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     let providerID: ProviderID
     let account: ProviderAccount?
     let snapshots: [LimitSnapshot]
     let status: AccountUsageStatus?
+    let increasedContrast: Bool
 
     var body: some View {
         let style = ProviderStyle.resolve(providerID)
@@ -86,7 +88,9 @@ private struct EdgeDetailPanel: View {
 
                 GeometryReader { proxy in
                     ZStack(alignment: .leading) {
-                        Capsule().fill(Color.white.opacity(0.14))
+                        Capsule().fill(
+                            Color.white.opacity(usesIncreasedContrast ? 0.34 : 0.14),
+                        )
                         Capsule()
                             .fill(style.accent)
                             .frame(width: proxy.size.width * min(snapshot.usedFraction, 1))
@@ -105,6 +109,10 @@ private struct EdgeDetailPanel: View {
         snapshots.isEmpty || presentation.severity == .positive
             ? account?.planName ?? "Plan unavailable"
             : presentation.title
+    }
+
+    private var usesIncreasedContrast: Bool {
+        colorSchemeContrast == .increased || increasedContrast
     }
 
     private func footerColor(_ presentation: UsageStatusPresentation) -> Color {
@@ -135,6 +143,7 @@ struct RailDetailContentLayerRepresentable: NSViewRepresentable {
     let edge: RailEdge
     let panelY: CGFloat
     let reducesMotion: Bool
+    let increasedContrast: Bool
 
     private var state: RailDetailContentState {
         RailDetailContentState(
@@ -145,6 +154,7 @@ struct RailDetailContentLayerRepresentable: NSViewRepresentable {
             edge: edge,
             panelY: panelY,
             reducesMotion: reducesMotion,
+            increasedContrast: increasedContrast,
         )
     }
 
@@ -165,6 +175,7 @@ private struct RailDetailContentState {
     let edge: RailEdge
     let panelY: CGFloat
     let reducesMotion: Bool
+    let increasedContrast: Bool
 }
 
 final class RailDetailContentLayerView: NSView {
@@ -206,6 +217,7 @@ final class RailDetailContentLayerView: NSView {
                     account: state.account,
                     snapshots: state.snapshots,
                     status: state.status,
+                    increasedContrast: state.increasedContrast,
                 ),
             )
             contentView.frame = targetFrame(edge: state.edge, panelY: state.panelY)

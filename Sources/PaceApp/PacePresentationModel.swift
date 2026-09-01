@@ -34,15 +34,19 @@ final class PacePresentationModel {
     private(set) var preferences: PacePreferences
     private(set) var loadingError: String?
     private(set) var preferencesError: String?
+    private(set) var refreshError: String?
     private(set) var isLoading = true
+    private(set) var isRefreshing = false
     var activeProviderID: ProviderID = .claude
     var railPreviewState: RailPreviewState
+    let forcesIncreasedContrast: Bool
 
     private let isReferencePreview: Bool
     private let simulatedPresentationState: SimulatedPresentationState
     private let preferencesPersistence: any PacePreferencesPersistence
     private var hasStarted = false
     private var preferencesStore: PacePreferencesStore?
+    private var refreshCoordinator: RefreshCoordinator?
     private var store: PaceStore?
 
     init(
@@ -67,6 +71,7 @@ final class PacePresentationModel {
         preferences = initialPreferences
         railPreviewState = previewState ?? .mini
         isReferencePreview = previewState != nil
+        forcesIncreasedContrast = environment["PACE_REFERENCE_CONTRAST"] == "increased"
         simulatedPresentationState = environment["PACE_SIMULATED_STATE"]
             .flatMap(SimulatedPresentationState.init(rawValue:)) ?? .current
         self.preferencesPersistence = preferencesPersistence
@@ -137,6 +142,7 @@ final class PacePresentationModel {
             for _ in 0 ..< scenario.refreshCycles {
                 try await coordinator.refreshAll()
             }
+            refreshCoordinator = coordinator
             self.store = store
             state = await store.currentState()
         } catch {
@@ -201,6 +207,35 @@ final class PacePresentationModel {
             state = await store.currentState()
         } catch {
             loadingError = String(describing: error)
+        }
+    }
+
+    func selectAdjacentAccount(offset: Int) async {
+        let accounts = accounts(for: activeProviderID)
+        guard accounts.count > 1,
+              let selectedAccount,
+              let currentIndex = accounts.firstIndex(where: { $0.id == selectedAccount.id })
+        else {
+            return
+        }
+        let nextIndex = (currentIndex + offset + accounts.count) % accounts.count
+        await selectAccount(accounts[nextIndex].id, for: activeProviderID)
+    }
+
+    func refreshAll() async {
+        guard !isRefreshing, let refreshCoordinator, let store else {
+            return
+        }
+        isRefreshing = true
+        defer {
+            isRefreshing = false
+        }
+        do {
+            try await refreshCoordinator.refreshAll()
+            state = await store.currentState()
+            refreshError = nil
+        } catch {
+            refreshError = "Usage could not be refreshed."
         }
     }
 

@@ -125,6 +125,9 @@ the Claude Personal fixture so the All accounts view can prove that account valu
 `stale` performs a successful refresh followed by an unavailable refresh, which preserves the
 last-good quota buckets and observation time.
 
+Set `PACE_REFERENCE_CONTRAST=increased` to exercise Pace's stronger progress tracks, dividers,
+selection indicator, and account-row outline without changing the Mac's accessibility settings.
+
 Set `PACE_REFERENCE_MOTION=1` with the mini preview to run a deterministic reveal, provider-switch,
 rapid-retarget, and dismissal sequence for frame capture. This harness does not enable pointer
 input or provider access. Set `PACE_REFERENCE_MOTION_DELAY` to the number of seconds that capture

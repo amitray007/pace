@@ -3,13 +3,16 @@ import SwiftUI
 
 @MainActor
 final class StatusItemController: NSObject {
+    private let model: PacePresentationModel
     private let popover = NSPopover()
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    private var keyMonitor: Any?
 
     init(
         model: PacePresentationModel,
         environment: [String: String] = ProcessInfo.processInfo.environment,
     ) {
+        self.model = model
         super.init()
 
         let hostingController = NSHostingController(rootView: MenuPanelView(model: model))
@@ -35,6 +38,16 @@ final class StatusItemController: NSObject {
                 self?.showPopover()
             }
         }
+
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            self?.handleKeyEvent(event) ?? event
+        }
+    }
+
+    isolated deinit {
+        if let keyMonitor {
+            NSEvent.removeMonitor(keyMonitor)
+        }
     }
 
     @objc
@@ -51,6 +64,41 @@ final class StatusItemController: NSObject {
             return
         }
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        popover.contentViewController?.view.window?.makeKey()
+        let popoverWindow = popover.contentViewController?.view.window
+        popoverWindow?.makeKey()
+        popoverWindow?.makeFirstResponder(nil)
+    }
+
+    private func handleKeyEvent(_ event: NSEvent) -> NSEvent? {
+        guard popover.isShown else {
+            return event
+        }
+        if event.keyCode == 53 {
+            popover.performClose(nil)
+            return nil
+        }
+
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard modifiers.contains(.option),
+              !modifiers.contains(.command),
+              !modifiers.contains(.control)
+        else {
+            return event
+        }
+        let offset: Int? = switch event.keyCode {
+        case 123:
+            -1
+        case 124:
+            1
+        default:
+            nil
+        }
+        guard let offset else {
+            return event
+        }
+        Task {
+            await model.selectAdjacentAccount(offset: offset)
+        }
+        return nil
     }
 }

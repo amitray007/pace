@@ -111,9 +111,12 @@ Inspect frame pacing with Instruments before calling the motion smooth.
 - Clicking the status item opens the panel without animation that delays access.
 - Provider tabs change the active provider.
 - The account switcher changes only the account inside that provider.
+- Command 1 through Command 9 selects the matching visible provider. Option Left Arrow and Option
+  Right Arrow cycle only the active provider's accounts.
 - The panel remembers one selected account per provider.
 - The status item can represent the selected quota or the most urgent enabled quota.
 - Keyboard navigation reaches provider tabs, accounts, quota rows, refresh, and settings.
+- Command R refreshes usage. Escape closes the panel.
 - Closing the panel restores focus to the previous application.
 
 ## Settings categories
