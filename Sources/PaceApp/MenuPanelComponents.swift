@@ -40,12 +40,10 @@ struct MenuQuotaRow: View {
     }
 
     private var resetDescription: String {
-        guard let resetsAt = snapshot.resetsAt else {
-            return "Reset unavailable"
-        }
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .full
-        return "Resets \(formatter.localizedString(for: resetsAt, relativeTo: referenceDate))"
+        QuotaResetText.description(
+            resetsAt: snapshot.resetsAt,
+            relativeTo: referenceDate,
+        )
     }
 
     private var accessibilityDescription: String {

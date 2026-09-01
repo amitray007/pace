@@ -8,14 +8,38 @@ enum EdgeRailGeometry {
     static let railWidth: CGFloat = 70
     static let detailWidth: CGFloat = 226
     static let connectorWidth: CGFloat = 28
+
+    /// The panel is only as tall as its content. A fixed height leaves an empty
+    /// band under an account that reports fewer quotas than the maximum, which
+    /// the reference never shows.
+    static let detailChromeHeight: CGFloat = 71
+    static let detailQuotaRowHeight: CGFloat = 38
+    static let detailEmptyStateHeight: CGFloat = 56
+    static let maximumDetailQuotaRows = 3
     static let railOriginX = detailWidth + connectorWidth
     static let railTopY: CGFloat = 30
     static let providerCentersY: [CGFloat] = [92, 194, 297]
     static let providerTopY: [CGFloat] = [60, 162, 265]
-    /// Reference ring is 85 px across a 139 px rail, so 0.61 of the rail width.
-    static let ringDiameter: CGFloat = 43
-    /// Reference provider mark fills roughly half the ring's outer diameter.
+    /// The running reference application draws an 87 px ring track on a 137 px
+    /// rail at 2x, so 43.5 pt on our 70 pt rail.
+    static let ringDiameter: CGFloat = 43.5
+    /// Reference provider mark fills roughly 0.42 of the ring's outer diameter.
     static let markDiameter: CGFloat = 21
+
+    /// The panel height for an account reporting `quotaCount` quotas.
+    static func detailHeight(quotaCount: Int) -> CGFloat {
+        let rows = min(quotaCount, maximumDetailQuotaRows)
+        let body = rows == 0
+            ? detailEmptyStateHeight
+            : CGFloat(rows) * detailQuotaRowHeight
+        return detailChromeHeight + body
+    }
+
+    /// The panel's top edge for a detail of `height` attached to a ring at
+    /// `centerY`, clamped so it stays inside the canvas.
+    static func detailPanelY(centerY: CGFloat, height: CGFloat) -> CGFloat {
+        min(max(centerY - height / 2, 0), canvasSize.height - height)
+    }
 }
 
 struct EdgeRailView: View {
@@ -32,6 +56,10 @@ struct EdgeRailView: View {
                 previewState: model.railPreviewState,
                 edge: model.preferences.railEdge,
                 detailCenterY: detailCenterY(providerIDs: providerIDs),
+                detailHeight: detailHeight(
+                    providerID: model.railPreviewState.detailProviderID,
+                    contents: detailContents(providerIDs: providerIDs),
+                ),
                 reducesMotion: accessibilityReduceMotion,
             )
 
@@ -105,9 +133,8 @@ struct EdgeRailView: View {
         .accessibilityLabel("Pace settings")
     }
 
-    private func detailContent(providerIDs: [ProviderID]) -> some View {
-        let providerID = model.railPreviewState.detailProviderID
-        let contents = providerIDs.map { contentProviderID in
+    private func detailContents(providerIDs: [ProviderID]) -> [RailDetailContent] {
+        providerIDs.map { contentProviderID in
             let account = model.selectedAccount(for: contentProviderID)
             return RailDetailContent(
                 providerID: contentProviderID,
@@ -117,13 +144,19 @@ struct EdgeRailView: View {
                 increasedContrast: usesIncreasedContrast,
             )
         }
+    }
+
+    private func detailContent(providerIDs: [ProviderID]) -> some View {
+        let providerID = model.railPreviewState.detailProviderID
+        let contents = detailContents(providerIDs: providerIDs)
         let centerY = detailCenterY(providerIDs: providerIDs) ?? 92
-        let panelY = min(max(centerY - 69.5, 0), 205)
+        let panelHeight = detailHeight(providerID: providerID, contents: contents)
         return RailDetailContentLayerRepresentable(
             contents: contents,
             visibleProviderID: providerID,
             edge: model.preferences.railEdge,
-            panelY: panelY,
+            panelY: EdgeRailGeometry.detailPanelY(centerY: centerY, height: panelHeight),
+            panelHeight: panelHeight,
             reducesMotion: accessibilityReduceMotion,
         )
         .frame(
@@ -131,6 +164,19 @@ struct EdgeRailView: View {
             height: EdgeRailGeometry.canvasSize.height,
         )
         .accessibilityHidden(providerID == nil)
+    }
+
+    /// Keeps the shell path and the hosted content on one height. While the
+    /// panel is hidden it retains the last shown provider's height so the
+    /// dismissal animation does not resize mid-flight.
+    private func detailHeight(
+        providerID: ProviderID?,
+        contents: [RailDetailContent],
+    ) -> CGFloat {
+        let content = providerID.flatMap { shownProviderID in
+            contents.first { $0.providerID == shownProviderID }
+        }
+        return EdgeRailGeometry.detailHeight(quotaCount: content?.snapshots.count ?? 0)
     }
 
     private func detailCenterY(providerIDs: [ProviderID]) -> CGFloat? {

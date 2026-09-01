@@ -48,7 +48,6 @@ private struct EdgeDetailPanel: View {
                 quotaRows()
             }
             Spacer(minLength: 0)
-
             Divider()
                 .overlay(Color.white.opacity(0.14))
 
@@ -78,7 +77,7 @@ private struct EdgeDetailPanel: View {
     /// the bar beneath them, and the used percentage on its own line below the
     /// bar. Measured from `settings-claude-detail.png`.
     private func quotaRows() -> some View {
-        ForEach(snapshots.prefix(2)) { snapshot in
+        ForEach(snapshots.prefix(3)) { snapshot in
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(snapshot.label)
@@ -146,16 +145,10 @@ private struct EdgeDetailPanel: View {
     }
 
     private func resetText(for snapshot: LimitSnapshot) -> String {
-        guard let resetsAt = snapshot.resetsAt else {
-            return "Reset unavailable"
-        }
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        let relativeReset = formatter.localizedString(
-            for: resetsAt,
+        QuotaResetText.description(
+            resetsAt: snapshot.resetsAt,
             relativeTo: SimulatedScenarios.referenceDate,
         )
-        return "Resets \(relativeReset)"
     }
 }
 
@@ -172,6 +165,7 @@ struct RailDetailContentLayerRepresentable: NSViewRepresentable {
     let visibleProviderID: ProviderID?
     let edge: RailEdge
     let panelY: CGFloat
+    let panelHeight: CGFloat
     let reducesMotion: Bool
 
     private var state: RailDetailContentState {
@@ -180,6 +174,7 @@ struct RailDetailContentLayerRepresentable: NSViewRepresentable {
             visibleProviderID: visibleProviderID,
             edge: edge,
             panelY: panelY,
+            panelHeight: panelHeight,
             reducesMotion: reducesMotion,
         )
     }
@@ -198,6 +193,7 @@ private struct RailDetailContentState {
     let visibleProviderID: ProviderID?
     let edge: RailEdge
     let panelY: CGFloat
+    let panelHeight: CGFloat
     let reducesMotion: Bool
 }
 
@@ -235,7 +231,11 @@ final class RailDetailContentLayerView: NSView {
         let currentPosition = layer?.presentation()?.position ?? layer?.position
         let currentOpacity = layer?.presentation()?.opacity ?? layer?.opacity ?? 0
 
-        contentContainerView.frame = targetFrame(edge: state.edge, panelY: state.panelY)
+        contentContainerView.frame = targetFrame(
+            edge: state.edge,
+            panelY: state.panelY,
+            panelHeight: state.panelHeight,
+        )
         reconcileContentViews(state.contents)
         updateContentVisibility(state.visibleProviderID)
 
@@ -378,7 +378,11 @@ final class RailDetailContentLayerView: NSView {
         CATransaction.commit()
     }
 
-    private func targetFrame(edge: RailEdge, panelY: CGFloat) -> CGRect {
+    private func targetFrame(
+        edge: RailEdge,
+        panelY: CGFloat,
+        panelHeight: CGFloat,
+    ) -> CGRect {
         let originX = edge == .right
             ? 0
             : EdgeRailGeometry.canvasSize.width - EdgeRailGeometry.detailWidth
@@ -386,7 +390,7 @@ final class RailDetailContentLayerView: NSView {
             x: originX,
             y: panelY,
             width: EdgeRailGeometry.detailWidth,
-            height: 139,
+            height: panelHeight,
         )
     }
 }

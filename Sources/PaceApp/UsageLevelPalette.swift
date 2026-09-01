@@ -67,8 +67,9 @@ enum UsageLevelPalette {
         alpha: 1,
     )
 
-    /// `rgb(55, 55, 55)`, sampled from the reference ring track.
-    static let track = NSColor(white: 55 / 255, alpha: 1)
+    /// `rgb(47, 47, 47)`, sampled from the running reference application's ring
+    /// track. The compressed video frame reads slightly lighter at 55.
+    static let track = NSColor(white: 47 / 255, alpha: 1)
 
     /// The track lightened so it stays distinguishable under increased contrast.
     static let increasedContrastTrack = NSColor(white: 0.42, alpha: 1)

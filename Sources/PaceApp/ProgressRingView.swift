@@ -45,9 +45,9 @@ final class ProgressRingLayerView: NSView {
 
     override func layout() {
         super.layout()
-        // Reference ring: 85 px outer diameter with a 10 px stroke, so the
-        // stroke is 0.118 of the diameter and the path radius is inset by half
-        // the stroke.
+        // Reference ring: 88 px outer diameter with an 11 px stroke, so the
+        // path radius is inset by half the stroke to keep the outer edge on
+        // the bounds.
         let strokeWidth = max(bounds.width * Self.strokeRatio, 1)
         trackLayer.lineWidth = strokeWidth
         progressLayer.lineWidth = strokeWidth
@@ -71,6 +71,7 @@ final class ProgressRingLayerView: NSView {
         CATransaction.commit()
     }
 
-    /// Reference stroke weight relative to the ring's outer diameter.
-    private static let strokeRatio: CGFloat = 10.0 / 85.0
+    /// Reference stroke weight relative to the ring's outer diameter: an 11 px
+    /// stroke on an 88 px track in the running reference application.
+    private static let strokeRatio: CGFloat = 11.0 / 88.0
 }

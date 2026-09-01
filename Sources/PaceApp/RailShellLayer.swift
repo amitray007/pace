@@ -6,6 +6,7 @@ struct RailShellLayerRepresentable: NSViewRepresentable {
     let previewState: RailPreviewState
     let edge: RailEdge
     let detailCenterY: CGFloat?
+    let detailHeight: CGFloat
     let reducesMotion: Bool
 
     func makeNSView(context _: Context) -> RailShellLayerView {
@@ -17,6 +18,7 @@ struct RailShellLayerRepresentable: NSViewRepresentable {
             previewState: previewState,
             edge: edge,
             detailCenterY: detailCenterY,
+            detailHeight: detailHeight,
             reducesMotion: reducesMotion,
         )
     }
@@ -30,6 +32,7 @@ final class RailShellLayerView: NSView {
     private var edge: RailEdge = .right
     private var detailCenterY: CGFloat?
     private var lastDetailCenterY: CGFloat = 92
+    private var detailHeight = EdgeRailGeometry.detailHeight(quotaCount: 2)
     private var hasReceivedState = false
     private var reducesMotion = false
 
@@ -59,15 +62,17 @@ final class RailShellLayerView: NSView {
         previewState: RailPreviewState,
         edge: RailEdge,
         detailCenterY: CGFloat?,
+        detailHeight: CGFloat,
         reducesMotion: Bool,
     ) {
         let previousPreviewState = self.previewState
         let changed = self.previewState != previewState || self.edge != edge ||
-            self.detailCenterY != detailCenterY
+            self.detailCenterY != detailCenterY || self.detailHeight != detailHeight
         let shouldAnimate = hasReceivedState && changed && !bounds.isEmpty
         self.previewState = previewState
         self.edge = edge
         self.detailCenterY = detailCenterY
+        self.detailHeight = detailHeight
         if let detailCenterY {
             lastDetailCenterY = detailCenterY
         }
@@ -146,7 +151,9 @@ final class RailShellLayerView: NSView {
         let centerY = detailCenterY ?? 92
         set(
             detailLayer,
-            path: transformed(RailShellPaths.detail(centerY: centerY)),
+            path: transformed(
+                RailShellPaths.detail(centerY: centerY, panelHeight: detailHeight),
+            ),
             opacity: 1,
             animated: animated,
             duration: duration,
@@ -321,9 +328,14 @@ private enum RailShellPaths {
         return path
     }
 
-    static func detail(centerY: CGFloat) -> CGPath {
-        let panelY = min(max(centerY - 69.5, 0), 205)
-        let rect = CGRect(x: 0, y: panelY, width: EdgeRailGeometry.detailWidth, height: 139)
+    static func detail(centerY: CGFloat, panelHeight: CGFloat) -> CGPath {
+        let panelY = EdgeRailGeometry.detailPanelY(centerY: centerY, height: panelHeight)
+        let rect = CGRect(
+            x: 0,
+            y: panelY,
+            width: EdgeRailGeometry.detailWidth,
+            height: panelHeight,
+        )
         let radius: CGFloat = 16
         let controlDistance = radius * 0.552_284_75
         let path = CGMutablePath()
