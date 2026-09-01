@@ -17,10 +17,17 @@ struct MenuPanelView: View {
                     description: Text(loadingError),
                 )
                 .frame(maxHeight: .infinity)
-            } else if model.selectedAccount == nil {
+            } else if model.isLoading {
                 ProgressView()
                     .controlSize(.small)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if model.selectedAccount == nil {
+                ContentUnavailableView(
+                    "No account configured",
+                    systemImage: "person.crop.circle.badge.questionmark",
+                    description: Text("Add an account for this provider to see usage."),
+                )
+                .frame(maxHeight: .infinity)
             } else if showsAllAccounts {
                 allAccountsContent
             } else {
@@ -86,13 +93,17 @@ struct MenuPanelView: View {
         VStack(alignment: .leading, spacing: 14) {
             accountHeader
 
-            VStack(spacing: 14) {
-                ForEach(model.selectedSnapshots) { snapshot in
-                    MenuQuotaRow(
-                        snapshot: snapshot,
-                        referenceDate: SimulatedScenarios.referenceDate,
-                        accent: ProviderStyle.resolve(model.activeProviderID).accent,
-                    )
+            if model.selectedSnapshots.isEmpty {
+                MenuUsageStateView(presentation: selectedStatusPresentation)
+            } else {
+                VStack(spacing: 14) {
+                    ForEach(model.selectedSnapshots) { snapshot in
+                        MenuQuotaRow(
+                            snapshot: snapshot,
+                            referenceDate: SimulatedScenarios.referenceDate,
+                            accent: ProviderStyle.resolve(model.activeProviderID).accent,
+                        )
+                    }
                 }
             }
 
@@ -122,8 +133,16 @@ struct MenuPanelView: View {
                 }
             }
 
-            Text(accountDetail)
-                .font(.system(size: 10))
+            HStack(spacing: 8) {
+                Text(accountDetail)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                UsageStatusLabel(presentation: selectedStatusPresentation)
+            }
+            .font(.system(size: 9.5, weight: .medium))
+
+            Text(selectedStatusSubtitle)
+                .font(.system(size: 9))
                 .foregroundStyle(.secondary)
 
             accountPicker
@@ -151,7 +170,9 @@ struct MenuPanelView: View {
             }
             .labelsHidden()
             .pickerStyle(.segmented)
-            .accessibilityLabel("Claude account")
+            .accessibilityLabel(
+                "\(ProviderStyle.resolve(model.activeProviderID).name) account",
+            )
         }
     }
 
@@ -173,6 +194,7 @@ struct MenuPanelView: View {
                 AllAccountsRow(
                     account: account,
                     snapshots: model.snapshots(for: account.id),
+                    status: model.usageStatus(for: account),
                     accent: ProviderStyle.resolve(model.activeProviderID).accent,
                 )
             }
@@ -221,9 +243,28 @@ struct MenuPanelView: View {
         guard let account = model.selectedAccount else {
             return "No account"
         }
-        return [account.displayName, account.planName, "Simulated · Current"]
+        return [account.displayName, account.planName]
             .compactMap(\.self)
             .joined(separator: " · ")
+    }
+
+    private var selectedStatusPresentation: UsageStatusPresentation {
+        guard let status = model.selectedUsageStatus else {
+            return UsageStatusPresentation(
+                title: "No account configured",
+                detail: "Add an account for this provider to see usage.",
+                symbolName: "person.crop.circle.badge.questionmark",
+                severity: .neutral,
+                observationText: "Not observed",
+            )
+        }
+        return UsageStatusPresentation.resolve(status)
+    }
+
+    private var selectedStatusSubtitle: String {
+        selectedStatusPresentation.severity == .positive
+            ? selectedStatusPresentation.observationText
+            : selectedStatusPresentation.detail
     }
 
     private var panelHeight: CGFloat {
@@ -239,7 +280,8 @@ struct MenuPanelView: View {
         let accountPickerHeight: CGFloat = model.accounts(for: model.activeProviderID).count > 1
             ? 29
             : 0
-        return 160 + rowsHeight + accountPickerHeight
+        let stateHeight: CGFloat = model.selectedSnapshots.isEmpty ? 36 : 0
+        return 178 + rowsHeight + accountPickerHeight + stateHeight
     }
 }
 
@@ -270,7 +312,7 @@ private struct MenuQuotaRow: View {
             HStack {
                 Text(resetDescription)
                 Spacer()
-                Text("Observed now")
+                Text(observationDescription)
             }
             .font(.system(size: 9))
             .foregroundStyle(.secondary)
@@ -289,17 +331,59 @@ private struct MenuQuotaRow: View {
     }
 
     private var accessibilityDescription: String {
-        "\(snapshot.label), \(Int(snapshot.usedFraction * 100)) percent used, \(resetDescription)"
+        "\(snapshot.label), \(Int(snapshot.usedFraction * 100)) percent used, " +
+            "\(resetDescription), \(observationDescription)"
+    }
+
+    private var observationDescription: String {
+        let observation = snapshot.observedAt.formatted(date: .omitted, time: .shortened)
+        switch snapshot.freshness {
+        case .current:
+            return "Observed \(observation)"
+        case .aging:
+            return "Aging · \(observation)"
+        case .failed:
+            return "Failed · \(observation)"
+        case .signedOut:
+            return "Signed out · \(observation)"
+        case .stale:
+            return "Stale · \(observation)"
+        case .unavailable:
+            return "Unavailable · \(observation)"
+        }
+    }
+}
+
+private struct MenuUsageStateView: View {
+    let presentation: UsageStatusPresentation
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: presentation.symbolName)
+                .font(.system(size: 19, weight: .medium))
+                .foregroundStyle(presentation.color)
+            Text(presentation.title)
+                .font(.system(size: 12, weight: .semibold))
+            Text(presentation.detail)
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, minHeight: 70)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(presentation.title). \(presentation.detail)")
     }
 }
 
 private struct AllAccountsRow: View {
     let account: ProviderAccount
     let snapshots: [LimitSnapshot]
+    let status: AccountUsageStatus
     let accent: Color
 
     var body: some View {
         let urgent = snapshots.max { $0.usedFraction < $1.usedFraction }
+        let presentation = UsageStatusPresentation.resolve(status)
         HStack(spacing: 12) {
             Circle()
                 .fill(accent.opacity(0.16))
@@ -312,9 +396,9 @@ private struct AllAccountsRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(account.displayName)
                     .font(.system(size: 12, weight: .semibold))
-                Text(account.planName ?? "Plan unavailable")
+                Text("\(account.planName ?? "Plan unavailable") · \(presentation.title)")
                     .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(presentation.color)
             }
             Spacer()
             if let urgent {
@@ -329,5 +413,9 @@ private struct AllAccountsRow: View {
         }
         .padding(11)
         .background(Color.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 10))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "\(account.displayName), \(presentation.title). \(presentation.detail)",
+        )
     }
 }

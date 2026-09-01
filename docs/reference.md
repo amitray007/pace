@@ -119,6 +119,12 @@ PACE_REFERENCE_PREVIEW=claude PACE_REFERENCE_MENU=1 \
 `PACE_REFERENCE_MENU=1` to capture only the edge surface. These variables change presentation only;
 the data always comes from `SimulatedScenarios.visualReference()`.
 
+Set `PACE_SIMULATED_STATE` to `current`, `aging`, `stale`, `missingBuckets`, `signedOut`,
+`unavailable`, or `failed` to inspect deterministic data and connection states. The state applies to
+the Claude Personal fixture so the All accounts view can prove that account values remain separate.
+`stale` performs a successful refresh followed by an unavailable refresh, which preserves the
+last-good quota buckets and observation time.
+
 Set `PACE_REFERENCE_MOTION=1` with the mini preview to run a deterministic reveal, provider-switch,
 rapid-retarget, and dismissal sequence for frame capture. This harness does not enable pointer
 input or provider access. Set `PACE_REFERENCE_MOTION_DELAY` to the number of seconds that capture

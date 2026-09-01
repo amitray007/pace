@@ -92,6 +92,13 @@ Exit gate:
 
 ## Phase 6: Shared application behavior
 
+Status: in progress. Both surfaces now share deterministic provider and account selection, preserve
+each account's own quota buckets, avoid percentage averaging, and present current, aging, stale,
+missing-bucket, signed-out, unavailable, and failed states without turning missing data into zero.
+Observation time, last-good stale data, text-and-symbol status, and the initial VoiceOver descriptions
+are wired. Broader keyboard, high-contrast, launch-at-login, notification, and persistence checks
+remain.
+
 - Add menu-bar, rail, and both presentation settings.
 - Add one-provider-at-a-time details and per-provider account selection.
 - Add All accounts without percentage averaging.

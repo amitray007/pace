@@ -275,9 +275,12 @@ private enum PaceBenchmark {
         )
         try await scenario.seed(store)
         let coordinator = try RefreshCoordinator(store: store, adapters: scenario.adapters)
-        let outcomes = try await coordinator.refreshAll()
+        var outcomeCount = 0
+        for _ in 0 ..< scenario.refreshCycles {
+            outcomeCount &+= try await coordinator.refreshAll().count
+        }
         let state = await store.currentState()
-        return state.accounts.count &+ state.snapshots.count &+ outcomes.count
+        return state.accounts.count &+ state.snapshots.count &+ outcomeCount
     }
 
     private static func percentile(_ percentile: Double, values: [Double]) -> Double {

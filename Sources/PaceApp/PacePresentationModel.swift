@@ -34,10 +34,12 @@ final class PacePresentationModel {
     private(set) var preferences: PacePreferences
     private(set) var loadingError: String?
     private(set) var preferencesError: String?
+    private(set) var isLoading = true
     var activeProviderID: ProviderID = .claude
     var railPreviewState: RailPreviewState
 
     private let isReferencePreview: Bool
+    private let simulatedPresentationState: SimulatedPresentationState
     private let preferencesPersistence: any PacePreferencesPersistence
     private var hasStarted = false
     private var preferencesStore: PacePreferencesStore?
@@ -65,6 +67,8 @@ final class PacePresentationModel {
         preferences = initialPreferences
         railPreviewState = previewState ?? .mini
         isReferencePreview = previewState != nil
+        simulatedPresentationState = environment["PACE_SIMULATED_STATE"]
+            .flatMap(SimulatedPresentationState.init(rawValue:)) ?? .current
         self.preferencesPersistence = preferencesPersistence
     }
 
@@ -93,11 +97,21 @@ final class PacePresentationModel {
         return snapshots(for: selectedAccount.id)
     }
 
+    var selectedUsageStatus: AccountUsageStatus? {
+        guard let selectedAccount else {
+            return nil
+        }
+        return usageStatus(for: selectedAccount)
+    }
+
     func start() async {
         guard !hasStarted else {
             return
         }
         hasStarted = true
+        defer {
+            isLoading = false
+        }
 
         if !isReferencePreview {
             do {
@@ -115,10 +129,14 @@ final class PacePresentationModel {
             let store = try await PaceStore.open(
                 persistence: InMemoryPaceStatePersistence(),
             )
-            let scenario = try SimulatedScenarios.visualReference()
+            let scenario = try SimulatedScenarios.visualReference(
+                presentationState: simulatedPresentationState,
+            )
             try await scenario.seed(store)
             let coordinator = try RefreshCoordinator(store: store, adapters: scenario.adapters)
-            try await coordinator.refreshAll()
+            for _ in 0 ..< scenario.refreshCycles {
+                try await coordinator.refreshAll()
+            }
             self.store = store
             state = await store.currentState()
         } catch {
@@ -142,6 +160,10 @@ final class PacePresentationModel {
     func snapshots(for accountID: AccountID) -> [LimitSnapshot] {
         state.snapshots
             .filter { $0.id.accountID == accountID }
+    }
+
+    func usageStatus(for account: ProviderAccount) -> AccountUsageStatus {
+        AccountUsageStatus(account: account, snapshots: snapshots(for: account.id))
     }
 
     func headlineUsage(for providerID: ProviderID) -> Double? {

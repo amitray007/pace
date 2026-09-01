@@ -18,6 +18,8 @@ Provider processes and APIs
           ▼
 Provider adapters ──▶ snapshot normalizer ──▶ snapshot store
                                                 │
+                                  account usage status resolver
+                                                │
                          ┌──────────────────────┼──────────────────────┐
                          ▼                      ▼                      ▼
                   menu-bar model         edge-rail model        settings model
@@ -58,8 +60,10 @@ Bucket identity includes provider, account, quota subject when present, and prov
 ID. This prevents values
 from different identities from overwriting each other.
 
-`Freshness` distinguishes current, aging, stale, unavailable, signed out, and failed states. A
-missing bucket is not a zero-percent snapshot.
+Snapshot `Freshness` records the state of returned data. `AccountUsageStatus` resolves those
+snapshots together with the account connection state. It keeps data freshness separate from the
+latest connection issue, so a failed refresh can retain and label the last good snapshots as stale.
+A missing bucket is not a zero-percent snapshot.
 
 ## Provider interface
 
@@ -196,8 +200,8 @@ hit-testing control.
 
 ## Unresolved implementation checks
 
-- Verify whether modifier-hover detection can remain permission-free while the panel ignores mouse
-  events.
+- Verify modifier-hover activation, click-through behavior, and suppression on physical hardware
+  with overlay scrollbars, pointer drags, full-screen applications, Spaces, and multiple displays.
 - Select the oldest supported macOS version after the visual prototype proves required APIs.
 - Verify multi-account capabilities independently for every provider.
 - Prove two live Claude config directories and safe credential rotation before promoting the

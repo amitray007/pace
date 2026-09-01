@@ -38,12 +38,49 @@ struct VisualReferenceScenarioTests {
         #expect(firstState == secondState)
     }
 
-    private func runScenario() async throws -> PaceState {
+    @Test
+    func `provides deterministic honest presentation states`() async throws {
+        typealias ExpectedState = (
+            connection: AccountConnectionState,
+            freshness: UsageDataFreshness,
+        )
+        let expectedStates: [SimulatedPresentationState: ExpectedState] = [
+            .aging: (.connected(lastVerifiedAt: SimulatedScenarios.referenceDate), .aging),
+            .current: (.connected(lastVerifiedAt: SimulatedScenarios.referenceDate), .current),
+            .failed: (.failed(code: "simulated-refresh"), .noData),
+            .missingBuckets: (
+                .connected(lastVerifiedAt: SimulatedScenarios.referenceDate),
+                .noData,
+            ),
+            .signedOut: (.needsAuthentication, .noData),
+            .stale: (.unavailable(code: "simulated-maintenance"), .stale),
+            .unavailable: (.unavailable(code: "simulated-maintenance"), .noData),
+        ]
+
+        for presentationState in SimulatedPresentationState.allCases {
+            let state = try await runScenario(presentationState: presentationState)
+            let account = try account(named: "Personal", providerID: .claude, in: state)
+            let snapshots = state.snapshots.filter { $0.id.accountID == account.id }
+            let status = AccountUsageStatus(account: account, snapshots: snapshots)
+            let expected = try #require(expectedStates[presentationState])
+
+            #expect(account.connectionState == expected.connection)
+            #expect(status.dataFreshness == expected.freshness)
+        }
+    }
+
+    private func runScenario(
+        presentationState: SimulatedPresentationState = .current,
+    ) async throws -> PaceState {
         let store = try await PaceStore.open(persistence: InMemoryPaceStatePersistence())
-        let scenario = try SimulatedScenarios.visualReference()
+        let scenario = try SimulatedScenarios.visualReference(
+            presentationState: presentationState,
+        )
         try await scenario.seed(store)
         let coordinator = try RefreshCoordinator(store: store, adapters: scenario.adapters)
-        try await coordinator.refreshAll()
+        for _ in 0 ..< scenario.refreshCycles {
+            try await coordinator.refreshAll()
+        }
         return await store.currentState()
     }
 

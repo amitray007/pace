@@ -16,15 +16,18 @@ public struct SimulatedScenario: Sendable {
     public let accounts: [SimulatedAccountFixture]
     public let adapters: [any ProviderAdapter]
     public let referenceDate: Date
+    public let refreshCycles: Int
 
     public init(
         accounts: [SimulatedAccountFixture],
         adapters: [any ProviderAdapter],
         referenceDate: Date,
+        refreshCycles: Int = 1,
     ) {
         self.accounts = accounts
         self.adapters = adapters
         self.referenceDate = referenceDate
+        self.refreshCycles = refreshCycles
     }
 
     public func seed(_ store: PaceStore) async throws {
@@ -37,6 +40,16 @@ public struct SimulatedScenario: Sendable {
             )
         }
     }
+}
+
+public enum SimulatedPresentationState: String, CaseIterable, Sendable {
+    case aging
+    case current
+    case failed
+    case missingBuckets
+    case signedOut
+    case stale
+    case unavailable
 }
 
 public enum SimulatedScenarios {

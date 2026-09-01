@@ -1,7 +1,9 @@
 import Foundation
 
 public extension SimulatedScenarios {
-    static func visualReference() throws -> SimulatedScenario {
+    static func visualReference(
+        presentationState: SimulatedPresentationState = .current,
+    ) throws -> SimulatedScenario {
         let fixtures = visualReferenceAccounts()
         let resultsByAccount = try visualReferenceResults(fixtures: fixtures)
         let fixturesByProvider = Dictionary(grouping: fixtures, by: { $0.account.providerID })
@@ -10,7 +12,15 @@ public extension SimulatedScenarios {
                 guard let result = resultsByAccount[fixture.id] else {
                     throw VisualReferenceScenarioError.missingResult(fixture.id)
                 }
-                return (fixture.id, [SimulatedRefreshStep.result(result)])
+                let isPrimaryAccount = fixture.account.identity.subjectID ==
+                    "visual-claude-personal"
+                return try (
+                    fixture.id,
+                    refreshSteps(
+                        for: result,
+                        presentationState: isPrimaryAccount ? presentationState : .current,
+                    ),
+                )
             })
             return SimulatedProviderAdapter(
                 providerID: providerID,
@@ -23,7 +33,42 @@ public extension SimulatedScenarios {
             accounts: fixtures,
             adapters: adapters,
             referenceDate: referenceDate,
+            refreshCycles: presentationState == .stale ? 2 : 1,
         )
+    }
+
+    private static func refreshSteps(
+        for result: ProviderRefreshResult,
+        presentationState: SimulatedPresentationState,
+    ) throws -> [SimulatedRefreshStep] {
+        switch presentationState {
+        case .current:
+            [.result(result)]
+        case .aging:
+            try [.result(result.replacingFreshnessWith(.aging))]
+        case .stale:
+            [
+                .result(result),
+                .failure(.unavailable(code: "simulated-maintenance")),
+            ]
+        case .signedOut:
+            [.failure(.signedOut)]
+        case .unavailable:
+            [.failure(.unavailable(code: "simulated-maintenance"))]
+        case .failed:
+            [.failure(.failed(code: "simulated-refresh"))]
+        case .missingBuckets:
+            [
+                .result(
+                    ProviderRefreshResult(
+                        identity: result.identity,
+                        planName: result.planName,
+                        snapshots: [],
+                        verifiedAt: result.verifiedAt,
+                    ),
+                ),
+            ]
+        }
     }
 
     private static func visualReferenceAccounts() -> [SimulatedAccountFixture] {
@@ -240,6 +285,31 @@ public extension SimulatedScenarios {
                 snapshots: snapshots,
                 verifiedAt: referenceDate,
             ),
+        )
+    }
+}
+
+private extension ProviderRefreshResult {
+    func replacingFreshnessWith(_ freshness: Freshness) throws -> ProviderRefreshResult {
+        let snapshots = try snapshots.map { snapshot in
+            try LimitSnapshot(
+                providerID: snapshot.id.providerID,
+                accountID: snapshot.id.accountID,
+                bucketID: snapshot.id.bucketID,
+                label: snapshot.label,
+                quotaSubject: snapshot.quotaSubject,
+                usedFraction: snapshot.usedFraction,
+                windowDuration: snapshot.windowDuration,
+                resetsAt: snapshot.resetsAt,
+                observedAt: snapshot.observedAt,
+                freshness: freshness,
+            )
+        }
+        return ProviderRefreshResult(
+            identity: identity,
+            planName: planName,
+            snapshots: snapshots,
+            verifiedAt: verifiedAt,
         )
     }
 }
