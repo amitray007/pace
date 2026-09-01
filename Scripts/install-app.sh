@@ -87,7 +87,11 @@ ditto "$app_path" "$staged_path/$app_name"
 # access after every build, so it reports that rather than failing silently.
 if security find-identity -v -p codesigning \
     | grep -Fq "$signing_identity"; then
-    codesign --force --deep --options runtime --timestamp=none \
+    # No hardened runtime here. It enforces library validation, which requires
+    # the process and its embedded frameworks to share a Team ID. A self-signed
+    # certificate has none, so the frameworks fail to load. The hardened runtime
+    # is a notarization requirement, and this is a local install.
+    codesign --force --deep --timestamp=none \
         --sign "$signing_identity" "$staged_path/$app_name"
     signature_kind=$signing_identity
 else
@@ -106,7 +110,29 @@ ditto "$staged_path/$app_name" "$installed_path"
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
     -f "$installed_path" >/dev/null 2>&1 || true
 
+# A bundle can sign and verify cleanly and still fail to launch: the hardened
+# runtime enforces library validation, which a self-signed identity cannot
+# satisfy, and dyld only reports that when the process starts. Launch the
+# installed copy once so a broken install fails here rather than silently.
+launch_log=$(mktemp "${TMPDIR:-/tmp}/pace-launch.XXXXXX")
+"$installed_path/Contents/MacOS/Pace" >"$launch_log" 2>&1 &
+launch_pid=$!
+sleep 3
+if kill -0 "$launch_pid" 2>/dev/null; then
+    kill "$launch_pid" 2>/dev/null || true
+    wait "$launch_pid" 2>/dev/null || true
+    launch_state=ok
+else
+    wait "$launch_pid" 2>/dev/null || true
+    echo "installed application exited immediately:" >&2
+    sed 's/^/  /' "$launch_log" >&2
+    rm -f "$launch_log"
+    exit 1
+fi
+rm -f "$launch_log"
+
 printf 'installed=%s\n' "$installed_path"
 printf 'bundle_id=%s\n' "$bundle_id"
 printf 'version=%s\n' "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$installed_path/Contents/Info.plist")"
 printf 'signature=%s\n' "$signature_kind"
+printf 'launch=%s\n' "$launch_state"
