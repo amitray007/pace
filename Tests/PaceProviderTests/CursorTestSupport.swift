@@ -105,8 +105,8 @@ enum CursorTestSupport {
                 """
                 {
                   "enabled": true,
-                  "billingCycleStart": 1788134400000,
-                  "billingCycleEnd": 1788739200000,
+                  "billingCycleStart": "1788134400000",
+                  "billingCycleEnd": "1788739200000",
                   "planUsage": {
                     "totalPercentUsed": \(totalPercent),
                     "autoPercentUsed": 20,

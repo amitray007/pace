@@ -62,9 +62,10 @@ final class CodexAppServerConnection: @unchecked Sendable {
 
         process.executableURL = executableURL
         process.arguments = ["app-server", "--stdio"]
-        var environment = ProcessInfo.processInfo.environment
-        environment["CODEX_HOME"] = profileDirectory.standardizedFileURL.path
-        process.environment = environment
+        process.environment = CodexLaunchEnvironment.environment(
+            executableURL: executableURL,
+            profileDirectory: profileDirectory,
+        )
         process.standardInput = input
         process.standardOutput = output
         process.standardError = FileHandle.nullDevice
@@ -98,7 +99,7 @@ final class CodexAppServerConnection: @unchecked Sendable {
             return connection
         } catch let error as CodexProviderError {
             await connection.close()
-            throw error
+            throw connection.launchFailure(or: error)
         } catch {
             await connection.close()
             throw .executableUnavailable
@@ -107,6 +108,21 @@ final class CodexAppServerConnection: @unchecked Sendable {
 
     var isUsable: Bool {
         lock.withLock { lifecycle == .running && process.isRunning }
+    }
+
+    /// Distinguishes a runtime that could not start from a server that failed.
+    ///
+    /// A `#!/usr/bin/env node` script exits with 127 when `node` is missing and 126 when the
+    /// interpreter cannot be executed, before it reads the initialize request.
+    private func launchFailure(or error: CodexProviderError) -> CodexProviderError {
+        guard error == .processFailed,
+              !process.isRunning,
+              process.terminationReason == .exit,
+              [126, 127].contains(process.terminationStatus)
+        else {
+            return error
+        }
+        return .executableUnavailable
     }
 
     func request(

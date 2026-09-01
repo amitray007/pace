@@ -39,6 +39,50 @@ struct CursorUsageDecoderTests {
     }
 
     @Test
+    func `reads Connect string-encoded billing cycle timestamps`() throws {
+        // Live `GetCurrentPeriodUsage` encodes its int64 cycle bounds as JSON strings.
+        let metrics = try CursorUsageDecoder.decode(Data(
+            """
+            {
+              "enabled": true,
+              "billingCycleStart": "1787734692000",
+              "billingCycleEnd": "1790413092000",
+              "planUsage": {"totalPercentUsed": 9.6}
+            }
+            """.utf8,
+        ))
+
+        guard case let .percentage(total) = metrics.first else {
+            Issue.record("Expected total percentage")
+            return
+        }
+        #expect(total.resetsAt == Date(timeIntervalSince1970: 1_790_413_092))
+        #expect(total.windowDuration == 2_678_400)
+    }
+
+    @Test
+    func `omits the cycle when its bounds are not numeric`() throws {
+        let metrics = try CursorUsageDecoder.decode(Data(
+            """
+            {
+              "enabled": true,
+              "billingCycleStart": "soon",
+              "billingCycleEnd": "",
+              "planUsage": {"totalPercentUsed": 9.6, "autoPercentUsed": "true"}
+            }
+            """.utf8,
+        ))
+
+        #expect(metrics.count == 1)
+        guard case let .percentage(total) = metrics.first else {
+            Issue.record("Expected total percentage")
+            return
+        }
+        #expect(total.resetsAt == nil)
+        #expect(total.windowDuration == nil)
+    }
+
+    @Test
     func `uses capped amount when total percentage is absent`() throws {
         let metrics = try CursorUsageDecoder.decode(Data(
             """

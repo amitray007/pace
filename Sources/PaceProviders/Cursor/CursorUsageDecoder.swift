@@ -162,13 +162,22 @@ enum CursorUsageDecoder {
     }
 
     private static func number(_ value: Any?) -> Double? {
-        guard let value = value as? NSNumber,
-              CFGetTypeID(value) != CFBooleanGetTypeID()
+        if let value = value as? NSNumber {
+            guard CFGetTypeID(value) != CFBooleanGetTypeID() else {
+                return nil
+            }
+            let number = value.doubleValue
+            return number.isFinite ? number : nil
+        }
+        // Connect encodes 64-bit integers such as `billingCycleEnd` as JSON strings.
+        guard let text = (value as? String)?.trimmingCharacters(in: .whitespaces),
+              !text.isEmpty,
+              let number = Double(text),
+              number.isFinite
         else {
             return nil
         }
-        let number = value.doubleValue
-        return number.isFinite ? number : nil
+        return number
     }
 
     private static func date(from timestamp: Double?) -> Date? {
