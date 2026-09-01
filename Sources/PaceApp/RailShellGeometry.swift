@@ -158,11 +158,11 @@ enum RailShellMetrics {
     /// The collapsed handle.
     ///
     /// This is the only thing on screen while the rail is closed, so it stays
-    /// small enough to read as a hint rather than a bar sitting on the edge.
-    /// It is centred on the rail's own vertical centre so opening the rail
-    /// grows out of where the handle was.
-    static let handleWidth: CGFloat = 8
-    static let handleHeight: CGFloat = 52
+    /// a hint rather than a bar sitting on the edge, while being large enough
+    /// to notice without looking for it. It is centred on the rail's own
+    /// vertical centre so opening the rail grows out of where the handle was.
+    static let handleWidth: CGFloat = 11
+    static let handleHeight: CGFloat = 76
 
     /// The handle's rounded end. Half its width, so the inner edge is a
     /// semicircle rather than a rectangle with clipped corners.
@@ -192,9 +192,10 @@ enum RailShellMetrics {
     ///
     /// Height matters more than width here. Moving to a screen edge parks the
     /// pointer against it, so the horizontal axis takes care of itself, but
-    /// finding a 60 pt band on a display over a thousand points tall means
-    /// aiming. The target is roughly twice the visible handle so approaching
-    /// the right area is enough.
+    /// finding a small band on a display over a thousand points tall means
+    /// aiming. The target stays larger than the visible handle so approaching
+    /// the right area is enough. Hover modes widen this further still, to the
+    /// whole stretch of edge the rail expands into.
     static let minimumHandleTargetWidth: CGFloat = 24
     static let minimumHandleTargetHeight: CGFloat = 132
 
