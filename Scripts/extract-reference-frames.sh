@@ -7,7 +7,7 @@ if ! command -v ffmpeg >/dev/null 2>&1; then
     exit 1
 fi
 
-repository_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+repository_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 source_directory="$repository_root/.local/references/source"
 frame_directory="$repository_root/.local/references/frames"
 
@@ -41,7 +41,7 @@ extract_frame "$settings_video" 2.50 "$frame_directory/settings-cursor-detail.pn
 extract_frame "$settings_video" 4.00 "$frame_directory/settings-claude-detail.png"
 extract_frame "$settings_video" 8.00 "$frame_directory/settings-rail.png"
 extract_frame "$settings_video" 10.00 "$frame_directory/settings-button.png"
-extract_frame "$settings_video" 12.50 "$frame_directory/settings-codex-detail.png"
+extract_frame "$settings_video" 6.00 "$frame_directory/settings-codex-detail.png"
 
 ffmpeg -hide_banner -loglevel error -y -i "$primary_video" \
     -vf "fps=2,scale=340:-1,tile=7x6" -frames:v 1 \

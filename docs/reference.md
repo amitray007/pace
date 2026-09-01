@@ -34,7 +34,7 @@ durations.
 | Refined Claude detail | Settings | 4.00 s | `settings-claude-detail.png` |
 | Refined rail | Settings | 8.00 s | `settings-rail.png` |
 | Settings hover | Settings | 10.00 s | `settings-button.png` |
-| Refined Codex detail | Settings | 12.50 s | `settings-codex-detail.png` |
+| Refined Codex detail | Settings | 6.00 s | `settings-codex-detail.png` |
 
 ## Measured geometry
 
