@@ -131,6 +131,12 @@ struct MenuPanelView: View {
                 Text(ProviderStyle.resolve(model.activeProviderID).name)
                     .font(.system(size: 14, weight: .semibold))
                 Spacer()
+                // The countdown sits with the provider identity, so the answer
+                // to "when does this change" is on the line the eye lands on.
+                RefreshCountdownView(
+                    nextRefreshAt: model.nextRefreshAt,
+                    isRefreshing: model.isRefreshing,
+                )
                 if model.accounts(for: model.activeProviderID).count > 1 {
                     Button("All accounts") {
                         showsAllAccounts = true

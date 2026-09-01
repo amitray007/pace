@@ -22,6 +22,7 @@ final class PaceAppDelegate: NSObject, NSApplicationDelegate {
 
         Task {
             await model.start()
+            model.startAutomaticRefresh()
         }
         if ProcessInfo.processInfo.environment["PACE_REFERENCE_MOTION"] == "1" {
             scheduleReferenceMotionSequence()
@@ -34,6 +35,7 @@ final class PaceAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_: Notification) {
+        model.stopAutomaticRefresh()
         model.stopProviderUpdates()
     }
 

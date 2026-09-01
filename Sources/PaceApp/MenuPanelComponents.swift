@@ -56,11 +56,17 @@ struct MenuQuotaRow: View {
             "\(resetDescription), \(observationDescription)"
     }
 
+    /// What to say about this snapshot's freshness.
+    ///
+    /// Current data says nothing: the header's countdown already states when it
+    /// will next change, and repeating an observation time on every row only
+    /// competed with the numbers. Every other state still names itself, because
+    /// those are the cases where the age of the data matters.
     private var observationDescription: String {
         let observation = snapshot.observedAt.formatted(date: .omitted, time: .shortened)
         switch snapshot.freshness {
         case .current:
-            return "Observed \(observation)"
+            return ""
         case .aging:
             return "Aging · \(observation)"
         case .failed:

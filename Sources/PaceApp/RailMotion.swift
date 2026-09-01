@@ -37,9 +37,15 @@ enum RailMotion {
     ///
     /// Measured across three switches in the reference recording: 0.333 s,
     /// 0.383 s, and 0.384 s. The panel travels further than the rail does when
-    /// it opens, and taking longer over it is what makes the move read as one
-    /// object gliding between rows rather than as a jump.
-    static let detailDuration = 0.37 * speedFactor
+    /// it opens, and taking some time over it is what makes the move read as
+    /// one object gliding between rows rather than as a jump.
+    ///
+    /// Scaled harder than the rest, though. Every provider's panel is built and
+    /// laid out before the rail opens, so a switch is waiting on the animation
+    /// and nothing else. Comparing several providers means making this move
+    /// repeatedly, and at the reference duration it was two and a half times
+    /// the reveal.
+    static let detailDuration = 0.37 * speedFactor * 0.62
 
     static let contentDismissDuration = 0.08 * speedFactor
     static let reducedMotionFadeDuration = 0.1 * speedFactor

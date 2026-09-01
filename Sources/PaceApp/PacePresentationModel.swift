@@ -16,6 +16,16 @@ final class PacePresentationModel {
     private(set) var preferencesError: String?
     private(set) var refreshError: String?
     private(set) var isLoading = true
+
+    /// When the next automatic refresh is due.
+    ///
+    /// Surfaces the schedule so a countdown can state it. Nil while no
+    /// automatic refresh is scheduled, which is honest: the panel then says
+    /// nothing about a refresh rather than counting toward one that will not
+    /// happen.
+    private(set) var nextRefreshAt: Date?
+
+    private var automaticRefreshTask: Task<Void, Never>?
     private(set) var isChangingLaunchAtLogin = false
     var isChangingNotificationAuthorization = false
     private(set) var isRefreshing = false
@@ -200,6 +210,49 @@ final class PacePresentationModel {
         await selectAccount(accounts[nextIndex].id, for: activeProviderID)
     }
 
+    /// How often Pace refreshes every account on its own.
+    ///
+    /// Adapters poll their own providers conservatively; this is the app-level
+    /// sweep that keeps the surfaces current when nothing else has run. Fifteen
+    /// minutes matches the providers' own baseline so it adds no extra load.
+    static let automaticRefreshInterval: TimeInterval = 900
+
+    /// Runs an automatic refresh on a repeating schedule.
+    ///
+    /// Without this, usage only updated at launch or when the user pressed
+    /// refresh, so a panel left open drifted further out of date the longer it
+    /// stayed open.
+    func startAutomaticRefresh() {
+        guard automaticRefreshTask == nil, !isReferencePreview else {
+            return
+        }
+        scheduleNextRefresh()
+        automaticRefreshTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(
+                    for: .seconds(Self.automaticRefreshInterval),
+                )
+                guard !Task.isCancelled else {
+                    return
+                }
+                await self?.refreshAll()
+            }
+        }
+    }
+
+    func stopAutomaticRefresh() {
+        automaticRefreshTask?.cancel()
+        automaticRefreshTask = nil
+        nextRefreshAt = nil
+    }
+
+    private func scheduleNextRefresh() {
+        guard !isReferencePreview else {
+            return
+        }
+        nextRefreshAt = Date().addingTimeInterval(Self.automaticRefreshInterval)
+    }
+
     func refreshAll() async {
         guard !isLoading, !isRefreshing, !isManagingAccounts,
               let refreshCoordinator, let store
@@ -209,6 +262,7 @@ final class PacePresentationModel {
         isRefreshing = true
         defer {
             isRefreshing = false
+            scheduleNextRefresh()
         }
         let previousState = state
         do {
