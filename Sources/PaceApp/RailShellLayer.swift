@@ -279,7 +279,7 @@ final class RailShellLayerView: NSView {
             opacityAnimation.toValue = opacity
             let fade = reducesMotion
                 ? RailMotion.Transition.reduced
-                : transition.capped(at: RailMotion.contentFadeDuration)
+                : transition.capped(at: transition.contentDuration)
             opacityAnimation.duration = fade.duration
             opacityAnimation.timingFunction = fade.timing
             shapeLayer.add(opacityAnimation, forKey: "pace.opacity")

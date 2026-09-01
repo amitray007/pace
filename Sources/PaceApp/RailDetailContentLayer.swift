@@ -367,7 +367,7 @@ final class RailDetailContentLayerView: NSView {
             fade.toValue = target
             fade.duration = reducesMotion
                 ? RailMotion.reducedMotionFadeDuration
-                : RailMotion.contentCrossfadeDuration
+                : RailMotion.Transition.detail.contentDuration
             fade.timingFunction = RailMotion.detailTimingFunction
             layer.add(fade, forKey: "pace.contentCrossfade")
         }
@@ -405,14 +405,18 @@ final class RailDetailContentLayerView: NSView {
         let animation = CABasicAnimation(keyPath: "opacity")
         animation.fromValue = currentOpacity
         animation.toValue = targetOpacity
+        // The content's fade is derived from the shell's own transition, so it
+        // finishes exactly when the panel stops expanding rather than settling
+        // inside a shape that is still moving.
+        let transition = RailMotion.Transition.detail
         animation.duration = reducesMotion
             ? RailMotion.reducedMotionFadeDuration
             : isVisible
-            ? RailMotion.contentFadeDuration
+            ? transition.contentDuration
             : RailMotion.contentDismissDuration
         animation.timingFunction = RailMotion.timingFunction
         if isVisible, isReveal, !reducesMotion {
-            animation.beginTime = CACurrentMediaTime() + RailMotion.contentRevealDelay
+            animation.beginTime = CACurrentMediaTime() + transition.contentDelay
             animation.fillMode = .backwards
         }
         layer.add(animation, forKey: "pace.detailOpacity")

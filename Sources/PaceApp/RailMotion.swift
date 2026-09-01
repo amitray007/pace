@@ -14,12 +14,20 @@ import SwiftUI
 /// harder than the reference, which is why the reveal read as a snap rather
 /// than a settle.
 enum RailMotion {
-    /// The mini handle grows to the full rail in 0.250 s.
-    static let revealDuration: CFTimeInterval = 0.25
+    /// How much quicker Pace runs than the reference recording.
+    ///
+    /// The reference is a showcase; Pace is glanced at many times a day, so the
+    /// same motion plays faster. Only durations scale. The fitted easing curves
+    /// are unchanged, which keeps the reference's character.
+    static let speedFactor: CFTimeInterval = 0.75
 
-    /// The rail collapses back to the mini handle in 0.300 s. Dismissal is
-    /// slower than reveal in the reference, so leaving does not feel abrupt.
-    static let dismissDuration: CFTimeInterval = 0.3
+    /// The mini handle grows to the full rail. Measured at 0.250 s.
+    static let revealDuration = 0.25 * speedFactor
+
+    /// The rail collapses back to the mini handle. Measured at 0.300 s.
+    /// Dismissal is slower than reveal in the reference, so leaving does not
+    /// feel abrupt, and that relationship survives the scaling.
+    static let dismissDuration = 0.3 * speedFactor
 
     /// The attached panel moving between provider rows.
     ///
@@ -27,17 +35,25 @@ enum RailMotion {
     /// 0.383 s, and 0.384 s. The panel travels further than the rail does when
     /// it opens, and taking longer over it is what makes the move read as one
     /// object gliding between rows rather than as a jump.
-    static let detailDuration: CFTimeInterval = 0.37
+    static let detailDuration = 0.37 * speedFactor
 
-    static let contentFadeDuration: CFTimeInterval = 0.14
+    static let contentDismissDuration = 0.08 * speedFactor
+    static let reducedMotionFadeDuration = 0.1 * speedFactor
 
-    /// One provider's panel content fading into the next during a switch. Kept
-    /// shorter than the move so the incoming content is settled and readable
-    /// before the panel stops travelling.
-    static let contentCrossfadeDuration: CFTimeInterval = 0.2
-    static let contentDismissDuration: CFTimeInterval = 0.08
-    static let contentRevealDelay: TimeInterval = 0.08
-    static let reducedMotionFadeDuration: CFTimeInterval = 0.1
+    /// Fraction of a shell transition that passes before its content starts to
+    /// appear, so the shape is established before anything is drawn inside it.
+    ///
+    /// The content's fade occupies the remainder, so it always finishes exactly
+    /// when the shell stops moving. Expressing it this way means the two cannot
+    /// drift apart: fixed content timings used to finish at 0.22 s against a
+    /// 0.37 s shell, leaving content fully drawn inside a panel that was still
+    /// expanding.
+    static let contentRevealDelayFraction: CFTimeInterval = 0.3
+
+    /// Fraction of a shell transition that the content's own fade occupies.
+    static var contentFadeFraction: CFTimeInterval {
+        1 - contentRevealDelayFraction
+    }
 
     /// Fitted from the reference reveal, 0.010 root-mean-square.
     static let timingFunction = CAMediaTimingFunction(
@@ -78,6 +94,16 @@ enum RailMotion {
     struct Transition {
         var duration: CFTimeInterval
         var timing: CAMediaTimingFunction
+
+        /// When this transition's content should start appearing.
+        var contentDelay: CFTimeInterval {
+            duration * contentRevealDelayFraction
+        }
+
+        /// How long that content takes to appear. It finishes with the shell.
+        var contentDuration: CFTimeInterval {
+            duration * contentFadeFraction
+        }
 
         static let reveal = Self(
             duration: revealDuration,
