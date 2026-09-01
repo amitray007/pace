@@ -276,9 +276,9 @@ private enum RailShellPaths {
             control2: CGPoint(x: leftX + 20, y: 348),
         )
         path.addCurve(
-            to: CGPoint(x: rightX, y: 368),
+            to: CGPoint(x: rightX, y: 354),
             control1: CGPoint(x: leftX + 58, y: 350),
-            control2: CGPoint(x: rightX - 4, y: 356),
+            control2: CGPoint(x: rightX - 7, y: 354),
         )
         path.addCompatibleLine(to: CGPoint(x: rightX, y: topY))
         path.closeSubpath()
@@ -288,19 +288,11 @@ private enum RailShellPaths {
     static func settings() -> CGPath {
         let path = CGMutablePath()
         let rightX = EdgeRailGeometry.canvasSize.width
-        path.move(to: CGPoint(x: rightX, y: 348))
-        path.addCurve(
-            to: CGPoint(x: rightX - 27, y: 370),
-            control1: CGPoint(x: rightX - 2, y: 359),
-            control2: CGPoint(x: rightX - 14, y: 366),
+        path.addRoundedRect(
+            in: CGRect(x: rightX - 20, y: 384, width: 20, height: 18),
+            cornerWidth: 9,
+            cornerHeight: 9,
         )
-        path.addCurve(
-            to: CGPoint(x: rightX, y: 416),
-            control1: CGPoint(x: rightX - 3, y: 386),
-            control2: CGPoint(x: rightX - 2, y: 404),
-        )
-        path.addLine(to: CGPoint(x: rightX, y: 348))
-        path.closeSubpath()
         path.addEllipse(
             in: CGRect(x: EdgeRailGeometry.railOriginX + 12, y: 370, width: 46, height: 46),
         )

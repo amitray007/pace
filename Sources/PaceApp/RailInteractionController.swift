@@ -257,12 +257,12 @@ private extension RailInteractionController {
         let originX = model.preferences.railEdge == .right
             ? visualPanel.frame.maxX - 18
             : visualPanel.frame.minX
-        return NSRect(
+        return scaledInteractionFrame(NSRect(
             x: originX,
             y: visualPanel.frame.minY + 173,
             width: 18,
             height: 70,
-        )
+        ))
     }
 
     private var railFrame: NSRect {
@@ -272,25 +272,28 @@ private extension RailInteractionController {
         let originX = model.preferences.railEdge == .right
             ? visualPanel.frame.minX + EdgeRailGeometry.railOriginX
             : visualPanel.frame.minX
-        return NSRect(
+        return scaledInteractionFrame(NSRect(
             x: originX,
-            y: visualPanel.frame.minY + 48,
+            y: visualPanel.frame.minY + 62,
             width: EdgeRailGeometry.railWidth,
-            height: 338,
-        )
+            height: 324,
+        ))
     }
 
     private var providerFrames: [NSRect] {
         guard let visualPanel else {
             return []
         }
+        let originX = model.preferences.railEdge == .right
+            ? visualPanel.frame.minX + EdgeRailGeometry.railOriginX
+            : visualPanel.frame.minX
         return EdgeRailGeometry.providerTopY.map { topPosition in
-            NSRect(
-                x: railFrame.minX,
+            scaledInteractionFrame(NSRect(
+                x: originX,
                 y: visualPanel.frame.minY + EdgeRailGeometry.canvasSize.height - topPosition - 64,
                 width: EdgeRailGeometry.railWidth,
                 height: 64,
-            )
+            ))
         }
     }
 
@@ -299,12 +302,12 @@ private extension RailInteractionController {
             return .zero
         }
         let localOriginX: CGFloat = model.preferences.railEdge == .right ? 266 : 12
-        return NSRect(
+        return scaledInteractionFrame(NSRect(
             x: visualPanel.frame.minX + localOriginX,
             y: visualPanel.frame.minY,
             width: 46,
             height: 46,
-        )
+        ))
     }
 
     private var detailFrame: NSRect? {
@@ -315,25 +318,46 @@ private extension RailInteractionController {
         let originX = model.preferences.railEdge == .right
             ? visualPanel.frame.minX
             : visualPanel.frame.maxX - EdgeRailGeometry.detailWidth
-        return NSRect(
+        return scaledInteractionFrame(NSRect(
             x: originX,
             y: visualPanel.frame.minY + EdgeRailGeometry.canvasSize.height - panelTop - 139,
             width: EdgeRailGeometry.detailWidth,
             height: 139,
-        )
+        ))
     }
 
     private var travelCorridorFrame: NSRect? {
-        guard let visualPanel, let detailFrame, let detailCenterY else {
+        guard let detailFrame, let detailCenterY,
+              let providerIndex = EdgeRailGeometry.providerCentersY.firstIndex(of: detailCenterY),
+              providerFrames.indices.contains(providerIndex)
+        else {
             return nil
         }
-        let centerY = visualPanel.frame.minY + EdgeRailGeometry.canvasSize.height - detailCenterY
+        let centerY = providerFrames[providerIndex].midY
         let minimumX = model.preferences.railEdge == .right ? detailFrame.maxX : railFrame.maxX
+        let maximumX = model.preferences.railEdge == .right ? railFrame.minX : detailFrame.minX
         return NSRect(
             x: minimumX,
-            y: centerY - 28,
-            width: EdgeRailGeometry.connectorWidth,
-            height: 56,
+            y: centerY - 24,
+            width: max(maximumX - minimumX, 0),
+            height: 48,
+        )
+    }
+
+    private func scaledInteractionFrame(_ frame: NSRect) -> NSRect {
+        guard let visualPanel else {
+            return .zero
+        }
+        let scale = EdgeRailGeometry.displayScale
+        let anchorX = model.preferences.railEdge == .right
+            ? visualPanel.frame.maxX
+            : visualPanel.frame.minX
+        let anchorY = visualPanel.frame.midY
+        return NSRect(
+            x: anchorX + (frame.minX - anchorX) * scale,
+            y: anchorY + (frame.minY - anchorY) * scale,
+            width: frame.width * scale,
+            height: frame.height * scale,
         )
     }
 

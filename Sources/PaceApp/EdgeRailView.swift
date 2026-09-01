@@ -4,6 +4,7 @@ import SwiftUI
 
 enum EdgeRailGeometry {
     static let canvasSize = NSSize(width: 324, height: 416)
+    static let displayScale: CGFloat = 0.86
     static let railWidth: CGFloat = 70
     static let detailWidth: CGFloat = 226
     static let connectorWidth: CGFloat = 28
@@ -42,6 +43,10 @@ struct EdgeRailView: View {
 
             detailContent(providerIDs: providerIDs)
         }
+        .scaleEffect(
+            EdgeRailGeometry.displayScale,
+            anchor: model.preferences.railEdge == .right ? .trailing : .leading,
+        )
         .frame(
             width: EdgeRailGeometry.canvasSize.width,
             height: EdgeRailGeometry.canvasSize.height,
