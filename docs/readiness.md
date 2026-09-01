@@ -21,6 +21,25 @@ when the audit began on 2026-09-01.
 | Provider integrations | Production-separated adapters implement explicit account registration, local naming, refresh, enable, disable, removal, identity verification, conservative polling, and live-to-simulated fallback. Credentials remain in provider-owned stores. | Locally ready | Compare displayed values with each provider's own live surface for the required account combinations. Re-run compatibility checks when providers change private endpoints. |
 | Distribution | `make release-preflight`, `make release-archive`, and `make release-smoke` build, inspect, package, checksum, extract, launch, observe, terminate, and clean up an unsigned universal application without installation. Repeated builds produced identical archive bytes. | Unsigned local release ready | Choose the public bundle identifier, minimum macOS version, architecture support, license, and provider-mark terms. Then authorize signing, notarization, clean-machine installation, update testing, CI, and publication separately. |
 
+## Local install identity
+
+`make install` builds the Release application, signs it with a local
+self-signed certificate, and copies it to `/Applications`. The certificate is
+created on demand by `Scripts/create-signing-identity.sh` and is trusted only in
+this user's trust domain. It is not an Apple Developer ID and it does not
+support distribution or notarization.
+
+The identity exists because of the keychain. macOS stores an "Always Allow"
+decision against an application's designated requirement. Signing produces
+`identifier "com.amitray.Pace.dev" and certificate root H"63f2ec…"`, which does
+not change when the binary does, so an approval granted once holds across
+rebuilds. An ad-hoc signature's requirement is the binary's own CDHash, which
+made every rebuild a different application and discarded every approval.
+
+Each provider credential is a separate keychain item with its own access
+control, so each still needs one approval the first time. Pace reads these items
+and never writes them; the credentials stay owned by Claude Code and Cursor.
+
 ## Current Mac coverage
 
 The local runtime audit used an Apple silicon Mac with one connected built-in display at 1728 x
