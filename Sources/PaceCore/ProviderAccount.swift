@@ -27,6 +27,26 @@ public enum CredentialBinding: Codable, Equatable, Sendable {
     case simulated
 }
 
+enum CredentialSourceKey: Equatable, Hashable, Sendable {
+    case providerProfile(path: String)
+    case keychain(service: String, account: String)
+}
+
+extension CredentialBinding {
+    var sourceKey: CredentialSourceKey? {
+        switch self {
+        case let .providerProfile(directory, _):
+            .providerProfile(
+                path: directory.standardizedFileURL.resolvingSymlinksInPath().path,
+            )
+        case let .keychain(service, account):
+            .keychain(service: service, account: account)
+        case .simulated:
+            nil
+        }
+    }
+}
+
 public enum AccountConnectionState: Codable, Equatable, Sendable {
     case connected(lastVerifiedAt: Date)
     case needsAuthentication
@@ -96,6 +116,7 @@ public struct DiscoveredAccount: Codable, Equatable, Sendable {
 }
 
 public enum AccountMutationError: Error, Equatable, Sendable {
+    case duplicateCredentialBinding(providerID: ProviderID)
     case duplicateDisplayName(providerID: ProviderID, displayName: String)
     case duplicateIdentity(providerID: ProviderID, subjectID: String)
     case emptyDisplayName

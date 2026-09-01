@@ -75,6 +75,10 @@ public actor PaceStore {
             discoveredAccount.identity,
             providerID: discoveredAccount.providerID,
         )
+        try ensureCredentialBindingIsUnique(
+            discoveredAccount.credentialBinding,
+            providerID: discoveredAccount.providerID,
+        )
         try ensureDisplayNameIsUnique(resolvedName, providerID: discoveredAccount.providerID)
 
         let providerAccounts = state.accounts.filter {
@@ -331,6 +335,20 @@ private extension PaceStore {
                 providerID: providerID,
                 displayName: displayName,
             )
+        }
+    }
+
+    func ensureCredentialBindingIsUnique(
+        _ binding: CredentialBinding,
+        providerID: ProviderID,
+    ) throws {
+        guard let sourceKey = binding.sourceKey else {
+            return
+        }
+        if state.accounts.contains(where: { account in
+            account.providerID == providerID && account.credentialBinding.sourceKey == sourceKey
+        }) {
+            throw AccountMutationError.duplicateCredentialBinding(providerID: providerID)
         }
     }
 

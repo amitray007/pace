@@ -126,6 +126,15 @@ complete read-save-publish transaction so concurrent account updates cannot over
 An applied delivery and a persistence failure are separate events, which lets both surfaces preserve
 last-good state while showing a save error. Explicit app onboarding remains the promotion gate.
 
+The account coordinator is the presentation-facing boundary for onboarding and account lifecycle.
+Discovery runs only after an explicit user action and does not mutate Pace state. It classifies
+each verified result as available, already registered, bound to a different identity, or already
+known through another credential source. Adding one candidate rechecks those rules against current
+state. A normalized real profile path or Keychain service/account pair can belong to only one Pace
+account per provider; simulated fixtures remain exempt. Rename, enable, disable, per-account
+refresh, and removal all flow through the same coordinator. Removal deletes normalized Pace state
+and never deletes provider-owned credentials or profiles.
+
 The live spike was verified on 2026-08-31 with Codex CLI 0.151.0. The response contained a general
 weekly bucket plus model-specific five-hour and weekly buckets. This proves the UI must render
 returned buckets dynamically.

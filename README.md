@@ -36,6 +36,11 @@ cooperative executor, and disabling or removing an account stops its monitor and
 Explicit account onboarding and live app configuration remain before live values replace the
 simulated shell.
 
+The account core keeps discovery and registration separate. A discovery request never adds an
+account to Pace. The selected candidate must be added explicitly, can receive a local name, and can
+then be refreshed, disabled, re-enabled, renamed, or removed. The same real provider profile or
+Keychain source cannot be registered twice, even if its reported identity changes.
+
 A separate Claude compatibility spike verifies OAuth identity before reading usage, supports
 explicit isolated profile directories, and keeps all credential and endpoint code outside the app.
 

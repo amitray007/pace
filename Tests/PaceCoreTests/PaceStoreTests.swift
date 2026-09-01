@@ -1,3 +1,4 @@
+import Foundation
 @testable import PaceCore
 import Testing
 
@@ -62,6 +63,73 @@ struct PaceStoreTests {
         await #expect(throws: AccountMutationError.self) {
             try await store.register(
                 work,
+                id: TestSupport.workID,
+                addedAt: TestSupport.referenceDate,
+            )
+        }
+    }
+
+    @Test
+    func `rejects the same provider credential source under another identity`() async throws {
+        let store = try await PaceStore.open(persistence: InMemoryPaceStatePersistence())
+        let profile = URL(filePath: "/profiles/claude/personal", directoryHint: .isDirectory)
+        let personal = TestSupport.discoveredAccount(
+            subjectID: "claude-personal",
+            displayName: "Personal",
+            credentialBinding: .providerProfile(directory: profile, ownership: .existing),
+        )
+        try await store.register(
+            personal,
+            id: TestSupport.personalID,
+            addedAt: TestSupport.referenceDate,
+        )
+        let changedIdentity = TestSupport.discoveredAccount(
+            subjectID: "claude-other",
+            displayName: "Other",
+            credentialBinding: .providerProfile(
+                directory: profile.deletingLastPathComponent().appending(path: "personal"),
+                ownership: .paceManaged,
+            ),
+        )
+
+        await #expect(
+            throws: AccountMutationError.duplicateCredentialBinding(providerID: .claude),
+        ) {
+            try await store.register(
+                changedIdentity,
+                id: TestSupport.workID,
+                addedAt: TestSupport.referenceDate,
+            )
+        }
+    }
+
+    @Test
+    func `rejects the same keychain source under another identity`() async throws {
+        let store = try await PaceStore.open(persistence: InMemoryPaceStatePersistence())
+        let binding = CredentialBinding.keychain(service: "github-cli", account: "amit")
+        let personal = TestSupport.discoveredAccount(
+            providerID: .githubCopilot,
+            subjectID: "github-100",
+            displayName: "Personal",
+            credentialBinding: binding,
+        )
+        try await store.register(
+            personal,
+            id: TestSupport.personalID,
+            addedAt: TestSupport.referenceDate,
+        )
+        let changedIdentity = TestSupport.discoveredAccount(
+            providerID: .githubCopilot,
+            subjectID: "github-200",
+            displayName: "Other",
+            credentialBinding: binding,
+        )
+
+        await #expect(
+            throws: AccountMutationError.duplicateCredentialBinding(providerID: .githubCopilot),
+        ) {
+            try await store.register(
+                changedIdentity,
                 id: TestSupport.workID,
                 addedAt: TestSupport.referenceDate,
             )

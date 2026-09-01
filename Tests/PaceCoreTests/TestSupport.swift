@@ -18,6 +18,7 @@ enum TestSupport {
         subjectID: String,
         displayName: String,
         planName: String = "Pro",
+        credentialBinding: CredentialBinding = .simulated,
     ) -> DiscoveredAccount {
         DiscoveredAccount(
             providerID: providerID,
@@ -27,7 +28,7 @@ enum TestSupport {
             ),
             suggestedDisplayName: displayName,
             planName: planName,
-            credentialBinding: .simulated,
+            credentialBinding: credentialBinding,
         )
     }
 

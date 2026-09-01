@@ -52,17 +52,7 @@ public struct RefreshCoordinator: Sendable {
                 }
 
                 group.addTask {
-                    do {
-                        let result = try await adapter.refresh(account)
-                        return .success(accountID: account.id, result: result)
-                    } catch let failure as ProviderFailure {
-                        return .failure(accountID: account.id, failure: failure)
-                    } catch {
-                        return .failure(
-                            accountID: account.id,
-                            failure: .failed(code: "unexpected-adapter-error"),
-                        )
-                    }
+                    await Self.refreshOutcome(account: account, adapter: adapter)
                 }
             }
 
@@ -74,6 +64,29 @@ public struct RefreshCoordinator: Sendable {
         outcomes.sort { $0.accountID < $1.accountID }
         try await store.applyRefreshOutcomes(outcomes)
         return outcomes
+    }
+
+    @discardableResult
+    public func refresh(_ accountID: AccountID) async throws -> AccountRefreshOutcome {
+        let state = await store.currentState()
+        guard let account = state.accounts.first(where: { $0.id == accountID }) else {
+            throw AccountMutationError.unknownAccount(accountID)
+        }
+        guard account.isEnabled else {
+            throw AccountMutationError.accountDisabled(accountID)
+        }
+        guard let adapter = adapters[account.providerID] else {
+            let outcome = AccountRefreshOutcome.failure(
+                accountID: account.id,
+                failure: .unavailable(code: "adapter-missing"),
+            )
+            try await store.applyRefreshOutcomes([outcome])
+            return outcome
+        }
+
+        let outcome = await Self.refreshOutcome(account: account, adapter: adapter)
+        try await store.applyRefreshOutcomes([outcome])
+        return outcome
     }
 
     public func updateStream() async -> AsyncStream<ProviderUpdateDelivery> {
@@ -136,6 +149,18 @@ public struct RefreshCoordinator: Sendable {
             .failure(accountID: accountID, failure: failure)
         case let .refresh(result):
             .success(accountID: accountID, result: result)
+        }
+    }
+
+    private static func refreshOutcome(
+        account: ProviderAccount,
+        adapter: any ProviderAdapter,
+    ) async -> AccountRefreshOutcome {
+        do {
+            let result = try await adapter.refresh(account)
+            return .success(accountID: account.id, result: result)
+        } catch let failure {
+            return .failure(accountID: account.id, failure: failure)
         }
     }
 }
