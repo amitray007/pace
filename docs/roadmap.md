@@ -29,10 +29,9 @@ shared selection.
 
 ## Phase 2: Provider feasibility spikes
 
-Status: in progress. Claude, Cursor, Grok, and GitHub Copilot single-profile identity and usage
-reads are proven. Claude, Grok, and GitHub Copilot now also have deterministic production
-two-account isolation and current read-only live smoke checks. Distinct live two-account login and
-credential-rotation checks remain open.
+Status: in progress. Claude, Cursor, Grok, Codex, and GitHub Copilot have deterministic production
+multi-account isolation and current read-only live smoke checks. Distinct live two-account login
+and credential-rotation checks remain open.
 
 - Prove two-account profile isolation for Claude, Cursor, Grok, Codex, and GitHub Copilot where the
   provider supports it.
@@ -142,7 +141,10 @@ before usage, serializes cancellable requests, bounds redirects and responses, a
 conservatively. Rotation uses Claude Code's current and legacy OAuth locks plus storage-write lock,
 reloads and compares the refresh token, and re-verifies identity before publishing. Concurrent
 login changes are adopted or restart cleanly. The read-only live smoke passed without a running
-Claude process. Cursor remains an isolated compatibility spike.
+Claude process. Cursor now binds the current Cursor Agent Keychain account or an explicit isolated
+file-profile home, verifies the CLI, remote user, and team identity before usage, refreshes access
+tokens only in memory, and polls every enabled account independently. Its production read-only
+smoke passed without a running Cursor application or agent process.
 
 - Promote validated feasibility spikes into production adapters.
 - Add provider-specific account discovery, login, reauthentication, and removal behavior.

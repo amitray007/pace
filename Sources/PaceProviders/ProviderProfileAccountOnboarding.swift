@@ -168,6 +168,8 @@ private extension CredentialBinding {
         switch self {
         case let .claudeProfile(binding):
             binding.configurationDirectory
+        case let .cursorProfile(binding):
+            binding.homeDirectory
         case let .providerProfile(directory, _):
             directory
         default:

@@ -137,6 +137,45 @@ struct PaceStoreTests {
     }
 
     @Test
+    func `keeps Cursor Keychain and file sources distinct at one home`() async throws {
+        let store = try await PaceStore.open(persistence: InMemoryPaceStatePersistence())
+        let home = URL(filePath: "/profiles/cursor", directoryHint: .isDirectory)
+        let keychain = TestSupport.discoveredAccount(
+            providerID: .cursor,
+            subjectID: "cursor-keychain",
+            displayName: "Keychain",
+            credentialBinding: .cursorProfile(CursorCredentialBinding(
+                homeDirectory: home,
+                credentialSource: .defaultKeychain,
+                ownership: .existing,
+            )),
+        )
+        let file = TestSupport.discoveredAccount(
+            providerID: .cursor,
+            subjectID: "cursor-file",
+            displayName: "File",
+            credentialBinding: .cursorProfile(CursorCredentialBinding(
+                homeDirectory: home,
+                credentialSource: .isolatedFile,
+                ownership: .existing,
+            )),
+        )
+
+        try await store.register(
+            keychain,
+            id: TestSupport.personalID,
+            addedAt: TestSupport.referenceDate,
+        )
+        try await store.register(
+            file,
+            id: TestSupport.workID,
+            addedAt: TestSupport.referenceDate,
+        )
+
+        #expect(await store.accounts(for: .cursor).count == 2)
+    }
+
+    @Test
     func `rejects the same command line account with different casing`() async throws {
         let store = try await PaceStore.open(persistence: InMemoryPaceStatePersistence())
         let first = TestSupport.discoveredAccount(

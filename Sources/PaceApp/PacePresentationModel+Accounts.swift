@@ -49,6 +49,18 @@ extension PacePresentationModel {
         await addProviderProfile(at: directory, providerID: .codex)
     }
 
+    func addDefaultCursorAccount() async {
+        await addProviderProfile(
+            at: defaultCursorProfile.homeDirectory,
+            providerID: .cursor,
+            cursorProfile: defaultCursorProfile,
+        )
+    }
+
+    func addCursorProfile(at directory: URL) async {
+        await addProviderProfile(at: directory, providerID: .cursor)
+    }
+
     func addDefaultGrokAccount() async {
         await addGrokProfile(at: defaultGrokProfileDirectory)
     }
@@ -131,6 +143,7 @@ extension PacePresentationModel {
         at directory: URL,
         providerID: ProviderID,
         claudeProfile: ClaudeProfile? = nil,
+        cursorProfile: CursorProfile? = nil,
     ) async {
         guard !isReferencePreview, !isLoading, !isManagingAccounts, !isRefreshing,
               let store, let scenario = simulatedScenario
@@ -149,19 +162,13 @@ extension PacePresentationModel {
         await shutdownProviderRuntime()
 
         do {
-            switch providerID {
-            case .claude:
-                _ = try await ClaudeAccountOnboarding().addProfile(
-                    claudeProfile ?? ClaudeProfile(directory: directory, ownership: .existing),
-                    to: store,
-                )
-            case .codex:
-                _ = try await CodexAccountOnboarding().addProfile(at: directory, to: store)
-            case .grok:
-                _ = try await GrokAccountOnboarding().addProfile(at: directory, to: store)
-            default:
-                preconditionFailure("Unsupported profile provider: \(providerID.rawValue)")
-            }
+            try await onboardProviderProfile(
+                at: directory,
+                providerID: providerID,
+                claudeProfile: claudeProfile,
+                cursorProfile: cursorProfile,
+                store: store,
+            )
             try await configureProviderRuntime(
                 store: store,
                 scenario: scenario,
@@ -182,6 +189,32 @@ extension PacePresentationModel {
                     + " Usage updates could not be restarted: "
                     + Self.accountErrorMessage(recoveryError, providerID: providerID)
             }
+        }
+    }
+
+    private func onboardProviderProfile(
+        at directory: URL,
+        providerID: ProviderID,
+        claudeProfile: ClaudeProfile?,
+        cursorProfile: CursorProfile?,
+        store: PaceStore,
+    ) async throws {
+        switch providerID {
+        case .claude:
+            let profile = claudeProfile ?? ClaudeProfile(
+                directory: directory,
+                ownership: .existing,
+            )
+            _ = try await ClaudeAccountOnboarding().addProfile(profile, to: store)
+        case .codex:
+            _ = try await CodexAccountOnboarding().addProfile(at: directory, to: store)
+        case .cursor:
+            let profile = cursorProfile ?? CursorProfile.isolated(homeDirectory: directory)
+            _ = try await CursorAccountOnboarding().addProfile(profile, to: store)
+        case .grok:
+            _ = try await GrokAccountOnboarding().addProfile(at: directory, to: store)
+        default:
+            preconditionFailure("Unsupported profile provider: \(providerID.rawValue)")
         }
     }
 

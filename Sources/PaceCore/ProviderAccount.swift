@@ -43,8 +43,30 @@ public struct ClaudeCredentialBinding: Codable, Equatable, Sendable {
     }
 }
 
+public enum CursorCredentialSource: String, Codable, Equatable, Hashable, Sendable {
+    case defaultKeychain
+    case isolatedFile
+}
+
+public struct CursorCredentialBinding: Codable, Equatable, Sendable {
+    public let homeDirectory: URL
+    public let credentialSource: CursorCredentialSource
+    public let ownership: ProfileOwnership
+
+    public init(
+        homeDirectory: URL,
+        credentialSource: CursorCredentialSource,
+        ownership: ProfileOwnership,
+    ) {
+        self.homeDirectory = homeDirectory
+        self.credentialSource = credentialSource
+        self.ownership = ownership
+    }
+}
+
 public enum CredentialBinding: Codable, Equatable, Sendable {
     case claudeProfile(ClaudeCredentialBinding)
+    case cursorProfile(CursorCredentialBinding)
     case commandLineAccount(
         tool: String,
         account: String,
@@ -63,6 +85,7 @@ enum CredentialSourceKey: Equatable, Hashable, Sendable {
         keychainAccount: String,
     )
     case commandLineAccount(tool: String, account: String, configurationPath: String?)
+    case cursorProfile(homePath: String, credentialSource: CursorCredentialSource)
     case providerProfile(path: String)
     case keychain(service: String, account: String)
 }
@@ -84,6 +107,12 @@ extension CredentialBinding {
                 configurationPath: configurationDirectory.map {
                     $0.standardizedFileURL.resolvingSymlinksInPath().path
                 },
+            )
+        case let .cursorProfile(binding):
+            .cursorProfile(
+                homePath: binding.homeDirectory.standardizedFileURL
+                    .resolvingSymlinksInPath().path,
+                credentialSource: binding.credentialSource,
             )
         case let .providerProfile(directory, _):
             .providerProfile(

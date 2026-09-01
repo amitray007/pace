@@ -7,6 +7,7 @@ struct ProviderAccountsSettingsContent: View {
     @Bindable var model: PacePresentationModel
     @State private var isChoosingClaudeProfile = false
     @State private var isChoosingCodexProfile = false
+    @State private var isChoosingCursorProfile = false
     @State private var isChoosingGrokProfile = false
     @State private var isChoosingGitHubCopilotAccount = false
 
@@ -47,6 +48,25 @@ struct ProviderAccountsSettingsContent: View {
             Text(
                 "For another Codex account, sign in with a separate CODEX_HOME, "
                     + "then choose that folder.",
+            )
+            .font(.callout)
+            .foregroundStyle(.secondary)
+
+            accountRows(for: .cursor)
+
+            HStack(spacing: 8) {
+                Button("Add current Cursor account") {
+                    Task { await model.addDefaultCursorAccount() }
+                }
+                Button("Choose Cursor profile home...") {
+                    isChoosingCursorProfile = true
+                }
+            }
+            .disabled(accountActionsAreDisabled)
+
+            Text(
+                "For another Cursor account, sign in with Cursor Agent from a separate home "
+                    + "using AGENT_CLI_CREDENTIAL_STORE=file, then choose that home folder.",
             )
             .font(.callout)
             .foregroundStyle(.secondary)
@@ -105,6 +125,11 @@ struct ProviderAccountsSettingsContent: View {
             allowsMultipleSelection: false,
         ) { handleProfileSelection($0, providerID: .codex) }
         .fileImporter(
+            isPresented: $isChoosingCursorProfile,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false,
+        ) { handleProfileSelection($0, providerID: .cursor) }
+        .fileImporter(
             isPresented: $isChoosingGrokProfile,
             allowedContentTypes: [.folder],
             allowsMultipleSelection: false,
@@ -150,6 +175,8 @@ struct ProviderAccountsSettingsContent: View {
                     await model.addClaudeProfile(at: directory)
                 case .codex:
                     await model.addCodexProfile(at: directory)
+                case .cursor:
+                    await model.addCursorProfile(at: directory)
                 case .grok:
                     await model.addGrokProfile(at: directory)
                 default:

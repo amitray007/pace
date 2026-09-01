@@ -43,6 +43,8 @@ extension PacePresentationModel {
             "Claude"
         case .codex:
             "Codex"
+        case .cursor:
+            "Cursor"
         case .grok:
             "Grok"
         case .githubCopilot:
@@ -107,6 +109,10 @@ extension PacePresentationModel {
                 "This Claude login cannot read subscription usage. Sign in again with Claude Code.",
             "claude-credential-changed":
                 "The Claude login changed during refresh. Try again.",
+            "cursor-credential-changed":
+                "The Cursor Agent login changed during refresh. Try again.",
+            "cursor-credential-unavailable":
+                "Cursor Agent credentials could not be read. Sign in again, then try again.",
         ]
         if let message = messages[code] {
             return message
@@ -136,6 +142,7 @@ private extension ProviderProfileAccountOnboardingError {
         let providerName = switch providerID {
         case .claude: "Claude"
         case .codex: "Codex"
+        case .cursor: "Cursor"
         case .grok: "Grok"
         default: "provider"
         }

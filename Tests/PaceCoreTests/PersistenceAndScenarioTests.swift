@@ -79,6 +79,23 @@ struct PersistenceAndScenarioTests {
     }
 
     @Test
+    func `round-trips the selected Cursor credential source without secrets`() throws {
+        let binding = CredentialBinding.cursorProfile(CursorCredentialBinding(
+            homeDirectory: URL(filePath: "/profiles/cursor", directoryHint: .isDirectory),
+            credentialSource: .isolatedFile,
+            ownership: .paceManaged,
+        ))
+
+        let data = try JSONEncoder().encode(binding)
+        let decoded = try JSONDecoder().decode(CredentialBinding.self, from: data)
+        let contents = try #require(String(data: data, encoding: .utf8))
+
+        #expect(decoded == binding)
+        #expect(contents.contains("isolatedFile"))
+        #expect(!contents.localizedCaseInsensitiveContains("token"))
+    }
+
+    @Test
     func `standard simulated scenario is stable and covers every planned provider`() async throws {
         let firstState = try await runStandardScenario()
         let secondState = try await runStandardScenario()

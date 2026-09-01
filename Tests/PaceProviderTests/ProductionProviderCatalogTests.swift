@@ -67,7 +67,7 @@ struct ProductionProviderCatalogTests {
             "/profiles/codex/personal",
         ])
         #expect(profiles.map(\.displayName) == ["Work", "Personal"])
-        #expect(adapters.map(\.providerID) == [.codex])
+        #expect(adapters.map(\.providerID) == [.codex, .cursor])
     }
 
     @Test
@@ -98,6 +98,61 @@ struct ProductionProviderCatalogTests {
     }
 
     @Test
+    func `builds Cursor profiles with current Keychain and isolated file ownership`() {
+        let currentHome = FileManager.default.homeDirectoryForCurrentUser
+        let current = account(
+            id: "25000000-0000-0000-0000-000000000001",
+            providerID: .cursor,
+            binding: .cursorProfile(CursorCredentialBinding(
+                homeDirectory: currentHome,
+                credentialSource: .defaultKeychain,
+                ownership: .existing,
+            )),
+            name: "Current",
+        )
+        let isolated = account(
+            id: "25000000-0000-0000-0000-000000000002",
+            providerID: .cursor,
+            binding: .cursorProfile(CursorCredentialBinding(
+                homeDirectory: currentHome,
+                credentialSource: .isolatedFile,
+                ownership: .paceManaged,
+            )),
+            name: "Work",
+        )
+
+        let profiles = ProductionProviderCatalog.cursorProfiles(for: [current, isolated])
+        let adapters = ProductionProviderCatalog.adapters(for: [current, isolated])
+
+        #expect(profiles.map(\.credentialSource) == [.defaultKeychain, .isolatedFile])
+        #expect(profiles.map(\.ownership) == [.existing, .paceManaged])
+        #expect(profiles.map(\.displayName) == ["Current", "Work"])
+        #expect(profiles.map(\.expectedIdentity) == [current.identity, isolated.identity])
+        #expect(adapters.map(\.providerID) == [.cursor])
+    }
+
+    @Test
+    func `migrates legacy Cursor profile sources from their canonical home`() {
+        let currentHome = FileManager.default.homeDirectoryForCurrentUser
+        let current = profileAccount(
+            id: "25000000-0000-0000-0000-000000000003",
+            providerID: .cursor,
+            path: currentHome.path,
+            name: "Current",
+        )
+        let isolated = profileAccount(
+            id: "25000000-0000-0000-0000-000000000004",
+            providerID: .cursor,
+            path: "/profiles/cursor/legacy",
+            name: "Legacy",
+        )
+
+        let profiles = ProductionProviderCatalog.cursorProfiles(for: [current, isolated])
+
+        #expect(profiles.map(\.credentialSource) == [.defaultKeychain, .isolatedFile])
+    }
+
+    @Test
     func `orders production adapters deterministically`() {
         let claude = profileAccount(
             id: "10000000-0000-0000-0000-000000000008",
@@ -117,6 +172,12 @@ struct ProductionProviderCatalogTests {
             path: "/profiles/codex/personal",
             name: "Codex",
         )
+        let cursor = profileAccount(
+            id: "25000000-0000-0000-0000-000000000008",
+            providerID: .cursor,
+            path: "/profiles/cursor/personal",
+            name: "Cursor",
+        )
 
         let copilot = account(
             id: "40000000-0000-0000-0000-000000000009",
@@ -130,10 +191,11 @@ struct ProductionProviderCatalogTests {
         )
 
         #expect(
-            ProductionProviderCatalog.adapters(for: [copilot, grok, codex, claude])
+            ProductionProviderCatalog.adapters(for: [copilot, grok, cursor, codex, claude])
                 .map(\.providerID) == [
                     .claude,
                     .codex,
+                    .cursor,
                     .grok,
                     .githubCopilot,
                 ],

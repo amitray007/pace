@@ -18,8 +18,8 @@ is the dependable default surface. Users can enable either surface or both.
 
 Pace is the settled product name. Its native application foundation now includes provider-neutral
 accounts, normalized quota snapshots, deterministic simulated data, shared selection, refresh
-orchestration, and local persistence. Claude, Codex, Grok, and GitHub Copilot now have
-production-separated adapters; Cursor stays isolated until its production validation gate passes.
+orchestration, and local persistence. Claude, Codex, Cursor, Grok, and GitHub Copilot now have
+production-separated adapters.
 
 The first static native surfaces now run against a dedicated visual-reference fixture. AppKit owns
 the menu-bar status item and click-through edge panel. Core Animation draws the rail, connector,
@@ -35,8 +35,8 @@ profile, and forwards rate-limit updates into shared state. Request deadlines do
 cooperative executor, and disabling or removing an account stops its monitor and profile process.
 The Providers settings section now adds the current profile or an explicitly chosen profile folder.
 It never registers an ambient login automatically. A successful add supersedes the simulated Codex
-fixture in the active runtime and presentation. Pace retains that fixture as a deterministic local
-fallback, and the other provider fixtures remain active until their own adapters are promoted.
+fixture in the active runtime and presentation. Pace retains every provider fixture as a
+deterministic local fallback.
 Disabling or removing the last enabled real account refreshes that retained fixture before Pace
 shows it again.
 
@@ -74,9 +74,16 @@ Keychain item, fallback file, and profile directory unchanged. If a provider rot
 token but the final Keychain or file write fails, Pace requires Claude Code sign-in instead of
 claiming the old token remains valid.
 
-The Cursor compatibility spike verifies identity directly with Cursor before reading usage. It
-supports the default Cursor Agent Keychain login and isolated Cursor Agent file profiles without
-reading Cursor Desktop state or browser cookies.
+The production Cursor compatibility adapter reads the default Cursor Agent Keychain account or an
+explicit isolated Cursor Agent home. It matches the access-token subject to that profile's CLI
+identity, verifies the remote user and team before usage, and keeps refreshed access tokens only in
+memory. It never reads Cursor Desktop state or browser cookies and never writes provider
+credentials. Enabled accounts poll independently at a conservative 15-minute baseline.
+
+For multiple Cursor accounts, sign each additional account in through Cursor Agent from a separate
+home with `AGENT_CLI_CREDENTIAL_STORE=file`, then choose that home in Pace. Cursor Agent owns login,
+logout, and the durable credential files. Removing an account from Pace leaves the selected home
+and its `.cursor` files unchanged.
 
 The original Grok compatibility spike remains as reproducible source and response-shape evidence
 for the production adapter.

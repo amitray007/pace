@@ -52,6 +52,7 @@ final class PacePresentationModel {
     let forcesIncreasedContrast: Bool
     let defaultClaudeProfile: ClaudeProfile
     let defaultCodexProfileDirectory: URL
+    let defaultCursorProfile: CursorProfile
     let defaultGrokProfileDirectory: URL
 
     let isReferencePreview: Bool
@@ -100,6 +101,7 @@ final class PacePresentationModel {
             .map { URL(filePath: $0, directoryHint: .isDirectory) }
             ?? FileManager.default.homeDirectoryForCurrentUser
             .appending(path: ".codex", directoryHint: .isDirectory)
+        defaultCursorProfile = CursorProfile.current()
         defaultGrokProfileDirectory = environment["GROK_HOME"]
             .map { URL(filePath: $0, directoryHint: .isDirectory) }
             ?? FileManager.default.homeDirectoryForCurrentUser

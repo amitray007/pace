@@ -89,7 +89,7 @@ all providers expose the same window names or reset behavior.
 | --- | --- | --- | --- |
 | Codex | Supported local `codex app-server` JSON-RPC | High | Use `account/rateLimits/read` and `account/rateLimits/updated`. Keep each account in a separate `CODEX_HOME`. |
 | Claude Code | Source-verified OAuth compatibility adapter | Medium-high | Bind an explicit `CLAUDE_CONFIG_DIR`, verify identity before usage, serialize reads, and rotate only through the same provider-owned source. |
-| Cursor | Source-verified compatibility adapter | Medium | Direct identity and usage reads are proven for one default CLI account. Prove two isolated CLI file profiles before product integration. |
+| Cursor | Source-verified compatibility adapter | Medium-high | Bind the default Keychain account or an isolated Cursor Agent file profile, verify identity before usage, and keep refreshed access tokens in memory only. |
 | Grok | Source-verified Grok Build compatibility adapter | Medium-high | Keep each account in a separate `GROK_HOME`; verify personal and team behavior separately. |
 | GitHub Copilot | GitHub-authenticated usage adapter | Medium-high | Bind every credential to an explicit GitHub identity; never depend on whichever `gh` account happens to be active. |
 
@@ -186,24 +186,35 @@ external validation checks.
 
 ### Cursor
 
-The isolated `cursor-usage-spike` supports two credential bindings. The default binding reads the
-Cursor Agent Keychain service without allowing an authentication prompt. Additional accounts use a
-profile-specific home directory and Cursor Agent's file credential store. Cursor Agent owns login,
-reauthentication, and token rotation. Pace stores only the profile path and verified identity.
+The production Cursor compatibility adapter supports two credential bindings. The default binding
+reads the exact Cursor Agent Keychain services without allowing an authentication prompt.
+Additional accounts use an explicit home directory and Cursor Agent's owner-private file credential
+store. Cursor Agent owns login, logout, and durable credential rotation. Pace stores only the home
+path, credential-source kind, profile ownership, and verified identity. Existing path-only Cursor
+bindings migrate by treating the current macOS home as Keychain-backed and other homes as
+file-backed.
 
-For every refresh, the spike reads the selected profile only, matches the access-token JWT subject
+For every refresh, the adapter reads the selected profile only, matches the access-token JWT subject
 to `authInfo.authId` in that profile's CLI config, then calls Cursor's
 `DashboardService/GetMe`. It requires the server response to return the same authentication ID and
 checks the returned user and team against the registered Pace identity. Only then does it call
 `DashboardService/GetCurrentPeriodUsage`; `GetPlanInfo` is optional and cannot discard valid usage.
-No Cursor process or harness must remain running.
+No Cursor process or coding harness must remain running. Expired access tokens can be refreshed
+through Cursor's source-verified OAuth endpoint. The refreshed access token stays in process memory;
+Pace never changes the provider-owned Keychain or file. The adapter reloads that source after each
+read and restarts once if Cursor Agent changed it concurrently. Requests serialize per credential
+source, so overlapping reads for one account cannot race while a slow account does not block other
+Cursor profiles.
 
-The direct default-profile path was verified on 2026-08-31 with Cursor Agent
-2026.07.01-41b2de7. It returned a Team plan and Total Usage, Cursor Models, and Other Models
-buckets. A fresh isolated home reported signed out instead of inheriting the default login. Two
-distinct live file profiles, file-profile token rotation, request-based Enterprise fallbacks, and
-long-running polling remain unverified. The spike never reads Cursor Desktop SQLite state or
-browser cookies, and it never refreshes or writes credentials.
+The production default-profile smoke passed on 2026-09-01 with Cursor Agent
+2026.07.01-41b2de7 and no running Cursor application or agent process. Deterministic tests cover
+two isolated profiles, Keychain and private-file ownership, signed-out and partial failures,
+identity checks before usage and after refresh, in-memory refresh reuse, concurrent source change,
+cancellation, response-size boundaries, dynamic and empty buckets, conservative polling, and
+provider backoff. Two distinct
+live file profiles, live provider-owned credential rotation, and Enterprise response variants
+remain external validation checks. The adapter never reads Cursor Desktop SQLite state or browser
+cookies.
 
 ### Grok
 
@@ -312,6 +323,6 @@ hit-testing control.
 - Verify multi-account capabilities independently for every provider.
 - Verify two live Claude config directories plus live Keychain and file rotation without account
   crossover.
-- Prove two live Cursor Agent file profiles and safe CLI-owned credential rotation before
-  promoting the Cursor spike.
+- Verify two live Cursor Agent file profiles and live CLI-owned credential rotation without account
+  crossover.
 - Measure reference paths, timings, and colors from the source media during the visual phase.

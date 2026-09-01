@@ -14,6 +14,10 @@ public enum ProductionProviderCatalog {
         if !codexProfiles.isEmpty {
             adapters.append(CodexProviderAdapter(profiles: codexProfiles))
         }
+        let cursorProfiles = cursorProfiles(for: accounts)
+        if !cursorProfiles.isEmpty {
+            adapters.append(CursorProviderAdapter(profiles: cursorProfiles))
+        }
         let grokProfiles = grokProfiles(for: accounts)
         if !grokProfiles.isEmpty {
             adapters.append(GrokProviderAdapter(profiles: grokProfiles))
@@ -92,6 +96,52 @@ public enum ProductionProviderCatalog {
             }
     }
 
+    public static func cursorProfiles(for accounts: [ProviderAccount]) -> [CursorProfile] {
+        let currentHome = FileManager.default.homeDirectoryForCurrentUser
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+        var seenSources: Set<CursorProfileSourceKey> = []
+        return accounts
+            .filter { $0.providerID == .cursor }
+            .sorted(by: accountPrecedes)
+            .compactMap { account in
+                let directory: URL
+                let credentialSource: CursorCredentialSource
+                let ownership: ProfileOwnership
+                switch account.credentialBinding {
+                case let .cursorProfile(binding):
+                    directory = binding.homeDirectory
+                    credentialSource = binding.credentialSource
+                    ownership = binding.ownership
+                case let .providerProfile(legacyDirectory, legacyOwnership):
+                    directory = legacyDirectory
+                    ownership = legacyOwnership
+                    let canonicalLegacyDirectory = legacyDirectory.standardizedFileURL
+                        .resolvingSymlinksInPath()
+                    credentialSource = canonicalLegacyDirectory == currentHome
+                        ? .defaultKeychain
+                        : .isolatedFile
+                default:
+                    return nil
+                }
+                let canonicalDirectory = directory.standardizedFileURL.resolvingSymlinksInPath()
+                let sourceKey = CursorProfileSourceKey(
+                    path: canonicalDirectory.path,
+                    credentialSource: credentialSource,
+                )
+                guard seenSources.insert(sourceKey).inserted else {
+                    return nil
+                }
+                return CursorProfile(
+                    homeDirectory: canonicalDirectory,
+                    credentialSource: credentialSource,
+                    ownership: ownership,
+                    displayName: account.displayName,
+                    expectedIdentity: account.identity,
+                )
+            }
+    }
+
     public static func grokProfiles(for accounts: [ProviderAccount]) -> [GrokProfile] {
         var seenDirectories: Set<String> = []
         return accounts
@@ -154,6 +204,11 @@ public enum ProductionProviderCatalog {
         }
         return lhs.order < rhs.order
     }
+}
+
+private struct CursorProfileSourceKey: Hashable {
+    let path: String
+    let credentialSource: CursorCredentialSource
 }
 
 private struct GitHubCopilotBindingKey: Hashable {
