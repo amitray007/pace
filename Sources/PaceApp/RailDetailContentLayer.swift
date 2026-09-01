@@ -237,7 +237,17 @@ final class RailDetailContentLayerView: NSView {
             panelHeight: state.panelHeight,
         )
         reconcileContentViews(state.contents)
-        updateContentVisibility(state.visibleProviderID)
+        // Crossfade only when moving between two providers. Opening and closing
+        // are carried by the container's own fade.
+        let isProviderSwitch = hasReceivedState &&
+            previousProviderID != nil &&
+            state.visibleProviderID != nil &&
+            previousProviderID != state.visibleProviderID
+        updateContentVisibility(
+            state.visibleProviderID,
+            animated: isProviderSwitch,
+            reducesMotion: state.reducesMotion,
+        )
 
         let targetPosition = layer?.position
         let isVisible = state.visibleProviderID != nil
@@ -304,6 +314,8 @@ final class RailDetailContentLayerView: NSView {
     ) -> NSHostingView<AnyView> {
         let contentView = NSHostingView(rootView: AnyView(detailPanel(for: content)))
         contentView.autoresizingMask = [.width, .height]
+        contentView.wantsLayer = true
+        contentView.layer?.actions = ["opacity": NSNull()]
         contentContainerView.addSubview(contentView)
         contentViews[content.providerID] = contentView
         renderedContents[content.providerID] = content
@@ -320,9 +332,44 @@ final class RailDetailContentLayerView: NSView {
         )
     }
 
-    private func updateContentVisibility(_ providerID: ProviderID?) {
+    /// Crossfades between provider panels instead of swapping them.
+    ///
+    /// docs/interactions.md asks for content to crossfade while the shell
+    /// moves. Toggling `isHidden` made the outgoing provider vanish and the
+    /// incoming one appear instantly part-way through the glide, so the panel
+    /// read as two separate cards rather than one that changed contents.
+    private func updateContentVisibility(
+        _ providerID: ProviderID?,
+        animated: Bool,
+        reducesMotion: Bool,
+    ) {
         for (contentProviderID, contentView) in contentViews {
-            contentView.isHidden = contentProviderID != providerID
+            let isVisible = contentProviderID == providerID
+            // A hidden view is not rendered at all, so it has to stay visible
+            // for its fade out to be seen.
+            contentView.isHidden = false
+            let target: Float = isVisible ? 1 : 0
+            guard let layer = contentView.layer else {
+                continue
+            }
+            let current = layer.presentation()?.opacity ?? layer.opacity
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            layer.opacity = target
+            CATransaction.commit()
+
+            guard animated, current != target else {
+                layer.removeAnimation(forKey: "pace.contentCrossfade")
+                continue
+            }
+            let fade = CABasicAnimation(keyPath: "opacity")
+            fade.fromValue = current
+            fade.toValue = target
+            fade.duration = reducesMotion
+                ? RailMotion.reducedMotionFadeDuration
+                : RailMotion.contentCrossfadeDuration
+            fade.timingFunction = RailMotion.detailTimingFunction
+            layer.add(fade, forKey: "pace.contentCrossfade")
         }
     }
 

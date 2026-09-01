@@ -21,11 +21,20 @@ enum RailMotion {
     /// slower than reveal in the reference, so leaving does not feel abrupt.
     static let dismissDuration: CFTimeInterval = 0.3
 
-    /// The attached panel moving between provider rows. Shorter than a reveal
-    /// because the shell is already open and only the panel travels.
-    static let detailDuration: CFTimeInterval = 0.22
+    /// The attached panel moving between provider rows.
+    ///
+    /// Measured across three switches in the reference recording: 0.333 s,
+    /// 0.383 s, and 0.384 s. The panel travels further than the rail does when
+    /// it opens, and taking longer over it is what makes the move read as one
+    /// object gliding between rows rather than as a jump.
+    static let detailDuration: CFTimeInterval = 0.37
 
     static let contentFadeDuration: CFTimeInterval = 0.14
+
+    /// One provider's panel content fading into the next during a switch. Kept
+    /// shorter than the move so the incoming content is settled and readable
+    /// before the panel stops travelling.
+    static let contentCrossfadeDuration: CFTimeInterval = 0.2
     static let contentDismissDuration: CFTimeInterval = 0.08
     static let contentRevealDelay: TimeInterval = 0.08
     static let reducedMotionFadeDuration: CFTimeInterval = 0.1
@@ -44,6 +53,18 @@ enum RailMotion {
         0.12,
         0.31,
         0.95,
+    )
+
+    /// Fitted from a reference provider switch, 0.006 root-mean-square.
+    ///
+    /// The near-zero start ramp means the panel leaves immediately and spends
+    /// most of the duration decelerating into place. The reveal curve fitted
+    /// this movement four times worse, so the two are not shared.
+    static let detailTimingFunction = CAMediaTimingFunction(
+        controlPoints: 0.07,
+        0.02,
+        0.32,
+        1,
     )
 
     /// The reveal curve for SwiftUI content, so the hosted labels and the
@@ -68,7 +89,7 @@ enum RailMotion {
         )
         static let detail = Self(
             duration: detailDuration,
-            timing: timingFunction,
+            timing: detailTimingFunction,
         )
         static let reduced = Self(
             duration: reducedMotionFadeDuration,

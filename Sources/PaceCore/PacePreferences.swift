@@ -84,6 +84,18 @@ public struct PacePreferences: Codable, Equatable, Sendable {
         .githubCopilot,
     ]
 
+    /// The dwell before a hover opens the rail.
+    ///
+    /// In the reference recording the rail starts opening while the pointer is
+    /// still travelling toward the edge, well before it arrives, so the design
+    /// intent is to open on approach rather than to make the user wait. The
+    /// lower bound is therefore small enough to feel immediate while still
+    /// rejecting a pointer that merely sweeps past the edge.
+    public static let dwellDelayRange: ClosedRange<TimeInterval> = 0.05 ... 2
+
+    /// Small enough that the rail appears to answer the pointer immediately.
+    public static let defaultDwellDelay: TimeInterval = 0.06
+
     public var version: Int
     public var surfaceMode: PaceSurfaceMode
     public var railEdge: RailEdge
@@ -107,7 +119,7 @@ public struct PacePreferences: Codable, Equatable, Sendable {
         railVerticalPosition: RailVerticalPosition = .center,
         activationMode: RailActivationMode = .dwellHover,
         activationModifier: RailActivationModifier = .shift,
-        dwellDelay: TimeInterval = 0.2,
+        dwellDelay: TimeInterval = Self.defaultDwellDelay,
         dismissalDelay: TimeInterval = 0.4,
         hideRailInFullScreen: Bool = true,
         notificationPolicy: PaceNotificationPolicy = .disabled,
@@ -121,7 +133,7 @@ public struct PacePreferences: Codable, Equatable, Sendable {
         self.railVerticalPosition = railVerticalPosition
         self.activationMode = activationMode
         self.activationModifier = activationModifier
-        self.dwellDelay = Self.clamped(dwellDelay, to: 0.2 ... 2)
+        self.dwellDelay = Self.clamped(dwellDelay, to: Self.dwellDelayRange)
         self.dismissalDelay = Self.clamped(dismissalDelay, to: 0.1 ... 2)
         self.hideRailInFullScreen = hideRailInFullScreen
         self.notificationPolicy = notificationPolicy
@@ -155,8 +167,8 @@ public struct PacePreferences: Codable, Equatable, Sendable {
                 : storedActivationMode ?? .dwellHover,
             activationModifier: container.value(.activationModifier, default: .shift),
             dwellDelay: migratesModifierHoverDefault
-                ? 0.2
-                : container.value(.dwellDelay, default: 0.2),
+                ? Self.defaultDwellDelay
+                : container.value(.dwellDelay, default: Self.defaultDwellDelay),
             dismissalDelay: container.value(.dismissalDelay, default: 0.4),
             hideRailInFullScreen: container.value(
                 .hideRailInFullScreen,

@@ -13,7 +13,7 @@ struct PacePreferencesTests {
         #expect(preferences.railScale == .medium)
         #expect(preferences.railVerticalPosition == .center)
         #expect(preferences.activationMode == .dwellHover)
-        #expect(preferences.dwellDelay == 0.2)
+        #expect(preferences.dwellDelay == PacePreferences.defaultDwellDelay)
         #expect(preferences.activationModifier == .shift)
         #expect(preferences.notificationPolicy == .disabled)
         #expect(preferences.providerOrder == PacePreferences.defaultProviderOrder)
@@ -39,6 +39,16 @@ struct PacePreferencesTests {
     }
 
     @Test
+    func `the dwell bound keeps hover activation immediate`() {
+        // In the reference recording the rail starts opening while the pointer
+        // is still travelling toward the edge. A dwell long enough to notice
+        // would contradict that, so the bound and the default both stay small.
+        #expect(PacePreferences.defaultDwellDelay <= 0.1)
+        #expect(PacePreferences.dwellDelayRange.lowerBound <= 0.05)
+        #expect(PacePreferences.dwellDelayRange.contains(PacePreferences.defaultDwellDelay))
+    }
+
+    @Test
     func `normalizes provider order and bounded delays`() {
         let customProvider = ProviderID(rawValue: "custom")
         let preferences = PacePreferences(
@@ -47,7 +57,9 @@ struct PacePreferencesTests {
             providerOrder: [.cursor, .claude, .cursor, customProvider],
         )
 
-        #expect(preferences.dwellDelay == 0.2)
+        // An out-of-range dwell clamps to the lower bound, which is small
+        // enough that the rail still answers the pointer immediately.
+        #expect(preferences.dwellDelay == PacePreferences.dwellDelayRange.lowerBound)
         #expect(preferences.dismissalDelay == 2)
         #expect(preferences.providerOrder == [
             .cursor,
@@ -74,7 +86,7 @@ struct PacePreferencesTests {
         #expect(preferences.railScale == .medium)
         #expect(preferences.surfaceMode == .menuBar)
         #expect(preferences.activationMode == .dwellHover)
-        #expect(preferences.dwellDelay == 0.2)
+        #expect(preferences.dwellDelay == PacePreferences.defaultDwellDelay)
         #expect(preferences.activationModifier == .shift)
         #expect(preferences.notificationPolicy == .disabled)
     }
@@ -94,7 +106,7 @@ struct PacePreferencesTests {
 
         #expect(preferences.version == PacePreferences.currentVersion)
         #expect(preferences.activationMode == .dwellHover)
-        #expect(preferences.dwellDelay == 0.2)
+        #expect(preferences.dwellDelay == PacePreferences.defaultDwellDelay)
     }
 
     @Test
