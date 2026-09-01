@@ -91,16 +91,17 @@ struct EdgeRailView: View {
     }
 
     private var settingsMark: some View {
-        Button {
+        let circle = RailShellMetrics.settingsCircleRect
+        return Button {
             openSettings()
         } label: {
             Image(systemName: "gearshape")
-                .font(.system(size: 19, weight: .medium))
-                .foregroundStyle(.white.opacity(0.9))
-                .frame(width: 50, height: 50)
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(.white)
+                .frame(width: circle.width, height: circle.height)
         }
         .buttonStyle(.plain)
-        .offset(x: settingsOriginX, y: 367)
+        .offset(x: settingsOriginX, y: circle.minY)
         .accessibilityLabel("Pace settings")
     }
 
@@ -146,8 +147,13 @@ struct EdgeRailView: View {
         model.preferences.railEdge == .right ? EdgeRailGeometry.railOriginX : 0
     }
 
+    /// Mirrors the shell's settings circle so the glyph stays centred in it on
+    /// either edge.
     private var settingsOriginX: CGFloat {
-        model.preferences.railEdge == .right ? EdgeRailGeometry.railOriginX + 10 : 10
+        let circle = RailShellMetrics.settingsCircleRect
+        return model.preferences.railEdge == .right
+            ? circle.minX
+            : EdgeRailGeometry.canvasSize.width - circle.maxX
     }
 
     private var usesIncreasedContrast: Bool {

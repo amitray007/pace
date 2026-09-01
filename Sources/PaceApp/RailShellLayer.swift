@@ -230,6 +230,24 @@ final class RailShellLayerView: NSView {
     }
 }
 
+/// Rail silhouette values traced from the reference frames. Reference pixels
+/// convert to canvas points at 70 / 139, the ratio between the rail's 70 pt
+/// width and its 139 px width in `settings-button.png`.
+enum RailShellMetrics {
+    /// Where the rail's straight left edge stops and the bottom contour starts.
+    static let railStraightBottomY: CGFloat = 322
+
+    /// Where the bottom contour meets the screen edge.
+    static let railBottomEdgeY: CGFloat = 353
+
+    /// The detached settings circle, 45 pt across in the reference.
+    static let settingsCircleRect = CGRect(x: 262, y: 358, width: 45, height: 45)
+
+    static var settingsCircleCenter: CGPoint {
+        CGPoint(x: settingsCircleRect.midX, y: settingsCircleRect.midY)
+    }
+}
+
 private enum RailShellPaths {
     static func mini() -> CGPath {
         let path = CGMutablePath()
@@ -269,33 +287,37 @@ private enum RailShellPaths {
             control1: CGPoint(x: leftX + 38, y: topY + 20),
             control2: CGPoint(x: leftX, y: topY + 20),
         )
-        path.addCompatibleLine(to: CGPoint(x: leftX, y: 322))
+        path.addCompatibleLine(to: CGPoint(x: leftX, y: RailShellMetrics.railStraightBottomY))
+        // The reference bottom sweeps outward and then concave into the screen
+        // edge, carving the negative space that the detached settings control
+        // sits in. Traced from settings-button.png rows 1050 through 1124.
         path.addCurve(
-            to: CGPoint(x: leftX + 36, y: 350),
-            control1: CGPoint(x: leftX, y: 338),
-            control2: CGPoint(x: leftX + 20, y: 348),
+            to: CGPoint(x: leftX + 16, y: 334),
+            control1: CGPoint(x: leftX, y: 328),
+            control2: CGPoint(x: leftX + 7, y: 332),
         )
         path.addCurve(
-            to: CGPoint(x: rightX, y: 354),
-            control1: CGPoint(x: leftX + 58, y: 350),
-            control2: CGPoint(x: rightX - 7, y: 354),
+            to: CGPoint(x: leftX + 50, y: 340),
+            control1: CGPoint(x: leftX + 26, y: 337),
+            control2: CGPoint(x: leftX + 40, y: 340),
+        )
+        path.addCurve(
+            to: CGPoint(x: rightX, y: RailShellMetrics.railBottomEdgeY),
+            control1: CGPoint(x: leftX + 60, y: 341),
+            control2: CGPoint(x: rightX - 5, y: 347),
         )
         path.addCompatibleLine(to: CGPoint(x: rightX, y: topY))
         path.closeSubpath()
         return path
     }
 
+    /// The reference settings control is a detached black circle below the
+    /// rail's concave bottom edge. Its separation from the rail is part of the
+    /// silhouette, so it carries no connecting tab. Measured from
+    /// settings-button.png at x 1429-1518, y 1113-1207.
     static func settings() -> CGPath {
         let path = CGMutablePath()
-        let rightX = EdgeRailGeometry.canvasSize.width
-        path.addRoundedRect(
-            in: CGRect(x: rightX - 20, y: 384, width: 20, height: 18),
-            cornerWidth: 9,
-            cornerHeight: 9,
-        )
-        path.addEllipse(
-            in: CGRect(x: EdgeRailGeometry.railOriginX + 12, y: 370, width: 46, height: 46),
-        )
+        path.addEllipse(in: RailShellMetrics.settingsCircleRect)
         return path
     }
 
