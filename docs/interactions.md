@@ -68,9 +68,16 @@ the collapsed dwell-hover rail. Right-edge scrolling moved the document from Y 0
 the rail stayed collapsed. A visible scrollbar track click moved an isolated edge scroller from Y 0
 to Y 802, and dragging its thumb moved it from Y 802 to Y 1664 through the click-through visual
 window. Entering Chrome full screen removed every on-screen Pace window reported by Core Graphics;
-the collapsed rail returned after leaving full screen. This check did not cover trackpad momentum,
-window resize handles, the expanded input regions, horizontal or traditional scrollbar variants,
-Spaces, Stage Manager, or another display.
+the collapsed rail returned after leaving full screen.
+
+A second running Release check placed explicit browser probes beneath the expanded 324 x 416 pt
+canvas. On the right edge, two transparent-space probes remained clickable with the rail open, and
+a third remained clickable beside an attached Claude detail card. Claude and Codex controls opened
+and retargeted the correct account detail, and the settings control opened native Settings. The
+mirrored left edge also passed one transparent-space probe and its Claude control opened the detail
+card on the correct side. These checks used isolated deterministic state and requested no system
+permission. They did not cover trackpad momentum, window resize handles, horizontal or traditional
+scrollbar variants, Spaces, Stage Manager, or another display.
 
 This window footprint is implementation evidence, not the physical pointer exit gate. Rounded
 corners still use bounded rectangular input regions, and scrolling directly over an expanded
