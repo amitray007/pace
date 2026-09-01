@@ -96,8 +96,9 @@ Status: in progress. Both surfaces now share deterministic provider and account 
 each account's own quota buckets, avoid percentage averaging, and present current, aging, stale,
 missing-bucket, signed-out, unavailable, and failed states without turning missing data into zero.
 Observation time, last-good stale data, text-and-symbol status, VoiceOver descriptions, direct
-provider and account shortcuts, keyboard-reachable quota rows, manual refresh, reduced motion, and
-increased-contrast tracks are wired. Launch-at-login, notification, and persistence checks remain.
+provider and account shortcuts, keyboard-reachable quota rows, manual refresh, reduced motion,
+increased-contrast tracks, and owner-only normalized state persistence are wired. Launch-at-login
+and notification checks remain.
 
 - Add menu-bar, rail, and both presentation settings.
 - Add one-provider-at-a-time details and per-provider account selection.

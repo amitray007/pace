@@ -7,6 +7,9 @@ final class PaceAppDelegate: NSObject, NSApplicationDelegate {
         preferencesPersistence: FilePacePreferencesPersistence(
             fileURL: PaceApplicationPaths.preferencesURL,
         ),
+        statePersistence: FilePaceStatePersistence(
+            fileURL: PaceApplicationPaths.stateURL,
+        ),
     )
 
     private var edgePanelController: EdgePanelController?

@@ -44,6 +44,7 @@ final class PacePresentationModel {
     private let isReferencePreview: Bool
     private let simulatedPresentationState: SimulatedPresentationState
     private let preferencesPersistence: any PacePreferencesPersistence
+    private let statePersistence: any PaceStatePersistence
     private var hasStarted = false
     private var preferencesStore: PacePreferencesStore?
     private var refreshCoordinator: RefreshCoordinator?
@@ -53,6 +54,7 @@ final class PacePresentationModel {
         environment: [String: String] = ProcessInfo.processInfo.environment,
         preferencesPersistence: any PacePreferencesPersistence =
             InMemoryPacePreferencesPersistence(),
+        statePersistence: any PaceStatePersistence = InMemoryPaceStatePersistence(),
     ) {
         let previewState = environment["PACE_REFERENCE_PREVIEW"]
             .flatMap(RailPreviewState.init(rawValue:))
@@ -75,6 +77,7 @@ final class PacePresentationModel {
         simulatedPresentationState = environment["PACE_SIMULATED_STATE"]
             .flatMap(SimulatedPresentationState.init(rawValue:)) ?? .current
         self.preferencesPersistence = preferencesPersistence
+        self.statePersistence = statePersistence
     }
 
     var isRailVisible: Bool {
@@ -131,13 +134,16 @@ final class PacePresentationModel {
         }
 
         do {
-            let store = try await PaceStore.open(
-                persistence: InMemoryPaceStatePersistence(),
-            )
+            let persistence: any PaceStatePersistence = isReferencePreview
+                ? InMemoryPaceStatePersistence()
+                : statePersistence
+            let store = try await PaceStore.open(persistence: persistence)
             let scenario = try SimulatedScenarios.visualReference(
                 presentationState: simulatedPresentationState,
             )
-            try await scenario.seed(store)
+            if await store.currentState().accounts.isEmpty {
+                try await scenario.seed(store)
+            }
             let coordinator = try RefreshCoordinator(store: store, adapters: scenario.adapters)
             for _ in 0 ..< scenario.refreshCycles {
                 try await coordinator.refreshAll()

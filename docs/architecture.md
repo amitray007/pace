@@ -191,6 +191,8 @@ hit-testing control.
 ## Persistence and security
 
 - Store normalized snapshots and preferences in Application Support.
+- Persist the simulated shell to `state.json` and presentation choices to `preferences.json`; both
+  files use owner-only permissions and contain no provider secrets.
 - Store optional provider-issued credentials in Keychain.
 - Never store conversation text, prompts, browser cookies, or silently copied OAuth tokens.
 - Record provider, account, bucket, source, observation time, and error state.
