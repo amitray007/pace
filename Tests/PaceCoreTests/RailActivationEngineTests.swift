@@ -35,6 +35,69 @@ struct RailActivationEngineTests {
     }
 
     @Test
+    func `arriving at the edge quickly still activates`() {
+        // Reaching the edge fast is the normal way to reach it. Judging on
+        // vertical speed alone suppressed every brisk approach, which is why
+        // hovering the handle sometimes did nothing.
+        var engine = makeEngine(mode: .dwellHover, dwellDelay: 0.06)
+
+        // Moving fast vertically while still closing on the edge.
+        _ = engine.handle(
+            .pointerMoved(hotspot(verticalPosition: 100, edgeDistance: 40)),
+            at: 1,
+        )
+        _ = engine.handle(
+            .pointerMoved(hotspot(verticalPosition: 200, edgeDistance: 2)),
+            at: 1.02,
+        )
+
+        #expect(engine.handle(.tick, at: 1.1) == [.reveal])
+    }
+
+    @Test
+    func `sweeping along the edge does not activate`() {
+        // A pointer travelling along the edge keeps its distance to the edge
+        // while moving fast vertically. That is the pass-by the rule is for.
+        var engine = makeEngine(mode: .dwellHover, dwellDelay: 0.06)
+
+        _ = engine.handle(
+            .pointerMoved(hotspot(verticalPosition: 100, edgeDistance: 1)),
+            at: 1,
+        )
+        _ = engine.handle(
+            .pointerMoved(hotspot(verticalPosition: 300, edgeDistance: 1)),
+            at: 1.02,
+        )
+
+        #expect(engine.handle(.tick, at: 1.1).isEmpty)
+    }
+
+    @Test
+    func `a pointer that settles after sweeping past can still activate`() {
+        // Suppression must expire, or an accidental sweep would lock the rail
+        // out while the user is deliberately trying to open it.
+        var engine = makeEngine(mode: .dwellHover, dwellDelay: 0.06)
+
+        _ = engine.handle(
+            .pointerMoved(hotspot(verticalPosition: 100, edgeDistance: 1)),
+            at: 1,
+        )
+        _ = engine.handle(
+            .pointerMoved(hotspot(verticalPosition: 300, edgeDistance: 1)),
+            at: 1.02,
+        )
+        #expect(engine.handle(.tick, at: 1.1).isEmpty)
+
+        // Settling at the edge after the suppression window.
+        _ = engine.handle(
+            .pointerMoved(hotspot(verticalPosition: 302, edgeDistance: 1)),
+            at: 1.4,
+        )
+
+        #expect(engine.handle(.tick, at: 1.5) == [.reveal])
+    }
+
+    @Test
     func `scroll drag and fast edge motion suppress accidental activation`() {
         var engine = makeEngine(mode: .dwellHover, dwellDelay: 0.2)
         _ = engine.handle(.scroll, at: 1)
@@ -133,11 +196,15 @@ struct RailActivationEngineTests {
         )
     }
 
-    private func hotspot(verticalPosition: Double) -> RailPointerSample {
+    private func hotspot(
+        verticalPosition: Double,
+        edgeDistance: Double = 0,
+    ) -> RailPointerSample {
         RailPointerSample(
             horizontalPosition: 0,
             verticalPosition: verticalPosition,
             region: .hotspot,
+            edgeDistance: edgeDistance,
         )
     }
 

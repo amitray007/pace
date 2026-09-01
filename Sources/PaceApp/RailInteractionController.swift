@@ -120,8 +120,19 @@ final class RailInteractionController {
             horizontalPosition: location.x,
             verticalPosition: location.y,
             region: region,
+            edgeDistance: edgeDistance(to: location),
         )
         perform(engine.handle(.pointerMoved(sample), at: time))
+    }
+
+    /// How far the pointer is from the edge the rail lives on.
+    private func edgeDistance(to location: NSPoint) -> Double {
+        guard let screen = visualPanel?.screen ?? NSScreen.main else {
+            return 0
+        }
+        return model.preferences.railEdge == .right
+            ? max(screen.frame.maxX - location.x, 0)
+            : max(location.x - screen.frame.minX, 0)
     }
 
     private func perform(_ actions: [RailActivationAction]) {

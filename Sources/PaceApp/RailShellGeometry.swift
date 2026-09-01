@@ -180,10 +180,16 @@ enum RailShellMetrics {
     static let handleHighlightColor = NSColor(white: 1, alpha: 0.32)
     static let handleHighlightWidth: CGFloat = 1
 
-    /// A pointer target smaller than this is hard to hit deliberately, so the
+    /// A pointer target smaller than this is hard to find deliberately, so the
     /// hit region is grown around the handle without making it look larger.
-    static let minimumHandleTargetWidth: CGFloat = 18
-    static let minimumHandleTargetHeight: CGFloat = 70
+    ///
+    /// Height matters more than width here. Moving to a screen edge parks the
+    /// pointer against it, so the horizontal axis takes care of itself, but
+    /// finding a 60 pt band on a display over a thousand points tall means
+    /// aiming. The target is roughly twice the visible handle so approaching
+    /// the right area is enough.
+    static let minimumHandleTargetWidth: CGFloat = 24
+    static let minimumHandleTargetHeight: CGFloat = 132
 
     /// The handle's hit region: the visible handle, expanded to a comfortable
     /// target.

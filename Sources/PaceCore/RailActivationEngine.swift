@@ -23,14 +23,23 @@ public struct RailPointerSample: Equatable, Sendable {
     public let verticalPosition: Double
     public let region: RailPointerRegion
 
+    /// Distance from the pointer to the active screen edge, in points.
+    ///
+    /// Supplied by the caller because only it knows which edge the rail is on.
+    /// The engine uses the change in this distance to tell a pointer arriving
+    /// at the edge from one sweeping along it.
+    public let edgeDistance: Double
+
     public init(
         horizontalPosition: Double,
         verticalPosition: Double,
         region: RailPointerRegion,
+        edgeDistance: Double = 0,
     ) {
         self.horizontalPosition = horizontalPosition
         self.verticalPosition = verticalPosition
         self.region = region
+        self.edgeDistance = edgeDistance
     }
 }
 
@@ -44,6 +53,10 @@ public struct RailActivationConfiguration: Equatable, Sendable {
     public var fastPointerSuppressionDuration: TimeInterval
     public var fastEdgeVelocityThreshold: Double
 
+    /// How much the pointer must still be closing on the edge, per sample, for
+    /// fast vertical movement to count as an approach rather than a pass-by.
+    public var edgeApproachTolerance: Double
+
     public init(
         mode: RailActivationMode,
         dwellDelay: TimeInterval,
@@ -52,7 +65,8 @@ public struct RailActivationConfiguration: Equatable, Sendable {
         scrollSuppressionDuration: TimeInterval = 0.45,
         dragReleaseSuppressionDuration: TimeInterval = 0.2,
         fastPointerSuppressionDuration: TimeInterval = 0.25,
-        fastEdgeVelocityThreshold: Double = 900,
+        fastEdgeVelocityThreshold: Double = 1600,
+        edgeApproachTolerance: Double = 0.5,
     ) {
         self.mode = mode
         self.dwellDelay = dwellDelay
@@ -62,6 +76,7 @@ public struct RailActivationConfiguration: Equatable, Sendable {
         self.dragReleaseSuppressionDuration = dragReleaseSuppressionDuration
         self.fastPointerSuppressionDuration = fastPointerSuppressionDuration
         self.fastEdgeVelocityThreshold = fastEdgeVelocityThreshold
+        self.edgeApproachTolerance = edgeApproachTolerance
     }
 }
 
@@ -167,7 +182,7 @@ public struct RailActivationEngine: Sendable {
         _ sample: RailPointerSample,
         at time: TimeInterval,
     ) -> [RailActivationAction] {
-        let isFastEdgeMovement = fastEdgeMovement(for: sample, at: time)
+        let isFastEdgeMovement = passesAlongEdge(for: sample, at: time)
         pointerRegion = sample.region
         lastPointerSample = (sample, time)
         if isFastEdgeMovement {
@@ -299,7 +314,19 @@ public struct RailActivationEngine: Sendable {
         time + 1e-9 >= start + duration
     }
 
-    private func fastEdgeMovement(
+    /// Whether the pointer is sweeping along the edge rather than arriving at
+    /// it.
+    ///
+    /// The rule this implements is "do not activate while the pointer is moving
+    /// rapidly along the edge". Speed alone cannot express that: reaching the
+    /// edge quickly is the normal way to reach it, and judging on vertical
+    /// speed alone suppressed every brisk approach.
+    ///
+    /// The distinction is direction. A pointer travelling along the edge keeps
+    /// moving vertically while its horizontal distance to the edge stays put. A
+    /// pointer arriving is still closing that distance, or has already stopped.
+    /// Only the first is a pass-by.
+    private func passesAlongEdge(
         for sample: RailPointerSample,
         at time: TimeInterval,
     ) -> Bool {
@@ -316,7 +343,13 @@ public struct RailActivationEngine: Sendable {
         let verticalVelocity = abs(
             sample.verticalPosition - lastPointerSample.sample.verticalPosition,
         ) / elapsed
-        return verticalVelocity >= configuration.fastEdgeVelocityThreshold
+        guard verticalVelocity >= configuration.fastEdgeVelocityThreshold else {
+            return false
+        }
+        // Still closing on the edge, so this is an approach that happens to be
+        // quick rather than a pass-by.
+        let closing = lastPointerSample.sample.edgeDistance - sample.edgeDistance
+        return closing <= configuration.edgeApproachTolerance
     }
 
     private func dwellIntentIsReady(at time: TimeInterval) -> Bool {
