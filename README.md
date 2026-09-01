@@ -132,6 +132,7 @@ make check          # format check, lint, tests, and macOS app build
 make benchmark      # measure the release-mode simulated refresh pipeline
 make release-preflight # build and verify the unsigned Release application bundle
 make release-archive # create and verify a deterministic unsigned ZIP and SHA-256 file
+make release-smoke  # extract and launch-test the packaged app without installing it
 make visual-benchmark VISUAL_CAPTURE=path/to/capture.png  # compare the rail silhouette
 make reference-fetch  # download the public reference media into ignored local storage
 make reference-frames # verify and extract the canonical visual-review frames
@@ -151,6 +152,11 @@ but does not sign, archive, install, notarize, or publish it.
 extracted app again. Repeating the same version and build must produce the same bytes; the command
 refuses to replace a different artifact. It remains unsigned and local. It does not install,
 notarize, upload, or publish anything.
+
+`make release-smoke` rechecks the archive, extracts it to a temporary directory, launches that
+extracted app with isolated deterministic state, confirms its real 324 x 416 pt rail window appears,
+and requests a normal application exit. It does not copy the app into Applications, register login
+items, request permission, use provider credentials, or retain the temporary extracted app.
 
 ## Documentation
 

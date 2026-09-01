@@ -178,13 +178,16 @@ absence of provider credential files, and absence of a code signature. A local p
 normalizes ZIP metadata, emits an immutable version-and-build archive plus SHA-256 file, verifies the
 checksum and compressed data, extracts the app, and repeats the bundle verification. Two rebuilds
 of version 0.1.0 build 1 produced the same archive hash, and a changed same-name archive was rejected.
-Public identity, supported architectures, signing, notarization, installation, update behavior,
-automation, and publication remain open.
+A separate smoke command validates the named checksum and archive paths before extraction, launches
+the packaged app with isolated deterministic state, confirms its real 324 x 416 pt rail window, and
+proves a graceful exit plus temporary-file cleanup. Public identity, supported architectures,
+signing, notarization, installation, update behavior, automation, and publication remain open.
 
 - Confirm provider-asset permissions.
 - Choose minimum macOS version and architecture support.
 - Keep version injection and unsigned bundle verification reproducible.
 - Keep unsigned local release archives and checksums reproducible and immutable.
+- Smoke-test the extracted archive without installing or registering it.
 - Add signing, notarization, and update behavior after public release identity is settled.
 - Add GitHub Actions and the personal Homebrew tap only when release scope is authorized.
 
