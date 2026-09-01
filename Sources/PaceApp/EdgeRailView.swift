@@ -146,9 +146,11 @@ struct EdgeRailView: View {
 
     /// The settings control.
     ///
-    /// At rest the reference shows only the shell's arc, with no glyph. The
-    /// gear and its filled circle are the hover state, so the glyph fades in
-    /// with the pointer rather than sitting on the resting silhouette.
+    /// At rest the reference shows only the shell's small arc, with no glyph.
+    /// The gear and its filled circle are the hover state, so the glyph fades
+    /// in with the pointer rather than sitting on the resting silhouette. The
+    /// hover region is larger than the arc it reveals from, so the control can
+    /// be found by moving toward it rather than by hitting it exactly.
     private var settingsMark: some View {
         let circle = RailShellMetrics.settingsCircleRect
         return Button {
