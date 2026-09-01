@@ -127,6 +127,7 @@ make generate       # create Pace.xcodeproj
 make format         # format Swift sources
 make check          # format check, lint, tests, and macOS app build
 make benchmark      # measure the release-mode simulated refresh pipeline
+make release-preflight # build and verify the unsigned Release application bundle
 make visual-benchmark VISUAL_CAPTURE=path/to/capture.png  # compare the rail silhouette
 make reference-fetch  # download the public reference media into ignored local storage
 make reference-frames # verify and extract the canonical visual-review frames
@@ -137,6 +138,9 @@ without reading or changing the user's saved Pace state.
 
 The current deployment target is macOS 15 for the core foundation. The oldest supported macOS
 version remains subject to the reference rail's AppKit and Core Animation verification.
+`make release-preflight` uses development version `0.1.0` and build number `1` by default. Override
+them with `RELEASE_VERSION` and `RELEASE_BUILD_NUMBER`. The command verifies the generated bundle
+but does not sign, archive, install, notarize, or publish it.
 
 ## Documentation
 

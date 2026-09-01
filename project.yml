@@ -52,12 +52,15 @@ targets:
     settings:
       base:
         CODE_SIGN_STYLE: Automatic
+        CURRENT_PROJECT_VERSION: 1
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
         INFOPLIST_KEY_LSUIElement: YES
+        MARKETING_VERSION: 0.1.0
         PRODUCT_BUNDLE_IDENTIFIER: com.amitray.Pace.dev
         PRODUCT_NAME: Pace
         SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        VERSIONING_SYSTEM: apple-generic
 
   PaceCoreTests:
     type: bundle.unit-test

@@ -159,8 +159,15 @@ Exit gate: displayed values match each provider's own surface and never cross ac
 
 ## Phase 8: Distribution
 
+Status: in progress. The generated application now has deterministic development version metadata.
+An unsigned local preflight builds the Release configuration and verifies the actual bundle name,
+identifier, version, build number, agent-app mode, deployment target, executable architectures,
+absence of provider credential files, and absence of a code signature. Public identity, supported
+architectures, signing, packaging, installation, and publication remain open.
+
 - Confirm provider-asset permissions.
 - Choose minimum macOS version and architecture support.
+- Keep version injection and unsigned bundle verification reproducible.
 - Add signing, notarization, release archives, checksums, and update behavior.
 - Add GitHub Actions and the personal Homebrew tap only when release scope is authorized.
 
