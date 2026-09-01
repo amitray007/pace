@@ -23,6 +23,11 @@ extension PacePresentationModel {
         let providerAccounts = state.accounts.filter {
             $0.providerID == providerID && $0.isEnabled
         }
+        if !isReferencePreview {
+            return providerAccounts
+                .filter { !$0.credentialBinding.isSimulated }
+                .sorted { $0.order < $1.order }
+        }
         let hasLiveAccount = providerAccounts.contains {
             !$0.credentialBinding.isSimulated
         }
@@ -33,9 +38,9 @@ extension PacePresentationModel {
 
     func selectedAccount(for providerID: ProviderID) -> ProviderAccount? {
         let selection = state.selections.first { $0.providerID == providerID }
-        return state.accounts.first {
-            $0.id == selection?.accountID && $0.isEnabled
-        } ?? accounts(for: providerID).first
+        let availableAccounts = accounts(for: providerID)
+        return availableAccounts.first { $0.id == selection?.accountID }
+            ?? availableAccounts.first
     }
 
     func snapshots(for accountID: AccountID) -> [LimitSnapshot] {

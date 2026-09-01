@@ -4,19 +4,20 @@ import PaceProviders
 
 extension PacePresentationModel {
     var dataSourceDescription: String {
+        if isReferencePreview {
+            return "Deterministic simulation"
+        }
         let liveProviders = Set(state.accounts.compactMap { account -> ProviderID? in
             guard !account.credentialBinding.isSimulated else {
                 return nil
             }
             return account.providerID
         })
-        let hasSimulation = state.accounts.contains { $0.credentialBinding.isSimulated }
         if !liveProviders.isEmpty {
             let names = liveProviders.sorted().map { ProviderStyle.resolve($0).name }
-            let liveDescription = "Live \(Self.formattedProviderList(names))"
-            return hasSimulation ? "\(liveDescription); other providers simulated" : liveDescription
+            return "Live \(Self.formattedProviderList(names))"
         }
-        return state.accounts.isEmpty ? "No accounts configured" : "Deterministic simulation"
+        return "No accounts configured"
     }
 
     func managedAccounts(for providerID: ProviderID) -> [ProviderAccount] {

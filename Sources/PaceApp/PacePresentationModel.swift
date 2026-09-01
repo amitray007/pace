@@ -108,7 +108,15 @@ final class PacePresentationModel {
     }
 
     var visibleProviderIDs: [ProviderID] {
-        let available = Set(state.accounts.map(\.providerID))
+        let available = if isReferencePreview {
+            Set(state.accounts.map(\.providerID))
+        } else {
+            Set(PacePreferences.defaultProviderOrder).union(
+                state.accounts.compactMap { account in
+                    account.credentialBinding.isSimulated ? nil : account.providerID
+                },
+            )
+        }
         let ordered = preferences.providerOrder.filter(available.contains)
         return ordered + available.subtracting(ordered).sorted()
     }
