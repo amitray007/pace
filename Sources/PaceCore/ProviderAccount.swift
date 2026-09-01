@@ -22,12 +22,18 @@ public enum ProfileOwnership: String, Codable, Sendable {
 }
 
 public enum CredentialBinding: Codable, Equatable, Sendable {
+    case commandLineAccount(
+        tool: String,
+        account: String,
+        configurationDirectory: URL?,
+    )
     case providerProfile(directory: URL, ownership: ProfileOwnership)
     case keychain(service: String, account: String)
     case simulated
 }
 
 enum CredentialSourceKey: Equatable, Hashable, Sendable {
+    case commandLineAccount(tool: String, account: String, configurationPath: String?)
     case providerProfile(path: String)
     case keychain(service: String, account: String)
 }
@@ -35,6 +41,14 @@ enum CredentialSourceKey: Equatable, Hashable, Sendable {
 extension CredentialBinding {
     var sourceKey: CredentialSourceKey? {
         switch self {
+        case let .commandLineAccount(tool, account, configurationDirectory):
+            .commandLineAccount(
+                tool: tool.lowercased(),
+                account: account.lowercased(),
+                configurationPath: configurationDirectory.map {
+                    $0.standardizedFileURL.resolvingSymlinksInPath().path
+                },
+            )
         case let .providerProfile(directory, _):
             .providerProfile(
                 path: directory.standardizedFileURL.resolvingSymlinksInPath().path,

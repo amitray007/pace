@@ -50,6 +50,26 @@ struct PersistenceAndScenarioTests {
     }
 
     @Test
+    func `round-trips command line account binding without a token`() throws {
+        let binding = CredentialBinding.commandLineAccount(
+            tool: "github-cli:github.com",
+            account: "amitray007",
+            configurationDirectory: URL(
+                filePath: "/profiles/github-cli",
+                directoryHint: .isDirectory,
+            ),
+        )
+
+        let data = try JSONEncoder().encode(binding)
+        let decoded = try JSONDecoder().decode(CredentialBinding.self, from: data)
+        let contents = try #require(String(data: data, encoding: .utf8))
+
+        #expect(decoded == binding)
+        #expect(contents.contains("amitray007"))
+        #expect(!contents.localizedCaseInsensitiveContains("token"))
+    }
+
+    @Test
     func `standard simulated scenario is stable and covers every planned provider`() async throws {
         let firstState = try await runStandardScenario()
         let secondState = try await runStandardScenario()

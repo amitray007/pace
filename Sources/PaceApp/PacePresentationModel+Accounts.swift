@@ -45,6 +45,76 @@ extension PacePresentationModel {
         await addProviderProfile(at: directory, providerID: .grok)
     }
 
+    func prepareGitHubCopilotAccountSelection() async -> Bool {
+        guard !isReferencePreview, !isLoading, !isManagingAccounts, !isRefreshing else {
+            return false
+        }
+        isManagingAccounts = true
+        defer { isManagingAccounts = false }
+        accountActionError = nil
+        do {
+            let discovered = try await GitHubCopilotAccountOnboarding().availableLogins()
+            let registered: Set<String> = Set(
+                managedAccounts(for: .githubCopilot).compactMap { account in
+                    guard case let .commandLineAccount(tool, login, _) = account.credentialBinding,
+                          tool
+                              .caseInsensitiveCompare(GitHubCopilotProfile.credentialTool) ==
+                              .orderedSame
+                    else {
+                        return nil
+                    }
+                    return login.lowercased()
+                },
+            )
+            availableGitHubCopilotLogins = discovered.filter {
+                !registered.contains($0.lowercased())
+            }
+            guard !availableGitHubCopilotLogins.isEmpty else {
+                accountActionError = "Every authenticated GitHub CLI account is already added."
+                return false
+            }
+            return true
+        } catch {
+            accountActionError = Self.accountErrorMessage(error, providerID: .githubCopilot)
+            return false
+        }
+    }
+
+    func addGitHubCopilotAccount(githubLogin: String) async {
+        guard !isReferencePreview, !isLoading, !isManagingAccounts, !isRefreshing,
+              let store, let scenario = simulatedScenario
+        else {
+            return
+        }
+        isManagingAccounts = true
+        defer { isManagingAccounts = false }
+        accountActionError = nil
+        await shutdownProviderRuntime()
+
+        do {
+            _ = try await GitHubCopilotAccountOnboarding().addAccount(
+                githubLogin: githubLogin,
+                to: store,
+            )
+            try await configureProviderRuntime(store: store, scenario: scenario, refreshAll: false)
+            state = await store.currentState()
+            activeProviderID = .githubCopilot
+        } catch {
+            do {
+                try await configureProviderRuntime(
+                    store: store,
+                    scenario: scenario,
+                    refreshAll: false,
+                )
+                accountActionError = Self.accountErrorMessage(error, providerID: .githubCopilot)
+            } catch let recoveryError {
+                accountActionError = Self.accountErrorMessage(error, providerID: .githubCopilot)
+                    + " Usage updates could not be restarted: "
+                    + Self.accountErrorMessage(recoveryError, providerID: .githubCopilot)
+            }
+        }
+    }
+
     private func addProviderProfile(at directory: URL, providerID: ProviderID) async {
         guard !isReferencePreview, !isLoading, !isManagingAccounts, !isRefreshing,
               let store, let scenario = simulatedScenario
@@ -267,102 +337,6 @@ extension PacePresentationModel {
             atPath: directory.standardizedFileURL.path,
             isDirectory: &isDirectory,
         ) && isDirectory.boolValue
-    }
-
-    private static func accountErrorMessage(
-        _ error: any Error,
-        providerID: ProviderID? = nil,
-    ) -> String {
-        if let failure = error as? ProviderFailure {
-            return providerFailureMessage(failure, providerID: providerID)
-        }
-        if let actionError = error as? ProviderProfileAccountOnboardingError {
-            return actionError.message(providerID: providerID)
-        }
-        if let mutationError = error as? AccountMutationError {
-            return accountMutationErrorMessage(mutationError)
-        }
-        return "The account change could not be completed."
-    }
-
-    private static func providerFailureMessage(
-        _ failure: ProviderFailure,
-        providerID: ProviderID?,
-    ) -> String {
-        let providerName = providerName(providerID)
-        return switch failure {
-        case .signedOut:
-            "\(providerName) is signed out in this profile. Sign in with \(providerName), then "
-                + "try again."
-        case .identityMismatch:
-            "This profile now belongs to a different \(providerName) account."
-        case .rateLimited:
-            "\(providerName) is temporarily rate limited. Try again later."
-        case .failed:
-            "\(providerName) could not verify this profile."
-        case let .unavailable(code):
-            if code == "codex-executable-unavailable" {
-                "Install the Codex CLI before adding this account."
-            } else if code == "grok-credential-unsupported" {
-                "This Grok profile uses an API key or custom issuer. Pace only reads first-party "
-                    + "Grok sessions."
-            } else {
-                "\(providerName) is unavailable for this profile."
-            }
-        }
-    }
-
-    private static func providerName(_ providerID: ProviderID?) -> String {
-        switch providerID {
-        case .codex:
-            "Codex"
-        case .grok:
-            "Grok"
-        default:
-            "Provider"
-        }
-    }
-
-    private static func formattedProviderList(_ names: [String]) -> String {
-        guard let last = names.last else {
-            return "provider accounts"
-        }
-        guard names.count > 1 else {
-            return last
-        }
-        return names.dropLast().joined(separator: ", ") + " and \(last)"
-    }
-
-    private static func accountMutationErrorMessage(_ error: AccountMutationError) -> String {
-        switch error {
-        case .emptyDisplayName:
-            "Account names cannot be empty."
-        case .duplicateDisplayName:
-            "Choose a different account name for this provider."
-        case .duplicateCredentialBinding:
-            "This provider profile is already registered."
-        default:
-            "The account change could not be saved."
-        }
-    }
-}
-
-private extension ProviderProfileAccountOnboardingError {
-    func message(providerID: ProviderID?) -> String {
-        let providerName = switch providerID {
-        case .codex: "Codex"
-        case .grok: "Grok"
-        default: "provider"
-        }
-        return switch self {
-        case .identityAlreadyRegistered:
-            "This \(providerName) identity is already registered from another profile folder."
-        case .profileIdentityChanged:
-            "This profile folder now belongs to a different \(providerName) identity. "
-                + "Remove the old account before adding it again."
-        case .profileNotDiscovered:
-            "\(providerName) did not return an account for the selected profile folder."
-        }
     }
 }
 

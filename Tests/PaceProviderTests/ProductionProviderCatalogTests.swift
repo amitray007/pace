@@ -85,10 +85,54 @@ struct ProductionProviderCatalogTests {
             name: "Codex",
         )
 
-        #expect(ProductionProviderCatalog.adapters(for: [grok, codex]).map(\.providerID) == [
-            .codex,
-            .grok,
-        ])
+        let copilot = account(
+            id: "40000000-0000-0000-0000-000000000009",
+            providerID: .githubCopilot,
+            binding: .commandLineAccount(
+                tool: GitHubCopilotProfile.credentialTool,
+                account: "personal",
+                configurationDirectory: nil,
+            ),
+            name: "Copilot",
+        )
+
+        #expect(
+            ProductionProviderCatalog.adapters(for: [copilot, grok, codex]).map(\.providerID) == [
+                .codex,
+                .grok,
+                .githubCopilot,
+            ],
+        )
+    }
+
+    @Test
+    func `builds GitHub Copilot profiles from explicit CLI account bindings`() {
+        let work = account(
+            id: "40000000-0000-0000-0000-000000000002",
+            providerID: .githubCopilot,
+            binding: .commandLineAccount(
+                tool: GitHubCopilotProfile.credentialTool,
+                account: "work",
+                configurationDirectory: URL(filePath: "/profiles/gh", directoryHint: .isDirectory),
+            ),
+            name: "Work",
+        )
+        let personal = account(
+            id: "40000000-0000-0000-0000-000000000001",
+            providerID: .githubCopilot,
+            binding: .commandLineAccount(
+                tool: GitHubCopilotProfile.credentialTool,
+                account: "personal",
+                configurationDirectory: nil,
+            ),
+            name: "Personal",
+        )
+
+        let profiles = ProductionProviderCatalog.githubCopilotProfiles(for: [work, personal])
+
+        #expect(profiles.map(\.githubLogin) == ["work", "personal"])
+        #expect(profiles.map(\.displayName) == ["Work", "Personal"])
+        #expect(profiles.map(\.expectedIdentity) == [work.identity, personal.identity])
     }
 
     @Test

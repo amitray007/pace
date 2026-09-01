@@ -14,6 +14,10 @@ public enum ProductionProviderCatalog {
         if !grokProfiles.isEmpty {
             adapters.append(GrokProviderAdapter(profiles: grokProfiles))
         }
+        let githubCopilotProfiles = githubCopilotProfiles(for: accounts)
+        if !githubCopilotProfiles.isEmpty {
+            adapters.append(GitHubCopilotProviderAdapter(profiles: githubCopilotProfiles))
+        }
         return adapters
     }
 
@@ -62,10 +66,48 @@ public enum ProductionProviderCatalog {
             }
     }
 
+    public static func githubCopilotProfiles(
+        for accounts: [ProviderAccount],
+    ) -> [GitHubCopilotProfile] {
+        var seenBindings: Set<GitHubCopilotBindingKey> = []
+        return accounts
+            .filter { $0.providerID == .githubCopilot }
+            .sorted(by: accountPrecedes)
+            .compactMap { account in
+                guard case let .commandLineAccount(tool, login, configurationDirectory) =
+                    account.credentialBinding,
+                    tool.caseInsensitiveCompare(GitHubCopilotProfile.credentialTool) == .orderedSame
+                else {
+                    return nil
+                }
+                let canonicalDirectory = configurationDirectory?
+                    .standardizedFileURL
+                    .resolvingSymlinksInPath()
+                let key = GitHubCopilotBindingKey(
+                    login: login.lowercased(),
+                    configurationPath: canonicalDirectory?.path,
+                )
+                guard seenBindings.insert(key).inserted else {
+                    return nil
+                }
+                return GitHubCopilotProfile(
+                    githubLogin: login,
+                    configurationDirectory: canonicalDirectory,
+                    displayName: account.displayName,
+                    expectedIdentity: account.identity,
+                )
+            }
+    }
+
     private static func accountPrecedes(_ lhs: ProviderAccount, _ rhs: ProviderAccount) -> Bool {
         if lhs.order == rhs.order {
             return lhs.addedAt < rhs.addedAt
         }
         return lhs.order < rhs.order
     }
+}
+
+private struct GitHubCopilotBindingKey: Hashable {
+    let login: String
+    let configurationPath: String?
 }

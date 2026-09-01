@@ -129,6 +129,12 @@ Keep settings grouped by user intent:
 4. **Notifications:** thresholds, quiet hours, reset reminders, stale-data warnings.
 5. **Accessibility:** reduced motion, contrast, text scale, keyboard shortcuts.
 
+GitHub Copilot account setup stays explicit. Clicking Add GitHub Copilot account asks GitHub CLI
+for its healthy `github.com` accounts, excludes accounts already registered in Pace, and presents
+the remaining usernames in the existing Settings surface. Discovery does not register anything.
+Selecting one username triggers identity verification and the first quota refresh. Removing the
+Pace account leaves the GitHub CLI login and OAuth credential unchanged.
+
 Do not expose internal animation control points or arbitrary theme values in the first release.
 
 The current Providers section keeps provider ordering and account management in the same native

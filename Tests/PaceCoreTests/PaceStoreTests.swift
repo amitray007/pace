@@ -137,6 +137,48 @@ struct PaceStoreTests {
     }
 
     @Test
+    func `rejects the same command line account with different casing`() async throws {
+        let store = try await PaceStore.open(persistence: InMemoryPaceStatePersistence())
+        let first = TestSupport.discoveredAccount(
+            providerID: .githubCopilot,
+            subjectID: "github:100",
+            displayName: "Personal",
+            credentialBinding: .commandLineAccount(
+                tool: "github-cli:github.com",
+                account: "AmitRay007",
+                configurationDirectory: nil,
+            ),
+        )
+        try await store.register(
+            first,
+            id: TestSupport.personalID,
+            addedAt: TestSupport.referenceDate,
+        )
+        let duplicate = TestSupport.discoveredAccount(
+            providerID: .githubCopilot,
+            subjectID: "github:200",
+            displayName: "Other",
+            credentialBinding: .commandLineAccount(
+                tool: "GITHUB-CLI:GITHUB.COM",
+                account: "amitray007",
+                configurationDirectory: nil,
+            ),
+        )
+
+        await #expect(
+            throws: AccountMutationError.duplicateCredentialBinding(
+                providerID: .githubCopilot,
+            ),
+        ) {
+            try await store.register(
+                duplicate,
+                id: TestSupport.workID,
+                addedAt: TestSupport.referenceDate,
+            )
+        }
+    }
+
+    @Test
     func `disabling and removing an account reconciles shared selection`() async throws {
         let store = try await PaceStore.open(persistence: InMemoryPaceStatePersistence())
         let personal = TestSupport.discoveredAccount(

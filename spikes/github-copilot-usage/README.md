@@ -1,7 +1,8 @@
 # GitHub Copilot usage feasibility spike
 
-This executable proves that Pace can read GitHub Copilot quota data without a running editor,
-Copilot CLI, or coding harness. It is not linked into the Pace application.
+This executable is the preserved feasibility proof behind Pace's production GitHub Copilot
+compatibility adapter. It proves that quota data does not require a running editor, Copilot CLI, or
+coding harness.
 
 ## Flow
 
@@ -16,8 +17,9 @@ Copilot CLI, or coding harness. It is not linked into the Pace application.
 4. Only after identity verification, call `GET /copilot_internal/user` with the client headers used
    by current OpenUsage. This quota endpoint is not a public GitHub API contract, so it remains a
    separately disableable compatibility adapter.
-5. Map the returned Credits, Extra Usage, Chat, and Completions buckets. Preserve an honest empty
-   personal state for organization-managed seats when GitHub returns no per-user quota.
+5. Map returned Credits, Chat, Completions, and legacy bounded quota buckets. Preserve an honest
+   empty personal state for organization-managed seats when GitHub returns no per-user denominator.
+   Do not present amount-only spend or overage counters as quota limits.
 
 The command prints only a short identity fingerprint, plan, and normalized metrics. It never prints
 tokens, GitHub logins, names, email addresses, organizations, or raw identifiers. It does not switch
@@ -50,7 +52,7 @@ request and response mapping follow OpenUsage commit
 `05c40a1dc50a16ecdc7b55d2e4fadf26827b4f61`, which was MIT licensed and had 3,960 GitHub stars when
 reviewed.
 
-## Verified on 2026-08-31
+## Verified through 2026-09-01
 
 - All 14 focused tests pass, including account discovery, explicit token selection, ambient-token
   removal, official identity verification, duplicate rejection, quota variants, and rate limits.
@@ -61,6 +63,13 @@ reviewed.
   the active GitHub CLI account.
 - The result was inspected only through redacted normalized output. No token, login, raw ID, or raw
   response was printed or stored.
+- Production tests also cover two explicit account bindings, partial failure containment, durable
+  identity mismatch, onboarding rollback, credential-source persistence, conservative polling and
+  backoff, response bounds, and CLI timeout.
+- GitHub's official Copilot SDK documents account quota access and explicit token injection, but
+  requiring the SDK would also require a Copilot CLI/SDK runtime and no Swift SDK is available.
+  Pace therefore keeps the direct client-compatible quota request isolated instead of adding a
+  harness dependency.
 
 ## Not yet proven
 
@@ -69,7 +78,7 @@ reviewed.
 - Copilot Free, Business, and Enterprise live response variants.
 - Organization-wide AI-credit billing. GitHub's public billing API is administrator-only and does
   not expose a personal per-seat denominator.
-- Long-running polling behavior and actual secondary-rate-limit recovery.
+- Long-running real polling behavior and actual secondary-rate-limit recovery.
 
-Do not promote this code into `PaceCore` or the application until these checks pass and the
-simulated-data visual shell is approved.
+The spike remains reproducible evidence. Production code lives in the provider layer and keeps the
+same identity, credential-ownership, polling, response-bound, and failure-isolation rules.

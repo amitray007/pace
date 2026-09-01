@@ -25,14 +25,33 @@ struct ProviderProfileAccountOnboarding: Sendable {
     ) async throws -> AccountID {
         let canonicalDirectory = directory.resolvingSymlinksInPath()
         let adapter = makeAdapter(canonicalDirectory)
+        return try await ProviderAccountOnboarding(providerID: providerID).addAccount(
+            with: adapter,
+            to: store,
+        ) { account in
+            account.credentialBinding.profileDirectory?.resolvingSymlinksInPath()
+                == canonicalDirectory
+        }
+    }
+}
+
+struct ProviderAccountOnboarding: Sendable {
+    private let providerID: ProviderID
+
+    init(providerID: ProviderID) {
+        self.providerID = providerID
+    }
+
+    func addAccount(
+        with adapter: any ProviderAdapter,
+        to store: PaceStore,
+        matching matches: @Sendable (DiscoveredAccount) -> Bool,
+    ) async throws -> AccountID {
         let runtime = try RefreshCoordinator(store: store, adapters: [adapter])
         let coordinator = AccountCoordinator(store: store, refreshCoordinator: runtime)
 
         do {
-            let candidate = try await discoverProfile(
-                at: canonicalDirectory,
-                with: coordinator,
-            )
+            let candidate = try await discoverAccount(with: coordinator, matching: matches)
             let registration = try await register(
                 candidate,
                 with: coordinator,
@@ -59,14 +78,12 @@ struct ProviderProfileAccountOnboarding: Sendable {
         }
     }
 
-    private func discoverProfile(
-        at directory: URL,
+    private func discoverAccount(
         with coordinator: AccountCoordinator,
+        matching matches: @Sendable (DiscoveredAccount) -> Bool,
     ) async throws -> AccountDiscoveryCandidate {
         let candidates = try await coordinator.discover(for: providerID)
-        guard let candidate = candidates.first(where: {
-            $0.account.credentialBinding.profileDirectory?.resolvingSymlinksInPath() == directory
-        }) else {
+        guard let candidate = candidates.first(where: { matches($0.account) }) else {
             throw ProviderProfileAccountOnboardingError.profileNotDiscovered
         }
         return candidate

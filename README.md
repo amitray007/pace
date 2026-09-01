@@ -18,8 +18,9 @@ is the dependable default surface. Users can enable either surface or both.
 
 Pace is the settled product name. Its native application foundation now includes provider-neutral
 accounts, normalized quota snapshots, deterministic simulated data, shared selection, refresh
-orchestration, and local persistence. Codex and Grok now have production-separated adapters; the
-remaining provider spikes stay isolated until their validation gates pass.
+orchestration, and local persistence. Codex, Grok, and GitHub Copilot now have
+production-separated adapters; the remaining provider spikes stay isolated until their validation
+gates pass.
 
 The first static native surfaces now run against a dedicated visual-reference fixture. AppKit owns
 the menu-bar status item and click-through edge panel. Core Animation draws the rail, connector,
@@ -69,9 +70,13 @@ reading Cursor Desktop state or browser cookies.
 The original Grok compatibility spike remains as reproducible source and response-shape evidence
 for the production adapter.
 
-The GitHub Copilot compatibility spike binds each account through an explicit GitHub CLI username,
-verifies its durable identity with GitHub's documented `/user` API, and then reads its personal
-Copilot quota. It does not depend on a running editor, Copilot CLI, or coding harness.
+The production GitHub Copilot compatibility adapter binds each Pace account to an explicit GitHub
+CLI username. It asks `gh auth token --user` for only that account, verifies its durable numeric
+identity with GitHub's documented `/user` API, and only then reads personal Copilot quota. Pace
+clears ambient token overrides, never changes the active GitHub CLI account, and does not depend on
+a running editor, Copilot CLI, or coding harness. Settings discovers healthy GitHub CLI accounts
+only after the user clicks Add. The user selects the account to register and can then rename,
+disable, re-enable, or remove it without changing GitHub CLI credentials.
 
 Run the feasibility spikes with the corresponding authenticated installation:
 

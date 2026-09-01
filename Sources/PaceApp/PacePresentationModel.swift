@@ -44,6 +44,7 @@ final class PacePresentationModel {
     private(set) var refreshError: String?
     private(set) var isLoading = true
     private(set) var isRefreshing = false
+    var availableGitHubCopilotLogins: [String] = []
     var accountActionError: String?
     var isManagingAccounts = false
     var activeProviderID: ProviderID = .claude
@@ -226,7 +227,7 @@ final class PacePresentationModel {
         case .grok:
             "included-weekly"
         case .githubCopilot:
-            "premium-interactions"
+            "credits"
         default:
             nil
         }

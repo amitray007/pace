@@ -132,13 +132,15 @@ The account coordinator is the presentation-facing boundary for onboarding and a
 Discovery runs only after an explicit user action and does not mutate Pace state. It classifies
 each verified result as available, already registered, bound to a different identity, or already
 known through another credential source. Adding one candidate rechecks those rules against current
-state. A normalized real profile path or Keychain service/account pair can belong to only one Pace
-account per provider; simulated fixtures remain exempt. Rename, enable, disable, per-account
-refresh, and removal all flow through the same coordinator. Removal deletes normalized Pace state
-and never deletes provider-owned credentials or profiles.
+state. A normalized real profile path, Keychain service/account pair, or explicit command-line
+tool/account/configuration binding can belong to only one Pace account per provider; simulated
+fixtures remain exempt. Command-line account keys compare the tool and account without case
+sensitivity. Rename, enable, disable, per-account refresh, and removal all flow through the same
+coordinator. Removal deletes normalized Pace state and never deletes provider-owned credentials or
+profiles.
 
 The production provider catalog derives one adapter per promoted provider from all registered real
-profile bindings, including disabled accounts that may be re-enabled. The active runtime installs
+credential bindings, including disabled accounts that may be re-enabled. The active runtime installs
 that adapter only while the provider has an enabled real account. Refresh and update-monitor
 reconciliation exclude retained simulated bindings from a provider's live adapter. Disabling or
 removing the last enabled real account rebuilds the runtime with the simulated adapter and refreshes
@@ -204,6 +206,31 @@ delay; authentication and identity failures use a slower retry interval. Disabli
 account cancels its polling task. The read-only live smoke passed on 2026-09-01 using the existing
 private default profile without a running Grok process. Two distinct live profiles, credential
 rotation, and additional personal or team response shapes remain external validation checks.
+
+### GitHub Copilot
+
+The production GitHub Copilot adapter uses GitHub CLI as the credential owner and account selector,
+not as a usage harness. Account discovery uses GitHub CLI's documented JSON status output. Token
+loading always supplies `--hostname github.com --user <login>`, removes ambient token variables,
+disables prompts, and applies a hard process timeout. Pace stores the selected login, optional
+GitHub CLI configuration directory, and verified numeric GitHub user identity. It never stores the
+token.
+
+Every discovery and refresh verifies the selected token through GitHub's documented `GET /user`
+API before quota access. Refresh then calls `GET /copilot_internal/user`, which is used by official
+Copilot clients and allowed by GitHub's documented network policy but is not a public REST
+contract. Its code and failure behavior therefore remain isolated as a compatibility adapter.
+Redirects are refused, responses are size and time bounded, and one account's failure does not hide
+another account.
+
+Credits, Chat, Completions, and legacy Free counts normalize without averaging accounts.
+Organization-managed seats may honestly produce no percentage bucket when GitHub returns no
+per-user denominator. Pace does not present amount-only spend or overage counters as quota limits.
+Enabled accounts poll at a 15-minute baseline. Authentication and identity failures back off for
+one hour; other failures back off for 30 minutes; provider retry times are honored. The read-only
+live smoke passed on 2026-09-01 with the existing GitHub CLI account and no editor, Copilot CLI, or
+coding harness. Two distinct live accounts, credential rotation, and live Free, Business, and
+Enterprise variants remain external checks.
 
 ### Compatibility adapters
 

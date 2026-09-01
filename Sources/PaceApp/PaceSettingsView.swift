@@ -7,6 +7,7 @@ struct PaceSettingsView: View {
     @Bindable var model: PacePresentationModel
     @State private var isChoosingCodexProfile = false
     @State private var isChoosingGrokProfile = false
+    @State private var isChoosingGitHubCopilotAccount = false
 
     var body: some View {
         Form {
@@ -128,6 +129,26 @@ struct PaceSettingsView: View {
                     Text(
                         "For another Grok account, sign in with a separate GROK_HOME, "
                             + "then choose that folder.",
+                    )
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+
+                    ForEach(model.managedAccounts(for: .githubCopilot)) { account in
+                        ManagedProviderAccountRow(model: model, account: account)
+                    }
+
+                    Button("Add GitHub Copilot account...") {
+                        Task {
+                            if await model.prepareGitHubCopilotAccountSelection() {
+                                isChoosingGitHubCopilotAccount = true
+                            }
+                        }
+                    }
+                    .disabled(model.isLoading || model.isManagingAccounts || model.isRefreshing)
+
+                    Text(
+                        "Pace reads only the GitHub CLI account you select. "
+                            + "Add more accounts with gh auth login.",
                     )
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -257,6 +278,22 @@ struct PaceSettingsView: View {
                 }
             }
         }
+        .confirmationDialog(
+            "Add GitHub Copilot account",
+            isPresented: $isChoosingGitHubCopilotAccount,
+            titleVisibility: .visible,
+        ) {
+            ForEach(model.availableGitHubCopilotLogins, id: \.self) { login in
+                Button(login) {
+                    Task {
+                        await model.addGitHubCopilotAccount(githubLogin: login)
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Choose one authenticated GitHub CLI account.")
+        }
     }
 
     private func delayControl(
@@ -368,58 +405,6 @@ private struct ManagedProviderAccountRow: View {
             if !didRename {
                 draftName = account.displayName
             }
-        }
-    }
-}
-
-private extension RailActivationMode {
-    var label: String {
-        switch self {
-        case .modifierHover:
-            "Modifier + hover"
-        case .clickHandle:
-            "Click handle"
-        case .dwellHover:
-            "Dwell hover"
-        }
-    }
-}
-
-private extension RailActivationModifier {
-    var label: String {
-        switch self {
-        case .shift:
-            "Shift"
-        case .option:
-            "Option"
-        case .control:
-            "Control"
-        case .command:
-            "Command"
-        }
-    }
-}
-
-private extension RailEdge {
-    var label: String {
-        switch self {
-        case .left:
-            "Left"
-        case .right:
-            "Right"
-        }
-    }
-}
-
-private extension RailVerticalPosition {
-    var label: String {
-        switch self {
-        case .top:
-            "Top"
-        case .center:
-            "Center"
-        case .bottom:
-            "Bottom"
         }
     }
 }

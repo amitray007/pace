@@ -30,8 +30,9 @@ shared selection.
 ## Phase 2: Provider feasibility spikes
 
 Status: in progress. Claude, Cursor, Grok, and GitHub Copilot single-profile identity and usage
-reads are proven. Grok now also has deterministic production two-profile isolation and a current
-read-only live smoke. Distinct live two-account login and credential-rotation checks remain open.
+reads are proven. Grok and GitHub Copilot now also have deterministic production two-account
+isolation and current read-only live smoke checks. Distinct live two-account login and
+credential-rotation checks remain open.
 
 - Prove two-account profile isolation for Claude, Cursor, Grok, Codex, and GitHub Copilot where the
   provider supports it.
@@ -131,8 +132,11 @@ Removal behavior is covered by store and coordinator tests. Grok now uses the sa
 onboarding and simulation fallback. Its production adapter validates owner-private first-party xAI
 credentials, verifies `/user` identity before `/billing`, normalizes returned weekly, monthly,
 included-credit, and capped pay-as-you-go buckets, and polls each enabled account independently at a
-provider-safe interval. Its live smoke passed without a running Grok process. Claude, Cursor, and
-GitHub Copilot remain isolated compatibility spikes.
+provider-safe interval. Its live smoke passed without a running Grok process. GitHub Copilot now
+uses explicit GitHub CLI account selection, documented GitHub identity verification, a separately
+isolated quota compatibility reader, independent polling, and the same shared account lifecycle.
+Its live smoke passed without an editor, Copilot CLI, or coding harness. Claude and Cursor remain
+isolated compatibility spikes.
 
 - Promote validated feasibility spikes into production adapters.
 - Add provider-specific account discovery, login, reauthentication, and removal behavior.
