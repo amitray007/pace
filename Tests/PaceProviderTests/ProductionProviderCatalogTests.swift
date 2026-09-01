@@ -44,6 +44,54 @@ struct ProductionProviderCatalogTests {
     }
 
     @Test
+    func `builds one Grok adapter from every registered real profile`() {
+        var work = profileAccount(
+            id: "30000000-0000-0000-0000-000000000002",
+            providerID: .grok,
+            path: "/profiles/grok/work",
+            name: "Work",
+        )
+        work.isEnabled = false
+        let personal = profileAccount(
+            id: "30000000-0000-0000-0000-000000000001",
+            providerID: .grok,
+            path: "/profiles/grok/personal",
+            name: "Personal",
+        )
+
+        let profiles = ProductionProviderCatalog.grokProfiles(for: [personal, work])
+        let adapters = ProductionProviderCatalog.adapters(for: [personal, work])
+
+        #expect(profiles.map(\.directory.path) == [
+            "/profiles/grok/personal",
+            "/profiles/grok/work",
+        ])
+        #expect(profiles.map(\.expectedIdentity) == [personal.identity, work.identity])
+        #expect(adapters.map(\.providerID) == [.grok])
+    }
+
+    @Test
+    func `orders production adapters deterministically`() {
+        let grok = profileAccount(
+            id: "30000000-0000-0000-0000-000000000003",
+            providerID: .grok,
+            path: "/profiles/grok/personal",
+            name: "Grok",
+        )
+        let codex = profileAccount(
+            id: "20000000-0000-0000-0000-000000000008",
+            providerID: .codex,
+            path: "/profiles/codex/personal",
+            name: "Codex",
+        )
+
+        #expect(ProductionProviderCatalog.adapters(for: [grok, codex]).map(\.providerID) == [
+            .codex,
+            .grok,
+        ])
+    }
+
+    @Test
     func `ignores simulated and unsupported Codex credential bindings`() {
         let simulated = account(
             id: "20000000-0000-0000-0000-000000000004",

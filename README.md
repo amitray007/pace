@@ -18,8 +18,8 @@ is the dependable default surface. Users can enable either surface or both.
 
 Pace is the settled product name. Its native application foundation now includes provider-neutral
 accounts, normalized quota snapshots, deterministic simulated data, shared selection, refresh
-orchestration, and local persistence. Live provider adapters remain behind the simulated-data visual
-approval gate.
+orchestration, and local persistence. Codex and Grok now have production-separated adapters; the
+remaining provider spikes stay isolated until their validation gates pass.
 
 The first static native surfaces now run against a dedicated visual-reference fixture. AppKit owns
 the menu-bar status item and click-through edge panel. Core Animation draws the rail, connector,
@@ -37,6 +37,8 @@ The Providers settings section now adds the current profile or an explicitly cho
 It never registers an ambient login automatically. A successful add supersedes the simulated Codex
 fixture in the active runtime and presentation. Pace retains that fixture as a deterministic local
 fallback, and the other provider fixtures remain active until their own adapters are promoted.
+Disabling or removing the last enabled real account refreshes that retained fixture before Pace
+shows it again.
 
 The account core keeps discovery and registration separate. A discovery request never adds an
 account to Pace. The selected candidate must be added explicitly, can receive a local name, and can
@@ -47,6 +49,16 @@ For multiple Codex accounts, sign each account in through Codex with a separate 
 choose that folder in Pace. Codex continues to own its credentials. Removing an account from Pace
 deletes only Pace's normalized usage and profile reference.
 
+The production Grok adapter reads one explicit `GROK_HOME` at a time. It accepts only a private,
+first-party xAI session, verifies the remote `/user` identity before requesting `/billing`, and
+polls at a conservative 15-minute baseline with provider retry intervals respected. Pace never
+starts or depends on a Grok process. Identity changes stop before quota retrieval and preserve the
+last good snapshot as stale.
+
+For multiple Grok accounts, authenticate each account with Grok in a separate `GROK_HOME`, then
+choose that folder in Pace. Grok owns login, logout, and credential rotation. Removing an account
+from Pace leaves `auth.json` and the profile directory unchanged.
+
 A separate Claude compatibility spike verifies OAuth identity before reading usage, supports
 explicit isolated profile directories, and keeps all credential and endpoint code outside the app.
 
@@ -54,9 +66,8 @@ The Cursor compatibility spike verifies identity directly with Cursor before rea
 supports the default Cursor Agent Keychain login and isolated Cursor Agent file profiles without
 reading Cursor Desktop state or browser cookies.
 
-The Grok compatibility spike uses xAI's officially supported `GROK_HOME` isolation. It verifies the
-session through Grok's `/user` endpoint before reading billing and never relies on a running Grok
-process.
+The original Grok compatibility spike remains as reproducible source and response-shape evidence
+for the production adapter.
 
 The GitHub Copilot compatibility spike binds each account through an explicit GitHub CLI username,
 verifies its durable identity with GitHub's documented `/user` API, and then reads its personal

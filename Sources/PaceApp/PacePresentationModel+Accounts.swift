@@ -11,11 +11,10 @@ extension PacePresentationModel {
             return account.providerID
         })
         let hasSimulation = state.accounts.contains { $0.credentialBinding.isSimulated }
-        if liveProviders == [.codex], hasSimulation {
-            return "Live Codex; other providers simulated"
-        }
         if !liveProviders.isEmpty {
-            return "Live provider accounts"
+            let names = liveProviders.sorted().map { ProviderStyle.resolve($0).name }
+            let liveDescription = "Live \(Self.formattedProviderList(names))"
+            return hasSimulation ? "\(liveDescription); other providers simulated" : liveDescription
         }
         return state.accounts.isEmpty ? "No accounts configured" : "Deterministic simulation"
     }
@@ -35,13 +34,26 @@ extension PacePresentationModel {
     }
 
     func addCodexProfile(at directory: URL) async {
+        await addProviderProfile(at: directory, providerID: .codex)
+    }
+
+    func addDefaultGrokAccount() async {
+        await addGrokProfile(at: defaultGrokProfileDirectory)
+    }
+
+    func addGrokProfile(at directory: URL) async {
+        await addProviderProfile(at: directory, providerID: .grok)
+    }
+
+    private func addProviderProfile(at directory: URL, providerID: ProviderID) async {
         guard !isReferencePreview, !isLoading, !isManagingAccounts, !isRefreshing,
               let store, let scenario = simulatedScenario
         else {
             return
         }
         guard Self.directoryExists(directory) else {
-            accountActionError = "The selected Codex profile folder does not exist."
+            accountActionError = "The selected \(Self.providerName(providerID)) profile folder "
+                + "does not exist."
             return
         }
 
@@ -51,17 +63,21 @@ extension PacePresentationModel {
         await shutdownProviderRuntime()
 
         do {
-            _ = try await CodexAccountOnboarding().addProfile(
-                at: directory,
-                to: store,
-            )
+            switch providerID {
+            case .codex:
+                _ = try await CodexAccountOnboarding().addProfile(at: directory, to: store)
+            case .grok:
+                _ = try await GrokAccountOnboarding().addProfile(at: directory, to: store)
+            default:
+                preconditionFailure("Unsupported profile provider: \(providerID.rawValue)")
+            }
             try await configureProviderRuntime(
                 store: store,
                 scenario: scenario,
                 refreshAll: false,
             )
             state = await store.currentState()
-            activeProviderID = .codex
+            activeProviderID = providerID
         } catch {
             do {
                 try await configureProviderRuntime(
@@ -69,11 +85,11 @@ extension PacePresentationModel {
                     scenario: scenario,
                     refreshAll: false,
                 )
-                accountActionError = Self.accountErrorMessage(error)
+                accountActionError = Self.accountErrorMessage(error, providerID: providerID)
             } catch let recoveryError {
-                accountActionError = Self.accountErrorMessage(error)
+                accountActionError = Self.accountErrorMessage(error, providerID: providerID)
                     + " Usage updates could not be restarted: "
-                    + Self.accountErrorMessage(recoveryError)
+                    + Self.accountErrorMessage(recoveryError, providerID: providerID)
             }
         }
     }
@@ -97,16 +113,29 @@ extension PacePresentationModel {
     }
 
     func setManagedAccount(_ accountID: AccountID, isEnabled: Bool) async {
-        guard !isLoading, !isManagingAccounts, !isRefreshing, let accountCoordinator else {
+        guard !isLoading, !isManagingAccounts, !isRefreshing, let accountCoordinator,
+              let store, let scenario = simulatedScenario,
+              let account = state.accounts.first(where: { $0.id == accountID })
+        else {
             return
         }
         isManagingAccounts = true
         defer { isManagingAccounts = false }
         do {
             try await accountCoordinator.setEnabled(accountID, isEnabled: isEnabled)
-            state = await store?.currentState() ?? state
+            try await configureProviderRuntime(
+                store: store,
+                scenario: scenario,
+                refreshAll: false,
+            )
+            if isEnabled {
+                try await refreshAccountIfAvailable(accountID)
+            } else {
+                try await refreshSimulatedFallbackIfNeeded(for: account.providerID)
+            }
             accountActionError = nil
         } catch {
+            state = await store.currentState()
             accountActionError = Self.accountErrorMessage(error)
         }
     }
@@ -120,12 +149,13 @@ extension PacePresentationModel {
         isManagingAccounts = true
         defer { isManagingAccounts = false }
         do {
-            _ = try await accountCoordinator.remove(accountID)
+            let removedAccount = try await accountCoordinator.remove(accountID)
             try await configureProviderRuntime(
                 store: store,
                 scenario: scenario,
                 refreshAll: false,
             )
+            try await refreshSimulatedFallbackIfNeeded(for: removedAccount.providerID)
             reconcileActiveProvider()
             accountActionError = nil
         } catch {
@@ -134,8 +164,9 @@ extension PacePresentationModel {
         }
     }
 
-    func reportAccountPickerError(_: any Error) {
-        accountActionError = "The Codex profile folder could not be opened."
+    func reportAccountPickerError(_: any Error, providerID: ProviderID) {
+        accountActionError = "The \(Self.providerName(providerID)) profile folder could not be "
+            + "opened."
     }
 }
 
@@ -147,14 +178,22 @@ extension PacePresentationModel {
     ) async throws {
         await shutdownProviderRuntime()
         let startingState = await store.currentState()
+        let enabledProductionProviderIDs = Set(
+            startingState.accounts.compactMap { account -> ProviderID? in
+                guard account.isEnabled, !account.credentialBinding.isSimulated else {
+                    return nil
+                }
+                return account.providerID
+            },
+        )
         let productionAdapters = ProductionProviderCatalog.adapters(for: startingState.accounts)
-        let productionProviderIDs = Set(productionAdapters.map(\.providerID))
+            .filter { enabledProductionProviderIDs.contains($0.providerID) }
         let simulatedProviderIDs = Set(startingState.accounts.compactMap { account -> ProviderID? in
             account.credentialBinding.isSimulated ? account.providerID : nil
         })
         let simulatedAdapters = scenario.adapters.filter { adapter in
             simulatedProviderIDs.contains(adapter.providerID)
-                && !productionProviderIDs.contains(adapter.providerID)
+                && !enabledProductionProviderIDs.contains(adapter.providerID)
         }
         let runtime = try RefreshCoordinator(
             store: store,
@@ -171,6 +210,34 @@ extension PacePresentationModel {
         state = await store.currentState()
         monitorProviderUpdates(coordinator: runtime, store: store)
         reconcileActiveProvider()
+    }
+
+    private func refreshAccountIfAvailable(_ accountID: AccountID) async throws {
+        guard let refreshCoordinator else {
+            return
+        }
+        _ = try await refreshCoordinator.refresh(accountID)
+        state = await store?.currentState() ?? state
+    }
+
+    private func refreshSimulatedFallbackIfNeeded(for providerID: ProviderID) async throws {
+        let currentState = await store?.currentState() ?? state
+        let hasEnabledLiveAccount = currentState.accounts.contains { account in
+            account.providerID == providerID
+                && account.isEnabled
+                && !account.credentialBinding.isSimulated
+        }
+        guard !hasEnabledLiveAccount,
+              let fallback = currentState.accounts.first(where: { account in
+                  account.providerID == providerID
+                      && account.isEnabled
+                      && account.credentialBinding.isSimulated
+              })
+        else {
+            state = currentState
+            return
+        }
+        try await refreshAccountIfAvailable(fallback.id)
     }
 
     func shutdownProviderRuntime() async {
@@ -202,12 +269,15 @@ extension PacePresentationModel {
         ) && isDirectory.boolValue
     }
 
-    private static func accountErrorMessage(_ error: any Error) -> String {
+    private static func accountErrorMessage(
+        _ error: any Error,
+        providerID: ProviderID? = nil,
+    ) -> String {
         if let failure = error as? ProviderFailure {
-            return providerFailureMessage(failure)
+            return providerFailureMessage(failure, providerID: providerID)
         }
-        if let actionError = error as? CodexAccountOnboardingError {
-            return actionError.message
+        if let actionError = error as? ProviderProfileAccountOnboardingError {
+            return actionError.message(providerID: providerID)
         }
         if let mutationError = error as? AccountMutationError {
             return accountMutationErrorMessage(mutationError)
@@ -215,19 +285,52 @@ extension PacePresentationModel {
         return "The account change could not be completed."
     }
 
-    private static func providerFailureMessage(_ failure: ProviderFailure) -> String {
-        switch failure {
+    private static func providerFailureMessage(
+        _ failure: ProviderFailure,
+        providerID: ProviderID?,
+    ) -> String {
+        let providerName = providerName(providerID)
+        return switch failure {
         case .signedOut:
-            "Codex is signed out in this profile. Sign in with Codex, then try again."
+            "\(providerName) is signed out in this profile. Sign in with \(providerName), then "
+                + "try again."
+        case .identityMismatch:
+            "This profile now belongs to a different \(providerName) account."
         case .rateLimited:
-            "Codex is temporarily rate limited. Try again later."
+            "\(providerName) is temporarily rate limited. Try again later."
         case .failed:
-            "Codex could not verify this profile."
+            "\(providerName) could not verify this profile."
         case let .unavailable(code):
-            code == "codex-executable-unavailable"
-                ? "Install the Codex CLI before adding this account."
-                : "Codex is unavailable for this profile."
+            if code == "codex-executable-unavailable" {
+                "Install the Codex CLI before adding this account."
+            } else if code == "grok-credential-unsupported" {
+                "This Grok profile uses an API key or custom issuer. Pace only reads first-party "
+                    + "Grok sessions."
+            } else {
+                "\(providerName) is unavailable for this profile."
+            }
         }
+    }
+
+    private static func providerName(_ providerID: ProviderID?) -> String {
+        switch providerID {
+        case .codex:
+            "Codex"
+        case .grok:
+            "Grok"
+        default:
+            "Provider"
+        }
+    }
+
+    private static func formattedProviderList(_ names: [String]) -> String {
+        guard let last = names.last else {
+            return "provider accounts"
+        }
+        guard names.count > 1 else {
+            return last
+        }
+        return names.dropLast().joined(separator: ", ") + " and \(last)"
     }
 
     private static func accountMutationErrorMessage(_ error: AccountMutationError) -> String {
@@ -244,16 +347,21 @@ extension PacePresentationModel {
     }
 }
 
-private extension CodexAccountOnboardingError {
-    var message: String {
-        switch self {
+private extension ProviderProfileAccountOnboardingError {
+    func message(providerID: ProviderID?) -> String {
+        let providerName = switch providerID {
+        case .codex: "Codex"
+        case .grok: "Grok"
+        default: "provider"
+        }
+        return switch self {
         case .identityAlreadyRegistered:
-            "This Codex identity is already registered from another profile folder."
+            "This \(providerName) identity is already registered from another profile folder."
         case .profileIdentityChanged:
-            "This profile folder now belongs to a different Codex identity. "
+            "This profile folder now belongs to a different \(providerName) identity. "
                 + "Remove the old account before adding it again."
         case .profileNotDiscovered:
-            "Codex did not return an account for the selected profile folder."
+            "\(providerName) did not return an account for the selected profile folder."
         }
     }
 }

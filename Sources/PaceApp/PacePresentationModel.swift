@@ -7,6 +7,8 @@ enum RailPreviewState: String, CaseIterable, Identifiable {
     case claude
     case codex
     case cursor
+    case githubCopilot
+    case grok
     case mini
     case rail
 
@@ -22,6 +24,10 @@ enum RailPreviewState: String, CaseIterable, Identifiable {
             .codex
         case .cursor:
             .cursor
+        case .githubCopilot:
+            .githubCopilot
+        case .grok:
+            .grok
         case .mini, .rail:
             nil
         }
@@ -44,6 +50,7 @@ final class PacePresentationModel {
     var railPreviewState: RailPreviewState
     let forcesIncreasedContrast: Bool
     let defaultCodexProfileDirectory: URL
+    let defaultGrokProfileDirectory: URL
 
     let isReferencePreview: Bool
     private let simulatedPresentationState: SimulatedPresentationState
@@ -90,6 +97,10 @@ final class PacePresentationModel {
             .map { URL(filePath: $0, directoryHint: .isDirectory) }
             ?? FileManager.default.homeDirectoryForCurrentUser
             .appending(path: ".codex", directoryHint: .isDirectory)
+        defaultGrokProfileDirectory = environment["GROK_HOME"]
+            .map { URL(filePath: $0, directoryHint: .isDirectory) }
+            ?? FileManager.default.homeDirectoryForCurrentUser
+            .appending(path: ".grok", directoryHint: .isDirectory)
         simulatedPresentationState = environment["PACE_SIMULATED_STATE"]
             .flatMap(SimulatedPresentationState.init(rawValue:)) ?? .current
         self.preferencesPersistence = preferencesPersistence
@@ -212,6 +223,10 @@ final class PacePresentationModel {
             "monthly-limit"
         case .cursor:
             "included-usage"
+        case .grok:
+            "included-weekly"
+        case .githubCopilot:
+            "premium-interactions"
         default:
             nil
         }
@@ -423,6 +438,10 @@ extension RailPreviewState {
             self = .codex
         case .cursor:
             self = .cursor
+        case .githubCopilot:
+            self = .githubCopilot
+        case .grok:
+            self = .grok
         default:
             return nil
         }

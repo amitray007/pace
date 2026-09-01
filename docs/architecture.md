@@ -137,18 +137,17 @@ account per provider; simulated fixtures remain exempt. Rename, enable, disable,
 refresh, and removal all flow through the same coordinator. Removal deletes normalized Pace state
 and never deletes provider-owned credentials or profiles.
 
-The production provider catalog derives one Codex adapter from all registered real Codex profile
-bindings, including disabled accounts that may be re-enabled. App launch promotes this adapter only
-when such a binding exists. The settings flow stops the current runtime, verifies the selected
-profile without opening unrelated registered profiles, registers or re-enables that one account,
-performs an initial refresh, and then rebuilds
-the shared runtime from every registered profile. A verified real Codex account suppresses the
-simulated Codex fixture in the active runtime and presentation. Pace retains the fixture as a
-deterministic fallback if the last real account is removed. A failed initial refresh removes a new
-registration or restores the disabled state of an account that Pace tried to re-enable. This
-transition occurs only after the
-explicit flow succeeds.
-Simulated accounts for providers without production adapters remain unchanged.
+The production provider catalog derives one adapter per promoted provider from all registered real
+profile bindings, including disabled accounts that may be re-enabled. The active runtime installs
+that adapter only while the provider has an enabled real account. Refresh and update-monitor
+reconciliation exclude retained simulated bindings from a provider's live adapter. Disabling or
+removing the last enabled real account rebuilds the runtime with the simulated adapter and refreshes
+the retained fixture before showing it again. The shared profile-onboarding flow stops the current
+runtime, verifies only the selected profile, registers or re-enables that one account, performs an
+initial refresh, and then rebuilds the shared runtime from every registered profile. A failed
+initial refresh removes a new registration or restores the disabled state of an account that Pace
+tried to re-enable. This transition occurs only after the explicit flow succeeds. Simulated
+accounts for providers without production adapters remain unchanged.
 
 The live spike was verified on 2026-08-31 with Codex CLI 0.151.0. The response contained a general
 weekly bucket plus model-specific five-hour and weekly buckets. This proves the UI must render
@@ -186,6 +185,25 @@ buckets. A fresh isolated home reported signed out instead of inheriting the def
 distinct live file profiles, file-profile token rotation, request-based Enterprise fallbacks, and
 long-running polling remain unverified. The spike never reads Cursor Desktop SQLite state or
 browser cookies, and it never refreshes or writes credentials.
+
+### Grok
+
+The production Grok adapter reads explicit `GROK_HOME` profiles without starting Grok. It accepts
+only one owner-private first-party xAI OIDC session from the selected `auth.json`; API keys, custom
+issuers, ambiguous credentials, expired sessions, group-readable files, and symbolic-link
+credential files are rejected before network use.
+
+Every discovery and refresh calls the Grok CLI proxy `/user?include=subscription` first. Refresh
+compares the canonical remote user, principal, and team identity with the registered Pace identity
+before calling `/billing?format=credits`. Weekly, monthly, legacy included-credit, and capped
+pay-as-you-go values normalize into provider-owned quota buckets. A mismatch becomes the shared
+identity-mismatch state without requesting billing or replacing last-good data.
+
+Enabled accounts poll independently at a 15-minute baseline. Rate-limit retry times extend that
+delay; authentication and identity failures use a slower retry interval. Disabling or removing the
+account cancels its polling task. The read-only live smoke passed on 2026-09-01 using the existing
+private default profile without a running Grok process. Two distinct live profiles, credential
+rotation, and additional personal or team response shapes remain external validation checks.
 
 ### Compatibility adapters
 

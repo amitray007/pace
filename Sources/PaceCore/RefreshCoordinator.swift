@@ -37,7 +37,7 @@ public struct RefreshCoordinator: Sendable {
     @discardableResult
     public func refreshAll() async throws -> [AccountRefreshOutcome] {
         let state = await store.currentState()
-        let accounts = state.accounts.filter(\.isEnabled)
+        let accounts = Self.activeAccounts(in: state)
         var outcomes: [AccountRefreshOutcome] = []
 
         await withTaskGroup(of: AccountRefreshOutcome.self) { group in
@@ -153,7 +153,7 @@ public struct RefreshCoordinator: Sendable {
         continuation: AsyncStream<ProviderUpdateDelivery>.Continuation,
         monitors: inout [AccountID: AccountMonitor],
     ) async {
-        let accounts = state.accounts.filter(\.isEnabled)
+        let accounts = Self.activeAccounts(in: state)
         let desiredIDs = Set(accounts.map(\.id))
 
         let retiredIDs = monitors.keys.filter { !desiredIDs.contains($0) }
@@ -203,6 +203,25 @@ public struct RefreshCoordinator: Sendable {
             .failure(accountID: accountID, failure: failure)
         case let .refresh(result):
             .success(accountID: accountID, result: result)
+        }
+    }
+
+    private static func activeAccounts(in state: PaceState) -> [ProviderAccount] {
+        let enabledAccounts = state.accounts.filter(\.isEnabled)
+        let providersWithLiveAccounts = Set(enabledAccounts.compactMap { account in
+            guard case .simulated = account.credentialBinding else {
+                return account.providerID
+            }
+            return nil
+        })
+        return enabledAccounts.filter { account in
+            guard providersWithLiveAccounts.contains(account.providerID) else {
+                return true
+            }
+            guard case .simulated = account.credentialBinding else {
+                return true
+            }
+            return false
         }
     }
 

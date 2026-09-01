@@ -378,6 +378,8 @@ private extension PaceStore {
         switch failure {
         case let .failed(code):
             .failed(code: code)
+        case .identityMismatch:
+            .identityMismatch
         case let .rateLimited(retryAt):
             .rateLimited(retryAt: retryAt)
         case .signedOut:

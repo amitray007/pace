@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 struct PaceSettingsView: View {
     @Bindable var model: PacePresentationModel
     @State private var isChoosingCodexProfile = false
+    @State private var isChoosingGrokProfile = false
 
     var body: some View {
         Form {
@@ -103,6 +104,29 @@ struct PaceSettingsView: View {
 
                     Text(
                         "For another Codex account, sign in with a separate CODEX_HOME, "
+                            + "then choose that folder.",
+                    )
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+
+                    ForEach(model.managedAccounts(for: .grok)) { account in
+                        ManagedProviderAccountRow(model: model, account: account)
+                    }
+
+                    HStack(spacing: 8) {
+                        Button("Add current Grok account") {
+                            Task {
+                                await model.addDefaultGrokAccount()
+                            }
+                        }
+                        Button("Choose Grok profile folder...") {
+                            isChoosingGrokProfile = true
+                        }
+                    }
+                    .disabled(model.isLoading || model.isManagingAccounts || model.isRefreshing)
+
+                    Text(
+                        "For another Grok account, sign in with a separate GROK_HOME, "
                             + "then choose that folder.",
                     )
                     .font(.callout)
@@ -210,7 +234,26 @@ struct PaceSettingsView: View {
                 }
             case let .failure(error):
                 if (error as? CocoaError)?.code != .userCancelled {
-                    model.reportAccountPickerError(error)
+                    model.reportAccountPickerError(error, providerID: .codex)
+                }
+            }
+        }
+        .fileImporter(
+            isPresented: $isChoosingGrokProfile,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false,
+        ) { result in
+            switch result {
+            case let .success(urls):
+                guard let directory = urls.first else {
+                    return
+                }
+                Task {
+                    await model.addGrokProfile(at: directory)
+                }
+            case let .failure(error):
+                if (error as? CocoaError)?.code != .userCancelled {
+                    model.reportAccountPickerError(error, providerID: .grok)
                 }
             }
         }

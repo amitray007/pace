@@ -18,6 +18,7 @@ public struct ProviderCapabilities: Codable, Equatable, Sendable {
 
 public enum ProviderFailure: Error, Equatable, Sendable {
     case failed(code: String)
+    case identityMismatch
     case rateLimited(retryAt: Date?)
     case signedOut
     case unavailable(code: String)

@@ -103,6 +103,40 @@ struct RefreshCoordinatorTests {
     }
 
     @Test
+    func `records identity mismatch before quota retrieval`() async throws {
+        let store = try await PaceStore.open(persistence: InMemoryPaceStatePersistence())
+        let personal = TestSupport.discoveredAccount(
+            providerID: .grok,
+            subjectID: "grok-personal",
+            displayName: "Personal",
+        )
+        try await store.register(
+            personal,
+            id: TestSupport.personalID,
+            addedAt: TestSupport.referenceDate,
+        )
+        let lastGood = try TestSupport.snapshot(
+            providerID: .grok,
+            accountID: TestSupport.personalID,
+            usedFraction: 0.3,
+        )
+        try await store.replaceSnapshots(for: TestSupport.personalID, with: [lastGood])
+        let adapter = SimulatedProviderAdapter(
+            providerID: .grok,
+            discoveredAccounts: [personal],
+            refreshSteps: [TestSupport.personalID: [.failure(.identityMismatch)]],
+        )
+        let coordinator = try RefreshCoordinator(store: store, adapters: [adapter])
+
+        try await coordinator.refreshAll()
+
+        let state = await store.currentState()
+        #expect(state.accounts.first?.connectionState == .identityMismatch)
+        #expect(state.snapshots.first?.usedFraction == 0.3)
+        #expect(state.snapshots.first?.freshness == .stale)
+    }
+
+    @Test
     func `skips disabled accounts`() async throws {
         let store = try await PaceStore.open(persistence: InMemoryPaceStatePersistence())
         let personal = TestSupport.discoveredAccount(

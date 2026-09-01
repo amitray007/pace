@@ -132,6 +132,8 @@ Keep settings grouped by user intent:
 Do not expose internal animation control points or arbitrary theme values in the first release.
 
 The current Providers section keeps provider ordering and account management in the same native
-group. Codex registration is always explicit: add the current `CODEX_HOME` or choose another profile
-folder. Each real account has a local name, an enable switch, and a remove action. Removing it never
-deletes the provider profile or credentials.
+group. Codex and Grok registration are always explicit: add the current `CODEX_HOME` or `GROK_HOME`,
+or choose another provider profile folder. Each real account has a local name, an enable switch,
+and a remove action. Removing it never deletes the provider profile or credentials. A real account
+suppresses only that provider's simulated fixture while the real account is enabled. Disabling or
+removing the last enabled real account restores and refreshes the fixture.
