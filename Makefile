@@ -1,4 +1,4 @@
-.PHONY: benchmark build check format format-check generate interaction-benchmark lint reference-fetch reference-frames release-archive release-preflight release-smoke test visual-benchmark
+.PHONY: benchmark build check format format-check generate install install-build interaction-benchmark launch lint reference-fetch reference-frames release-archive release-preflight release-smoke run test visual-benchmark
 
 VISUAL_CAPTURE ?=
 VISUAL_OUTPUT ?= .local/review/visual-benchmark
@@ -7,6 +7,9 @@ RELEASE_BUILD_NUMBER ?= 1
 RELEASE_BUNDLE_ID ?= com.amitray.Pace.dev
 RELEASE_DERIVED_DATA ?= .build/release-preflight
 RELEASE_ARTIFACTS ?= .build/release-artifacts
+INSTALL_DIR ?= /Applications
+INSTALL_DERIVED_DATA ?= .build/install
+INSTALL_APP = $(INSTALL_DERIVED_DATA)/Build/Products/Release/Pace.app
 RELEASE_ARTIFACT_BASENAME = Pace-$(RELEASE_VERSION)-$(RELEASE_BUILD_NUMBER)-macos-universal-unsigned
 
 benchmark:
@@ -72,3 +75,23 @@ build: generate
 		-derivedDataPath .build/xcode-derived-data CODE_SIGNING_ALLOWED=NO build
 
 check: format-check lint test build
+
+# Build the Release application into a dedicated derived-data path for installing.
+install-build: generate
+	xcodebuild -project Pace.xcodeproj -scheme Pace -configuration Release \
+		-derivedDataPath "$(INSTALL_DERIVED_DATA)" CODE_SIGNING_ALLOWED=NO \
+		MARKETING_VERSION="$(RELEASE_VERSION)" \
+		CURRENT_PROJECT_VERSION="$(RELEASE_BUILD_NUMBER)" \
+		ONLY_ACTIVE_ARCH=YES build
+
+# Build, then ad-hoc sign and copy the application into INSTALL_DIR.
+install: install-build
+	bash Scripts/install-app.sh "$(INSTALL_APP)" "$(INSTALL_DIR)"
+
+# Install, then launch the installed application.
+run: install
+	open -a "$(INSTALL_DIR)/Pace.app"
+
+# Launch the already-installed application without rebuilding.
+launch:
+	open -a "$(INSTALL_DIR)/Pace.app"
