@@ -1,5 +1,4 @@
 import Foundation
-import LocalAuthentication
 import Security
 
 protocol ClaudeKeychainAccessing: Sendable {
@@ -24,8 +23,19 @@ struct ClaudeSecurityKeychain: ClaudeKeychainAccessing {
         service: String,
         account: String,
     ) throws(ClaudeProviderError) -> ClaudeKeychainRecord? {
-        let context = LAContext()
-        context.interactionNotAllowed = true
+        // `LAContext.interactionNotAllowed` only suppresses LocalAuthentication
+        // UI, such as a Touch ID sheet. It does not suppress the classic
+        // keychain authorization dialog that asks for the login password when
+        // an item's access control does not already admit this application.
+        // `kSecUseAuthenticationUIFail` is what suppresses that dialog, failing
+        // with `errSecInteractionNotAllowed` instead of showing it.
+        //
+        // The two are not combined: supplying `kSecUseAuthenticationContext`
+        // makes the context's policy win and the UI key is ignored, which is
+        // what left the password dialog appearing.
+        //
+        // Pace reads a credential another application owns and has a fallback
+        // for every failure, so it must never be the reason a dialog appears.
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -34,7 +44,7 @@ struct ClaudeSecurityKeychain: ClaudeKeychainAccessing {
             kSecMatchLimit as String: kSecMatchLimitOne,
             kSecReturnAttributes as String: true,
             kSecReturnData as String: true,
-            kSecUseAuthenticationContext as String: context,
+            kSecUseAuthenticationUI as String: kSecUseAuthenticationUIFail,
         ]
         var result: CFTypeRef?
         switch SecItemCopyMatching(query as CFDictionary, &result) {
@@ -48,6 +58,12 @@ struct ClaudeSecurityKeychain: ClaudeKeychainAccessing {
             return ClaudeKeychainRecord(account: account, data: data)
         case errSecItemNotFound:
             return nil
+        case errSecInteractionNotAllowed, errSecAuthFailed:
+            // The item's access control does not admit Pace without asking the
+            // user for a password. Treat that as "this source is unavailable"
+            // so `load` moves on to the credential file, which is the same
+            // credential written by the provider.
+            throw .credentialUnavailable
         default:
             throw .credentialReadFailed
         }
@@ -58,18 +74,23 @@ struct ClaudeSecurityKeychain: ClaudeKeychainAccessing {
         account: String,
         data: Data,
     ) throws(ClaudeProviderError) {
-        let context = LAContext()
-        context.interactionNotAllowed = true
+        // See the note on reading: the same dialog can appear for a write, and
+        // a rotation that cannot complete silently is reported rather than
+        // escalated to the user mid-refresh.
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
             kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
-            kSecUseAuthenticationContext as String: context,
+            kSecUseAuthenticationUI as String: kSecUseAuthenticationUIFail,
         ]
         let attributes = [kSecValueData as String: data]
-        guard SecItemUpdate(query as CFDictionary, attributes as CFDictionary) == errSecSuccess
-        else {
+        switch SecItemUpdate(query as CFDictionary, attributes as CFDictionary) {
+        case errSecSuccess:
+            return
+        case errSecInteractionNotAllowed, errSecAuthFailed:
+            throw .credentialUnavailable
+        default:
             throw .credentialWriteFailed
         }
     }

@@ -123,8 +123,8 @@ enum RailShellMetrics {
     /// small enough to read as a hint rather than a bar sitting on the edge.
     /// It is centred on the rail's own vertical centre so opening the rail
     /// grows out of where the handle was.
-    static let handleWidth: CGFloat = 6
-    static let handleHeight: CGFloat = 34
+    static let handleWidth: CGFloat = 8
+    static let handleHeight: CGFloat = 52
 
     /// The handle's rounded end. Half its width, so the inner edge is a
     /// semicircle rather than a rectangle with clipped corners.

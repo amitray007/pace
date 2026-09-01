@@ -175,6 +175,12 @@ public struct ClaudeProviderAdapter: ProviderUpdateStreamingAdapter {
         switch error {
         case .credentialReadFailed, .credentialWriteFailed, .insecureCredentialFile:
             .unavailable(code: "claude-credential-unavailable")
+        case .credentialUnavailable:
+            // Every credential source refused to answer without interrupting
+            // the user. This is a distinct, actionable state, not a generic
+            // failure: the account is fine and signing in again through Claude
+            // Code resolves it.
+            .unavailable(code: "claude-credential-needs-authorization")
         case .missingProfileScope:
             .unavailable(code: "claude-profile-scope-missing")
         case .credentialChanged:

@@ -237,6 +237,11 @@ enum ClaudeProviderError: Error, Equatable, Sendable {
     case cancelled
     case credentialChanged
     case credentialReadFailed
+    /// A credential source exists but will not release its value without
+    /// interrupting the user. Callers treat this as "try the next source"
+    /// rather than as a failure, because Pace reads credentials another
+    /// application owns and must never prompt for them.
+    case credentialUnavailable
     case credentialWriteFailed
     case identityMismatch
     case insecureCredentialFile

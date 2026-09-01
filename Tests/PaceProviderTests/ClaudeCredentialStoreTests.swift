@@ -101,6 +101,53 @@ struct ClaudeCredentialStoreTests {
     }
 
     @Test
+    func `a keychain that will not answer falls back to the credential file`() throws {
+        // Pace reads a credential another application owns. If the keychain
+        // will not release it without asking the user for a password, Pace
+        // must use the provider's credential file rather than let a password
+        // dialog appear during a background refresh.
+        let directory = try temporaryProfile()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let profile = ClaudeProfile(directory: directory, ownership: .existing)
+        let credentialURL = directory.appending(path: ".credentials.json")
+        try ClaudeTestSupport.credentialDocument(
+            ClaudeTestSupport.credential(accessToken: "from-file"),
+        ).write(to: credentialURL)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o600],
+            ofItemAtPath: credentialURL.path,
+        )
+        let keychain = ClaudeStubKeychain(
+            records: [:],
+            readError: .credentialUnavailable,
+        )
+
+        let candidates = try ClaudeCredentialStore(keychain: keychain).load(for: profile)
+
+        #expect(candidates.map(\.credential.accessToken) == ["from-file"])
+        #expect(keychain.readServices == [profile.keychainService])
+    }
+
+    @Test
+    func `a refusing keychain with no file reports that authorization is needed`() throws {
+        // With no fallback the account is genuinely unusable, but the reason
+        // must survive: it is an authorization problem, not a corrupt or
+        // missing credential.
+        let directory = try temporaryProfile()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let profile = ClaudeProfile(directory: directory, ownership: .existing)
+        let keychain = ClaudeStubKeychain(
+            records: [:],
+            readError: .credentialUnavailable,
+        )
+        let store = ClaudeCredentialStore(keychain: keychain)
+
+        #expect(throws: ClaudeProviderError.credentialUnavailable) {
+            try store.load(for: profile)
+        }
+    }
+
+    @Test
     func `rejects group readable and symbolic link credential files`() throws {
         let directory = try temporaryProfile()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -267,16 +314,25 @@ private final class ClaudeStubKeychain: ClaudeKeychainAccessing, @unchecked Send
     private var records: [String: ClaudeKeychainRecord]
     private var mutableReadServices: [String] = []
     private var mutableWrites: [Write] = []
+    private let readError: ClaudeProviderError?
 
-    init(records: [String: ClaudeKeychainRecord]) {
+    init(
+        records: [String: ClaudeKeychainRecord],
+        readError: ClaudeProviderError? = nil,
+    ) {
         self.records = records
+        self.readError = readError
     }
 
     func readGenericPassword(
         service: String,
         account: String,
     ) throws(ClaudeProviderError) -> ClaudeKeychainRecord? {
-        lock.withLock {
+        if let readError {
+            lock.withLock { mutableReadServices.append(service) }
+            throw readError
+        }
+        return lock.withLock {
             mutableReadServices.append(service)
             guard records[service]?.account == account else {
                 return nil
