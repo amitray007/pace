@@ -29,6 +29,7 @@ final class RailShellLayerView: NSView {
     private let detailLayer = CAShapeLayer()
     private let railLayer = CAShapeLayer()
     private let settingsLayer = CAShapeLayer()
+    private let handleHighlightLayer = CAShapeLayer()
     private var previewState: RailPreviewState = .rail
     private var edge: RailEdge = .right
     private var detailCenterY: CGFloat?
@@ -44,10 +45,26 @@ final class RailShellLayerView: NSView {
         layer?.addSublayer(detailLayer)
         layer?.addSublayer(railLayer)
         layer?.addSublayer(settingsLayer)
+        layer?.addSublayer(handleHighlightLayer)
         for item in [detailLayer, railLayer, settingsLayer] {
             item.fillColor = NSColor.black.cgColor
             item.actions = ["path": NSNull(), "opacity": NSNull()]
         }
+        configureHandleHighlight()
+    }
+
+    /// A hairline along the collapsed handle's inner edge.
+    ///
+    /// The handle is pure black, so on a dark desktop it has nothing to
+    /// contrast against and effectively disappears. A light stroke does not
+    /// depend on the wallpaper behind it, which makes the handle findable
+    /// without making it larger or lighter overall.
+    private func configureHandleHighlight() {
+        handleHighlightLayer.fillColor = nil
+        handleHighlightLayer.strokeColor = RailShellMetrics.handleHighlightColor.cgColor
+        handleHighlightLayer.lineWidth = RailShellMetrics.handleHighlightWidth
+        handleHighlightLayer.lineCap = .round
+        handleHighlightLayer.actions = ["path": NSNull(), "opacity": NSNull()]
     }
 
     @available(*, unavailable)
@@ -107,51 +124,84 @@ final class RailShellLayerView: NSView {
         railLayer.frame = bounds
         settingsLayer.frame = bounds
         detailLayer.frame = bounds
+        handleHighlightLayer.frame = bounds
 
         if previewState == .mini {
-            set(
-                railLayer,
-                path: transformed(RailShellPaths.mini()),
-                opacity: 1,
-                animated: animated,
-                transition: transition,
-            )
-            set(
-                settingsLayer,
-                path: transformed(
-                    RailShellPaths.settings(showsCircle: showsSettingsCircle),
-                ),
-                opacity: 0,
-                animated: animated,
-                transition: transition,
-            )
-            set(
-                detailLayer,
-                path: transformed(RailShellPaths.collapsedDetail(centerY: lastDetailCenterY)),
-                opacity: 1,
-                animated: animated,
-                transition: transition,
-            )
+            updateCollapsedPaths(animated: animated, transition: transition)
         } else {
-            set(
-                railLayer,
-                path: transformed(RailShellPaths.rail()),
-                opacity: 1,
-                animated: animated,
-                transition: transition,
-            )
-            set(
-                settingsLayer,
-                path: transformed(
-                    RailShellPaths.settings(showsCircle: showsSettingsCircle),
-                ),
-                opacity: 1,
-                animated: animated,
-                transition: transition,
-            )
-            updateDetailPath(animated: animated, transition: transition)
+            updateExpandedPaths(animated: animated, transition: transition)
         }
         CATransaction.commit()
+    }
+
+    private func updateCollapsedPaths(
+        animated: Bool,
+        transition: RailMotion.Transition,
+    ) {
+        set(
+            railLayer,
+            path: transformed(RailShellPaths.mini()),
+            opacity: 1,
+            animated: animated,
+            transition: transition,
+        )
+        set(
+            settingsLayer,
+            path: transformed(
+                RailShellPaths.settings(showsCircle: showsSettingsCircle),
+            ),
+            opacity: 0,
+            animated: animated,
+            transition: transition,
+        )
+        set(
+            detailLayer,
+            path: transformed(RailShellPaths.collapsedDetail(centerY: lastDetailCenterY)),
+            opacity: 1,
+            animated: animated,
+            transition: transition,
+        )
+        // The highlight marks the collapsed handle, which is otherwise pure
+        // black against whatever wallpaper is behind it.
+        set(
+            handleHighlightLayer,
+            path: transformed(RailShellPaths.handleHighlight()),
+            opacity: 1,
+            animated: animated,
+            transition: transition,
+        )
+    }
+
+    private func updateExpandedPaths(
+        animated: Bool,
+        transition: RailMotion.Transition,
+    ) {
+        // Once the rail is open its own silhouette is the affordance, so the
+        // handle's highlight goes away with it.
+        set(
+            handleHighlightLayer,
+            path: transformed(RailShellPaths.handleHighlight()),
+            opacity: 0,
+            animated: animated,
+            transition: transition,
+        )
+        set(
+            railLayer,
+            path: transformed(RailShellPaths.rail()),
+            opacity: 1,
+            animated: animated,
+            transition: transition,
+        )
+        set(
+            settingsLayer,
+            path: transformed(
+                RailShellPaths.settings(showsCircle: showsSettingsCircle),
+            ),
+            opacity: 1,
+            animated: animated,
+            transition: transition,
+        )
+        updateDetailPath(animated: animated, transition: transition)
     }
 
     private func updateDetailPath(

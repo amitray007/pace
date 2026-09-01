@@ -250,18 +250,24 @@ private extension RailInteractionController {
         return .outside
     }
 
+    /// The collapsed handle's pointer target.
+    ///
+    /// Derived from the same rect the shell draws the handle from, so shrinking
+    /// the handle cannot leave the clickable area somewhere else. The target is
+    /// deliberately larger than the visible handle, which stays small.
     private var hotspotFrame: NSRect {
         guard let visualPanel else {
             return .zero
         }
+        let target = RailShellMetrics.handleTargetRect
         let originX = model.preferences.railEdge == .right
-            ? visualPanel.frame.maxX - 18
+            ? visualPanel.frame.maxX - target.width
             : visualPanel.frame.minX
         return scaledInteractionFrame(NSRect(
             x: originX,
-            y: visualPanel.frame.minY + 173,
-            width: 18,
-            height: 70,
+            y: visualPanel.frame.minY + target.minY,
+            width: target.width,
+            height: target.height,
         ))
     }
 

@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Foundation
 
@@ -115,43 +116,116 @@ enum RailShellMetrics {
     static var settingsCircleCenter: CGPoint {
         CGPoint(x: settingsCircleRect.midX, y: settingsCircleRect.midY)
     }
+
+    /// The collapsed handle.
+    ///
+    /// This is the only thing on screen while the rail is closed, so it stays
+    /// small enough to read as a hint rather than a bar sitting on the edge.
+    /// It is centred on the rail's own vertical centre so opening the rail
+    /// grows out of where the handle was.
+    static let handleWidth: CGFloat = 6
+    static let handleHeight: CGFloat = 34
+
+    /// The handle's rounded end. Half its width, so the inner edge is a
+    /// semicircle rather than a rectangle with clipped corners.
+    static var handleRadius: CGFloat {
+        handleWidth / 2
+    }
+
+    /// The handle's frame, which the shell path and the pointer's hit region
+    /// both derive from so the visible and clickable areas cannot drift apart.
+    static var handleRect: CGRect {
+        let centerY = (bodyTopY + bodyBottomY) / 2
+        return CGRect(
+            x: EdgeRailGeometry.canvasSize.width - handleWidth,
+            y: centerY - handleHeight / 2,
+            width: handleWidth,
+            height: handleHeight,
+        )
+    }
+
+    /// The handle's edge hairline. White at low opacity reads as a highlight on
+    /// any wallpaper, where a fixed grey would vanish against a light one.
+    static let handleHighlightColor = NSColor(white: 1, alpha: 0.32)
+    static let handleHighlightWidth: CGFloat = 1
+
+    /// A pointer target smaller than this is hard to hit deliberately, so the
+    /// hit region is grown around the handle without making it look larger.
+    static let minimumHandleTargetWidth: CGFloat = 18
+    static let minimumHandleTargetHeight: CGFloat = 70
+
+    /// The handle's hit region: the visible handle, expanded to a comfortable
+    /// target.
+    static var handleTargetRect: CGRect {
+        let rect = handleRect
+        let width = max(rect.width, minimumHandleTargetWidth)
+        let height = max(rect.height, minimumHandleTargetHeight)
+        return CGRect(
+            x: EdgeRailGeometry.canvasSize.width - width,
+            y: rect.midY - height / 2,
+            width: width,
+            height: height,
+        )
+    }
 }
 
 /// The rail's shell paths. Each is authored top-down and flipped once by the
 /// layer view, so a smaller y is higher on screen.
 enum RailShellPaths {
+    /// The collapsed handle: a small pill flush with the screen edge, with only
+    /// its inner side rounded.
     static func mini() -> CGPath {
+        let rect = RailShellMetrics.handleRect
+        let radius = min(
+            RailShellMetrics.handleRadius,
+            rect.height / 2,
+        )
         let path = CGMutablePath()
-        let rightX = EdgeRailGeometry.canvasSize.width
-        let leftX = rightX - 18
-        let topY: CGFloat = 173
-        let bottomY: CGFloat = 243
-        let radius: CGFloat = 9
-        path.move(to: CGPoint(x: rightX, y: topY))
-        path.addCompatibleLine(to: CGPoint(x: leftX + radius, y: topY))
+        path.move(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addCompatibleLine(to: CGPoint(x: rect.minX + radius, y: rect.minY))
         path.addCurve(
-            to: CGPoint(x: leftX, y: topY + radius),
-            control1: CGPoint(x: leftX + radius * 0.45, y: topY),
-            control2: CGPoint(x: leftX, y: topY + radius * 0.45),
+            to: CGPoint(x: rect.minX, y: rect.minY + radius),
+            control1: CGPoint(x: rect.minX + radius * 0.45, y: rect.minY),
+            control2: CGPoint(x: rect.minX, y: rect.minY + radius * 0.45),
         )
-        path.addCompatibleLine(to: CGPoint(x: leftX, y: bottomY - radius))
+        path.addCompatibleLine(to: CGPoint(x: rect.minX, y: rect.maxY - radius))
         path.addCurve(
-            to: CGPoint(x: leftX + radius, y: bottomY),
-            control1: CGPoint(x: leftX, y: bottomY - radius * 0.45),
-            control2: CGPoint(x: leftX + radius * 0.45, y: bottomY),
+            to: CGPoint(x: rect.minX + radius, y: rect.maxY),
+            control1: CGPoint(x: rect.minX, y: rect.maxY - radius * 0.45),
+            control2: CGPoint(x: rect.minX + radius * 0.45, y: rect.maxY),
         )
-        path.addCompatibleLine(to: CGPoint(x: rightX, y: bottomY))
-        path.addCompatibleLine(to: CGPoint(x: rightX, y: topY))
+        path.addCompatibleLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addCompatibleLine(to: CGPoint(x: rect.maxX, y: rect.minY))
         path.closeSubpath()
         return path
     }
 
-    /// The rail body plus its two organic contours.
+    /// The hairline along the collapsed handle's inner edge.
     ///
-    /// The contour is the reference's defining feature, so it is built from the
-    /// measured curve rather than from hand-chosen control points. The top and
-    /// bottom are the same curve mirrored, which is why the silhouette reads as
-    /// one shape rather than two rounded ends.
+    /// Only the rounded inner side is stroked. The flat side sits against the
+    /// screen edge, where half the stroke would be off screen and the visible
+    /// half would read heavier than the rest of the line.
+    static func handleHighlight() -> CGPath {
+        let rect = RailShellMetrics.handleRect
+        let radius = min(RailShellMetrics.handleRadius, rect.height / 2)
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addCompatibleLine(to: CGPoint(x: rect.minX + radius, y: rect.minY))
+        path.addCurve(
+            to: CGPoint(x: rect.minX, y: rect.minY + radius),
+            control1: CGPoint(x: rect.minX + radius * 0.45, y: rect.minY),
+            control2: CGPoint(x: rect.minX, y: rect.minY + radius * 0.45),
+        )
+        path.addCompatibleLine(to: CGPoint(x: rect.minX, y: rect.maxY - radius))
+        path.addCurve(
+            to: CGPoint(x: rect.minX + radius, y: rect.maxY),
+            control1: CGPoint(x: rect.minX, y: rect.maxY - radius * 0.45),
+            control2: CGPoint(x: rect.minX + radius * 0.45, y: rect.maxY),
+        )
+        path.addCompatibleLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        return path
+    }
+
     static func rail() -> CGPath {
         let path = CGMutablePath()
         let leftX = EdgeRailGeometry.canvasSize.width - RailShellMetrics.railWidth
