@@ -219,13 +219,17 @@ extension PacePresentationModel {
         }
     }
 
+    /// Renames an account without taking the `isManagingAccounts` lock.
+    ///
+    /// A rename is a store-only mutation, so it can run beside a refresh or
+    /// another account change. Holding the lock disabled the row that was being
+    /// edited, which ended the editing session and rejected the commit that the
+    /// resulting blur fired.
     @discardableResult
     func renameManagedAccount(_ accountID: AccountID, to displayName: String) async -> Bool {
-        guard !isLoading, !isManagingAccounts, !isRefreshing, let accountCoordinator else {
+        guard !isLoading, let accountCoordinator else {
             return false
         }
-        isManagingAccounts = true
-        defer { isManagingAccounts = false }
         do {
             try await accountCoordinator.rename(accountID, to: displayName)
             state = await store?.currentState() ?? state

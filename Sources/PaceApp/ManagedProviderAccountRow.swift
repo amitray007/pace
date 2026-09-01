@@ -21,6 +21,12 @@ struct ManagedProviderAccountRow: View {
                 color: ProviderStyle.resolve(account.providerID).accent,
                 size: 11,
             )
+            // The name field is never disabled by the model's busy flags.
+            // Disabling it while it is being edited forces AppKit to end the
+            // editing session: the field loses focus, the blur commit fires a
+            // second rename that the busy guard rejects, and the field then
+            // refuses to take focus again until Settings is reopened. A rename
+            // only touches the store, so it does not need that exclusivity.
             TextField("Account name", text: $draftName)
                 .focused($nameIsFocused)
                 .onSubmit(commitName)
@@ -42,6 +48,7 @@ struct ManagedProviderAccountRow: View {
                 ),
             )
             .labelsHidden()
+            .disabled(isManagingAccounts)
             .accessibilityLabel("Enable \(account.displayName)")
 
             Button(role: .destructive) {
@@ -50,9 +57,9 @@ struct ManagedProviderAccountRow: View {
                 Image(systemName: "trash")
             }
             .buttonStyle(.borderless)
+            .disabled(isManagingAccounts)
             .accessibilityLabel("Remove \(account.displayName)")
         }
-        .disabled(model.isLoading || model.isManagingAccounts || model.isRefreshing)
         .onChange(of: account.displayName) { _, displayName in
             if !nameIsFocused {
                 draftName = displayName
@@ -72,6 +79,10 @@ struct ManagedProviderAccountRow: View {
                     + "The provider profile and credentials stay unchanged.",
             )
         }
+    }
+
+    private var isManagingAccounts: Bool {
+        model.isLoading || model.isManagingAccounts || model.isRefreshing
     }
 
     private func commitName() {
