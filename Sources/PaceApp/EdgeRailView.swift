@@ -62,15 +62,17 @@ struct EdgeRailView: View {
         let isExpanded = model.railPreviewState != .mini
         ZStack(alignment: .topLeading) {
             RailShellLayerRepresentable(
-                previewState: model.railPreviewState,
-                edge: model.preferences.railEdge,
-                detailCenterY: detailCenterY(providerIDs: providerIDs),
-                detailHeight: detailHeight(
-                    providerID: model.railPreviewState.detailProviderID,
-                    contents: detailContents(providerIDs: providerIDs),
+                state: RailShellState(
+                    previewState: model.railPreviewState,
+                    edge: model.preferences.railEdge,
+                    detailCenterY: detailCenterY(providerIDs: providerIDs),
+                    detailHeight: detailHeight(
+                        providerID: model.railPreviewState.detailProviderID,
+                        contents: detailContents(providerIDs: providerIDs),
+                    ),
+                    showsSettingsCircle: isSettingsHovered,
+                    reducesMotion: accessibilityReduceMotion,
                 ),
-                showsSettingsCircle: isSettingsHovered,
-                reducesMotion: accessibilityReduceMotion,
             )
 
             providerRows(providerIDs: providerIDs)

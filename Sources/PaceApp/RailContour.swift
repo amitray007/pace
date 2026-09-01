@@ -35,47 +35,46 @@ enum RailContour {
         width * heightRatio
     }
 
-    /// Appends the contour to `path`, running from the screen edge to the rail
-    /// body.
+    /// Where a contour starts and how it is oriented.
     ///
-    /// The curve is expressed in a unit box and then mapped, so a caller only
-    /// supplies where the contour starts and how it is oriented.
-    ///
-    /// - Parameters:
-    ///   - path: The path to append to. Its current point must already be the
-    ///     contour's start, on the screen edge.
-    ///   - width: The rail's width. The contour spans this horizontally.
-    ///   - height: The contour's vertical span.
-    ///   - origin: The contour's start, on the screen edge.
-    ///   - inward: Direction from the screen edge toward the rail body, either
-    ///     `1` for a left-edge rail or `-1` for a right-edge rail.
-    ///   - downward: Direction along the contour, either `1` when it runs from
-    ///     the rail's top toward its body or `-1` for the mirrored bottom.
-    static func append(
-        to path: CGMutablePath,
-        width: CGFloat,
-        height: CGFloat,
-        origin: CGPoint,
-        inward: CGFloat,
-        downward: CGFloat,
-    ) {
+    /// The rail draws this curve four times across its two edges and two ends,
+    /// so its placement travels as one value rather than as five loose
+    /// arguments.
+    struct Placement {
+        /// The rail's width. The contour spans this horizontally.
+        var width: CGFloat
+        /// The contour's vertical span.
+        var height: CGFloat
+        /// The contour's endpoint on the screen edge.
+        var edgePoint: CGPoint
+        /// Direction from the screen edge toward the rail body: `1` for a
+        /// left-edge rail, `-1` for a right-edge rail.
+        var inward: CGFloat
+        /// Direction along the contour: `1` when it runs from the rail's top
+        /// toward its body, `-1` for the mirrored bottom.
+        var downward: CGFloat
+
         func point(_ unitX: CGFloat, _ unitY: CGFloat) -> CGPoint {
             CGPoint(
-                x: origin.x + inward * unitX * width,
-                y: origin.y + downward * unitY * height,
+                x: edgePoint.x + inward * unitX * width,
+                y: edgePoint.y + downward * unitY * height,
             )
         }
+    }
 
-        let meeting = point(inflection.x, inflection.y)
+    /// Appends the contour to `path`, running from the screen edge to the rail
+    /// body. The path's current point must already be `placement.edgePoint`.
+    static func append(to path: CGMutablePath, placement: Placement) {
+        let meeting = placement.point(inflection.x, inflection.y)
         path.addCurve(
             to: meeting,
-            control1: point(0, edgeControlY),
-            control2: point(approachControlX, inflection.y),
+            control1: placement.point(0, edgeControlY),
+            control2: placement.point(approachControlX, inflection.y),
         )
         path.addCurve(
-            to: point(1, 1),
-            control1: point(departControlX, inflection.y),
-            control2: point(1, 1),
+            to: placement.point(1, 1),
+            control1: placement.point(departControlX, inflection.y),
+            control2: placement.point(1, 1),
         )
     }
 
@@ -84,36 +83,19 @@ enum RailContour {
     ///
     /// The rail outline is one closed path, so the second contour has to be
     /// traversed in reverse. Reversing the control points keeps it the exact
-    /// mirror of ``append(to:width:height:origin:inward:downward:)`` instead of
-    /// an independently tuned near-copy.
-    ///
-    /// - Parameter origin: The contour's end, on the screen edge. The curve is
-    ///   emitted from the body toward this point.
-    static func appendReversed(
-        to path: CGMutablePath,
-        width: CGFloat,
-        height: CGFloat,
-        origin: CGPoint,
-        inward: CGFloat,
-        downward: CGFloat,
-    ) {
-        func point(_ unitX: CGFloat, _ unitY: CGFloat) -> CGPoint {
-            CGPoint(
-                x: origin.x + inward * unitX * width,
-                y: origin.y + downward * unitY * height,
-            )
-        }
-
-        let meeting = point(inflection.x, inflection.y)
+    /// mirror of ``append(to:placement:)`` instead of an independently tuned
+    /// near-copy.
+    static func appendReversed(to path: CGMutablePath, placement: Placement) {
+        let meeting = placement.point(inflection.x, inflection.y)
         path.addCurve(
             to: meeting,
-            control1: point(1, 1),
-            control2: point(departControlX, inflection.y),
+            control1: placement.point(1, 1),
+            control2: placement.point(departControlX, inflection.y),
         )
         path.addCurve(
-            to: point(0, 0),
-            control1: point(approachControlX, inflection.y),
-            control2: point(0, edgeControlY),
+            to: placement.point(0, 0),
+            control1: placement.point(approachControlX, inflection.y),
+            control2: placement.point(0, edgeControlY),
         )
     }
 }
