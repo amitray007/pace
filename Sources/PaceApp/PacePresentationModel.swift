@@ -161,9 +161,6 @@ final class PacePresentationModel {
 
     func selectProvider(_ providerID: ProviderID) {
         activeProviderID = providerID
-        if railPreviewState.detailProviderID != nil {
-            railPreviewState = RailPreviewState(providerID: providerID) ?? .rail
-        }
     }
 
     func selectAccount(_ accountID: AccountID, for providerID: ProviderID) async {
@@ -308,20 +305,11 @@ extension PacePresentationModel {
         setRailVisible(!isRailVisible)
     }
 
-    func toggleRailDetails() {
-        if railPreviewState.detailProviderID == nil {
-            railPreviewState = RailPreviewState(providerID: activeProviderID) ?? .rail
-        } else {
-            railPreviewState = .rail
-        }
-    }
-
     func showRail() {
         railPreviewState = .rail
     }
 
     func showRailDetails(for providerID: ProviderID) {
-        activeProviderID = providerID
         railPreviewState = RailPreviewState(providerID: providerID) ?? .rail
     }
 

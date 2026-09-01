@@ -237,18 +237,6 @@ struct MenuPanelView: View {
                 )
             }
 
-            if model.isRailVisible {
-                Button {
-                    model.toggleRailDetails()
-                } label: {
-                    Label(
-                        model.railPreviewState
-                            .detailProviderID == nil ? "Show detail" : "Rail only",
-                        systemImage: "rectangle.split.2x1",
-                    )
-                }
-            }
-
             Spacer()
             SettingsLink {
                 Image(systemName: "gearshape")

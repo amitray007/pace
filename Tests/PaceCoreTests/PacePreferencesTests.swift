@@ -5,13 +5,14 @@ import Testing
 @Suite("Pace preferences")
 struct PacePreferencesTests {
     @Test
-    func `defaults keep the rail opt-in and use safe activation`() {
+    func `defaults keep the rail opt-in and use deliberate hover activation`() {
         let preferences = PacePreferences()
 
         #expect(preferences.surfaceMode == .menuBar)
         #expect(preferences.railEdge == .right)
         #expect(preferences.railVerticalPosition == .center)
-        #expect(preferences.activationMode == .modifierHover)
+        #expect(preferences.activationMode == .dwellHover)
+        #expect(preferences.dwellDelay == 0.2)
         #expect(preferences.activationModifier == .shift)
         #expect(preferences.notificationPolicy == .disabled)
         #expect(preferences.providerOrder == PacePreferences.defaultProviderOrder)
@@ -51,8 +52,28 @@ struct PacePreferencesTests {
 
         #expect(preferences.railEdge == .left)
         #expect(preferences.surfaceMode == .menuBar)
+        #expect(preferences.activationMode == .dwellHover)
+        #expect(preferences.dwellDelay == 0.2)
         #expect(preferences.activationModifier == .shift)
         #expect(preferences.notificationPolicy == .disabled)
+    }
+
+    @Test
+    func `migrates the prototype modifier hover default to plain hover`() throws {
+        let data = Data("""
+        {
+          "activationMode": "modifierHover",
+          "dismissalDelay": 0.4,
+          "dwellDelay": 0.6,
+          "version": 1
+        }
+        """.utf8)
+
+        let preferences = try JSONDecoder().decode(PacePreferences.self, from: data)
+
+        #expect(preferences.version == PacePreferences.currentVersion)
+        #expect(preferences.activationMode == .dwellHover)
+        #expect(preferences.dwellDelay == 0.2)
     }
 
     @Test

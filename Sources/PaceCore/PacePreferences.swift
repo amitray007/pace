@@ -39,7 +39,7 @@ public enum RailActivationModifier: String, CaseIterable, Codable, Sendable {
 }
 
 public struct PacePreferences: Codable, Equatable, Sendable {
-    public static let currentVersion = 1
+    public static let currentVersion = 2
     public static let defaultProviderOrder: [ProviderID] = [
         .claude,
         .codex,
@@ -67,9 +67,9 @@ public struct PacePreferences: Codable, Equatable, Sendable {
         railEdge: RailEdge = .right,
         selectedDisplayID: String? = nil,
         railVerticalPosition: RailVerticalPosition = .center,
-        activationMode: RailActivationMode = .modifierHover,
+        activationMode: RailActivationMode = .dwellHover,
         activationModifier: RailActivationModifier = .shift,
-        dwellDelay: TimeInterval = 0.6,
+        dwellDelay: TimeInterval = 0.2,
         dismissalDelay: TimeInterval = 0.4,
         hideRailInFullScreen: Bool = true,
         notificationPolicy: PaceNotificationPolicy = .disabled,
@@ -91,9 +91,15 @@ public struct PacePreferences: Codable, Equatable, Sendable {
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        let storedVersion = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
+        let storedActivationMode = try container.decodeIfPresent(
+            RailActivationMode.self,
+            forKey: .activationMode,
+        )
+        let migratesModifierHoverDefault = storedVersion < 2 &&
+            storedActivationMode == .modifierHover
         try self.init(
-            version: container.decodeIfPresent(Int.self, forKey: .version)
-                ?? Self.currentVersion,
+            version: storedVersion < Self.currentVersion ? Self.currentVersion : storedVersion,
             surfaceMode: container.decodeIfPresent(
                 PaceSurfaceMode.self,
                 forKey: .surfaceMode,
@@ -107,16 +113,16 @@ public struct PacePreferences: Codable, Equatable, Sendable {
                 RailVerticalPosition.self,
                 forKey: .railVerticalPosition,
             ) ?? .center,
-            activationMode: container.decodeIfPresent(
-                RailActivationMode.self,
-                forKey: .activationMode,
-            ) ?? .modifierHover,
+            activationMode: migratesModifierHoverDefault
+                ? .dwellHover
+                : storedActivationMode ?? .dwellHover,
             activationModifier: container.decodeIfPresent(
                 RailActivationModifier.self,
                 forKey: .activationModifier,
             ) ?? .shift,
-            dwellDelay: container.decodeIfPresent(TimeInterval.self, forKey: .dwellDelay)
-                ?? 0.6,
+            dwellDelay: migratesModifierHoverDefault
+                ? 0.2
+                : container.decodeIfPresent(TimeInterval.self, forKey: .dwellDelay) ?? 0.2,
             dismissalDelay: container.decodeIfPresent(
                 TimeInterval.self,
                 forKey: .dismissalDelay,
