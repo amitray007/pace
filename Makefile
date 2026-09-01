@@ -1,4 +1,4 @@
-.PHONY: benchmark build check format format-check generate install install-build interaction-benchmark launch lint reference-fetch reference-frames release-archive release-preflight release-smoke run test visual-benchmark
+.PHONY: benchmark build check format format-check generate install install-build interaction-benchmark launch lint reference-fetch reference-frames release-archive release-preflight release-smoke run signing-identity test visual-benchmark
 
 VISUAL_CAPTURE ?=
 VISUAL_OUTPUT ?= .local/review/visual-benchmark
@@ -84,8 +84,12 @@ install-build: generate
 		CURRENT_PROJECT_VERSION="$(RELEASE_BUILD_NUMBER)" \
 		ONLY_ACTIVE_ARCH=YES build
 
-# Build, then ad-hoc sign and copy the application into INSTALL_DIR.
-install: install-build
+# Create the local signing identity if it does not exist yet.
+signing-identity:
+	@bash Scripts/create-signing-identity.sh
+
+# Build, then sign and copy the application into INSTALL_DIR.
+install: signing-identity install-build
 	bash Scripts/install-app.sh "$(INSTALL_APP)" "$(INSTALL_DIR)"
 
 # Install, then launch the installed application.
