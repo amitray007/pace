@@ -5,6 +5,10 @@ import SwiftUI
 /// Everything the rail shell draws from. Grouping it gives one comparison for
 /// "did anything change" instead of a growing list of stored properties.
 struct RailShellState: Equatable {
+    /// How many provider rows the rail is drawing. The shell's paths are built
+    /// from static geometry, so this is applied to RailShellMetrics before they
+    /// are evaluated.
+    var providerRowCount: Int
     var previewState: RailPreviewState
     var edge: RailEdge
     var detailCenterY: CGFloat?
@@ -79,6 +83,7 @@ final class RailShellLayerView: NSView {
     }
 
     func update(_ state: RailShellState) {
+        RailShellMetrics.providerRowCount = state.providerRowCount
         let previousPreviewState = previewState
         let changed = state != currentState
         let shouldAnimate = hasReceivedState && changed && !bounds.isEmpty
@@ -106,6 +111,7 @@ final class RailShellLayerView: NSView {
 
     private var currentState: RailShellState {
         RailShellState(
+            providerRowCount: RailShellMetrics.providerRowCount,
             previewState: previewState,
             edge: edge,
             detailCenterY: detailCenterY,

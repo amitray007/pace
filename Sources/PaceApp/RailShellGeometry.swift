@@ -105,9 +105,16 @@ enum RailShellMetrics {
         )
     }
 
+    /// How many provider rows the rail is currently drawing.
+    ///
+    /// The shell's paths are built from static geometry, so the row count lives
+    /// here rather than being threaded through every path function. The view
+    /// sets it before the shell draws.
+    static var providerRowCount = 3
+
     /// The first ring's centre, which anchors the whole vertical layout.
     static var firstRingCenterY: CGFloat {
-        EdgeRailGeometry.providerCentersY[0]
+        EdgeRailGeometry.firstProviderCenterY
     }
 
     /// Where the straight body starts, above the first ring.
@@ -117,8 +124,8 @@ enum RailShellMetrics {
 
     /// Where the straight body ends, below the last ring by the same inset.
     static var bodyBottomY: CGFloat {
-        (EdgeRailGeometry.providerCentersY.last ?? firstRingCenterY)
-            + railWidth * firstRingInsetRatio
+        let centers = EdgeRailGeometry.providerCentersY(count: providerRowCount)
+        return (centers.last ?? firstRingCenterY) + railWidth * firstRingInsetRatio
     }
 
     /// Where the top contour meets the screen edge.

@@ -3,7 +3,40 @@ import PaceCore
 import SwiftUI
 
 enum EdgeRailGeometry {
-    static let canvasSize = NSSize(width: 324, height: 416)
+    /// The most provider rows the rail will show at once.
+    ///
+    /// Pace supports five providers, and the rail sizes itself to however many
+    /// have accounts rather than to a fixed three.
+    static let maximumProviderRows = 5
+
+    /// The transparent canvas the rail is drawn inside.
+    ///
+    /// Its height follows the number of provider rows, plus the space the
+    /// contour and the settings arc need below the last ring.
+    static var canvasSize: NSSize {
+        NSSize(width: 324, height: canvasHeight(providerCount: maximumProviderRows))
+    }
+
+    static func canvasHeight(providerCount: Int) -> CGFloat {
+        let rows = max(providerCount, 1)
+        let lastRing = firstProviderCenterY + CGFloat(rows - 1) * providerPitch
+        return lastRing + trailingSpace
+    }
+
+    /// Where the first provider ring sits, measured from the canvas top.
+    static let firstProviderCenterY: CGFloat = 92
+
+    /// Distance between adjacent ring centres, from the reference's measured
+    /// 1.4748 pitch-to-width ratio.
+    static var providerPitch: CGFloat {
+        railWidth * 1.4748
+    }
+
+    /// Room below the last ring for the bottom contour and the settings arc.
+    static var trailingSpace: CGFloat {
+        railWidth * 1.7
+    }
+
     /// The fraction of the canvas the reference rail fills at the `medium`
     /// scale step.
     static let referenceDisplayScale = CGFloat(RailScale.canvasFraction)
@@ -29,12 +62,19 @@ enum EdgeRailGeometry {
     static let maximumDetailQuotaRows = 3
     static let railOriginX = detailWidth + connectorWidth
     static let railTopY: CGFloat = 30
-    /// Ring centres use the reference's measured 1.4748 pitch-to-width ratio,
-    /// which is 103.2 pt on a 70 pt rail.
-    static let providerCentersY: [CGFloat] = [92, 195.2, 298.5]
+    /// Ring centres for the rows currently shown.
+    ///
+    /// Generated from the measured pitch rather than listed, so the rail can
+    /// show however many providers have accounts.
+    static func providerCentersY(count: Int) -> [CGFloat] {
+        (0 ..< max(count, 0)).map { index in
+            firstProviderCenterY + CGFloat(index) * providerPitch
+        }
+    }
+
     /// Each ring row is centred on its provider centre.
-    static var providerTopY: [CGFloat] {
-        providerCentersY.map { $0 - providerRowHeight / 2 }
+    static func providerTopY(count: Int) -> [CGFloat] {
+        providerCentersY(count: count).map { $0 - providerRowHeight / 2 }
     }
 
     /// Ring top to percentage baseline measures 135 px on a 139 px rail.
@@ -69,11 +109,14 @@ struct EdgeRailView: View {
     @State private var isSettingsHovered = false
 
     var body: some View {
-        let providerIDs = Array(model.visibleProviderIDs.prefix(3))
+        let providerIDs = Array(
+            model.visibleProviderIDs.prefix(EdgeRailGeometry.maximumProviderRows),
+        )
         let isExpanded = model.railPreviewState != .mini
         ZStack(alignment: .topLeading) {
             RailShellLayerRepresentable(
                 state: RailShellState(
+                    providerRowCount: providerIDs.count,
                     previewState: model.railPreviewState,
                     edge: model.preferences.railEdge,
                     detailCenterY: detailCenterY(providerIDs: providerIDs),
@@ -133,7 +176,7 @@ struct EdgeRailView: View {
                 )
                 .offset(
                     x: railContentOriginX,
-                    y: EdgeRailGeometry.providerTopY[index],
+                    y: EdgeRailGeometry.providerTopY(count: providerIDs.count)[index],
                 )
             }
         }
@@ -226,11 +269,12 @@ struct EdgeRailView: View {
     private func detailCenterY(providerIDs: [ProviderID]) -> CGFloat? {
         guard let providerID = model.railPreviewState.detailProviderID,
               let index = providerIDs.firstIndex(of: providerID),
-              EdgeRailGeometry.providerCentersY.indices.contains(index)
+              EdgeRailGeometry.providerCentersY(count: providerIDs.count)
+                  .indices.contains(index)
         else {
             return nil
         }
-        return EdgeRailGeometry.providerCentersY[index]
+        return EdgeRailGeometry.providerCentersY(count: providerIDs.count)[index]
     }
 
     private var railContentOriginX: CGFloat {
@@ -288,9 +332,13 @@ private struct EdgeProviderRow: View {
                         height: EdgeRailGeometry.ringDiameter,
                     )
 
+                    // The mark carries the provider's identity; the arc around
+                    // it carries usage level. Colouring the arc by brand would
+                    // lose the at-a-glance reading of which quota is nearly
+                    // exhausted.
                     ProviderMark(
                         providerID: providerID,
-                        color: .white,
+                        color: style.accent,
                         size: EdgeRailGeometry.markDiameter,
                     )
                 }

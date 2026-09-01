@@ -9,57 +9,48 @@ struct ProviderStyle {
     let accentColor: NSColor
     let markResourceName: String?
 
+    /// Brand colors for each provider.
+    ///
+    /// Claude's is taken from the provider mark Pace ships, which carries
+    /// #D97757. OpenAI, Cursor, and xAI publish monochrome marks, so their
+    /// accents come from the surface each brand actually presents rather than
+    /// from an invented hue: near-white, which stays legible on the rail's
+    /// black shell. GitHub Copilot uses GitHub's own accent blue, lightened so
+    /// it holds up on black.
+    ///
+    /// These identify a provider. They do not report usage: the rail's arcs and
+    /// the menu panel's quota bars stay on the usage-level palette, so an
+    /// exhausted quota still reads as urgent whichever provider it belongs to.
+    private static let brandColors: [ProviderID: (name: String, color: NSColor)] = [
+        .claude: ("Claude", NSColor(srgbRed: 0.851, green: 0.467, blue: 0.341, alpha: 1)),
+        .codex: ("Codex", NSColor(white: 0.94, alpha: 1)),
+        .cursor: ("Cursor", NSColor(white: 0.82, alpha: 1)),
+        // A cooler white keeps xAI distinguishable from OpenAI at ring size.
+        .grok: ("Grok", NSColor(srgbRed: 0.83, green: 0.86, blue: 0.90, alpha: 1)),
+        .githubCopilot: (
+            "Copilot",
+            NSColor(srgbRed: 0.427, green: 0.635, blue: 1, alpha: 1)
+        ),
+    ]
+
+    private static let markResourceNames: [ProviderID: String] = [
+        .claude: "claude",
+        .codex: "codex",
+        .cursor: "cursor",
+        .grok: "grok",
+        .githubCopilot: "copilot",
+    ]
+
     static func resolve(_ providerID: ProviderID) -> Self {
-        switch providerID {
-        case .claude:
-            Self(
-                id: providerID,
-                name: "Claude",
-                accent: Color(red: 0.97, green: 0.36, blue: 0.20),
-                accentColor: NSColor(red: 0.97, green: 0.36, blue: 0.20, alpha: 1),
-                markResourceName: "claude",
-            )
-        case .codex:
-            Self(
-                id: providerID,
-                name: "Codex",
-                accent: Color(red: 0.17, green: 0.94, blue: 0.62),
-                accentColor: NSColor(red: 0.17, green: 0.94, blue: 0.62, alpha: 1),
-                markResourceName: "codex",
-            )
-        case .cursor:
-            Self(
-                id: providerID,
-                name: "Cursor",
-                accent: Color(red: 0.78, green: 1.00, blue: 0.10),
-                accentColor: NSColor(red: 0.78, green: 1.00, blue: 0.10, alpha: 1),
-                markResourceName: "cursor",
-            )
-        case .grok:
-            Self(
-                id: providerID,
-                name: "Grok",
-                accent: Color(red: 0.56, green: 0.67, blue: 1.00),
-                accentColor: NSColor(red: 0.56, green: 0.67, blue: 1.00, alpha: 1),
-                markResourceName: "grok",
-            )
-        case .githubCopilot:
-            Self(
-                id: providerID,
-                name: "Copilot",
-                accent: Color(red: 0.62, green: 0.68, blue: 1.00),
-                accentColor: NSColor(red: 0.62, green: 0.68, blue: 1.00, alpha: 1),
-                markResourceName: "copilot",
-            )
-        default:
-            Self(
-                id: providerID,
-                name: providerID.rawValue.capitalized,
-                accent: .white,
-                accentColor: .white,
-                markResourceName: nil,
-            )
-        }
+        let brand = brandColors[providerID]
+        let color = brand?.color ?? .white
+        return Self(
+            id: providerID,
+            name: brand?.name ?? providerID.rawValue.capitalized,
+            accent: Color(nsColor: color),
+            accentColor: color,
+            markResourceName: markResourceNames[providerID],
+        )
     }
 }
 

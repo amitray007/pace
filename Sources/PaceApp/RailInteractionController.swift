@@ -126,6 +126,12 @@ final class RailInteractionController {
     }
 
     /// How far the pointer is from the edge the rail lives on.
+    /// How many provider rows the rail is showing, which the hit regions are
+    /// laid out against.
+    private var railProviderCount: Int {
+        min(model.visibleProviderIDs.count, EdgeRailGeometry.maximumProviderRows)
+    }
+
     private func edgeDistance(to location: NSPoint) -> Double {
         guard let screen = visualPanel?.screen ?? NSScreen.main else {
             return 0
@@ -146,7 +152,8 @@ final class RailInteractionController {
             case .dismiss:
                 model.collapseRail()
             case let .selectProvider(index):
-                let providerIDs = Array(model.visibleProviderIDs.prefix(3))
+                let providerIDs = Array(model.visibleProviderIDs
+                    .prefix(EdgeRailGeometry.maximumProviderRows))
                 guard providerIDs.indices.contains(index) else {
                     continue
                 }
@@ -304,7 +311,7 @@ private extension RailInteractionController {
         let originX = model.preferences.railEdge == .right
             ? visualPanel.frame.minX + EdgeRailGeometry.railOriginX
             : visualPanel.frame.minX
-        return EdgeRailGeometry.providerTopY.map { topPosition in
+        return EdgeRailGeometry.providerTopY(count: railProviderCount).map { topPosition in
             scaledInteractionFrame(NSRect(
                 x: originX,
                 y: visualPanel.frame.minY + EdgeRailGeometry.canvasSize.height - topPosition - 64,
@@ -345,8 +352,9 @@ private extension RailInteractionController {
 
     private var travelCorridorFrame: NSRect? {
         guard let detailFrame, let detailCenterY,
-              let providerIndex = EdgeRailGeometry.providerCentersY.firstIndex(of: detailCenterY),
-              providerFrames.indices.contains(providerIndex)
+              let providerIndex = EdgeRailGeometry.providerCentersY(count: railProviderCount)
+                  .firstIndex(of: detailCenterY),
+                  providerFrames.indices.contains(providerIndex)
         else {
             return nil
         }
@@ -380,12 +388,13 @@ private extension RailInteractionController {
 
     private var detailCenterY: CGFloat? {
         guard let providerID = model.railPreviewState.detailProviderID,
-              let index = Array(model.visibleProviderIDs.prefix(3)).firstIndex(of: providerID),
-              EdgeRailGeometry.providerCentersY.indices.contains(index)
+              let index = Array(model.visibleProviderIDs
+                  .prefix(EdgeRailGeometry.maximumProviderRows)).firstIndex(of: providerID),
+              EdgeRailGeometry.providerCentersY(count: railProviderCount).indices.contains(index)
         else {
             return nil
         }
-        return EdgeRailGeometry.providerCentersY[index]
+        return EdgeRailGeometry.providerCentersY(count: railProviderCount)[index]
     }
 
     private static func configuration(for preferences: PacePreferences)

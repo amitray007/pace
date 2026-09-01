@@ -16,11 +16,16 @@ struct MenuQuotaRow: View {
                 Text(snapshot.usedFraction, format: .percent.precision(.fractionLength(0)))
                     .font(.system(size: 11.5, weight: .semibold).monospacedDigit())
             }
+            // The bar reports how much of the quota is gone, so it follows the
+            // usage-level palette rather than the provider's brand colour. The
+            // provider is already identified by the tab and the header mark.
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(increasedContrast ? 0.28 : 0.11))
+                    Capsule().fill(
+                        Color.paceUsageTrack(increasedContrast: increasedContrast),
+                    )
                     Capsule()
-                        .fill(accent)
+                        .fill(Color.paceUsageAccent(forFraction: snapshot.usedFraction))
                         .frame(width: proxy.size.width * min(snapshot.usedFraction, 1))
                 }
             }

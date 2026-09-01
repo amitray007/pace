@@ -125,7 +125,7 @@ struct MenuPanelView: View {
             HStack(spacing: 8) {
                 ProviderMark(
                     providerID: model.activeProviderID,
-                    color: .white,
+                    color: ProviderStyle.resolve(model.activeProviderID).accent,
                     size: 14,
                 )
                 Text(ProviderStyle.resolve(model.activeProviderID).name)
