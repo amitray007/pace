@@ -24,10 +24,14 @@ approval gate.
 The first static native surfaces now run against a dedicated visual-reference fixture. AppKit owns
 the menu-bar status item and click-through edge panel. Core Animation draws the rail, connector,
 settings attachment, and progress rings. The menu panel and rail share provider and account
-selection. Motion and pointer activation remain deliberately unimplemented.
+selection. Interruptible motion, pointer-safe activation, keyboard access, and honest simulated
+states are implemented; hardware interaction testing and final reference-media approval remain
+open.
 
-A Swift spike proves that Codex limits can be read through the supported local app-server protocol
-without copying account tokens or calling private web endpoints.
+A production-separated Codex adapter and its original Swift spike read limits through the supported
+local app-server protocol without copying account tokens or calling private web endpoints. The
+adapter supports explicit isolated `CODEX_HOME` profiles; onboarding and persistent update wiring
+remain before live values replace the simulated shell.
 
 A separate Claude compatibility spike verifies OAuth identity before reading usage, supports
 explicit isolated profile directories, and keeps all credential and endpoint code outside the app.

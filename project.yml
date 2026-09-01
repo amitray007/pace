@@ -28,6 +28,19 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.amitray.PaceCore
 
+  PaceProviders:
+    type: framework
+    platform: macOS
+    sources:
+      - Sources/PaceProviders
+    dependencies:
+      - target: PaceCore
+    settings:
+      base:
+        DEFINES_MODULE: YES
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.amitray.PaceProviders
+
   Pace:
     type: application
     platform: macOS
@@ -35,6 +48,7 @@ targets:
       - Sources/PaceApp
     dependencies:
       - target: PaceCore
+      - target: PaceProviders
     settings:
       base:
         CODE_SIGN_STYLE: Automatic
@@ -57,6 +71,19 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         PRODUCT_BUNDLE_IDENTIFIER: com.amitray.PaceCoreTests
 
+  PaceProviderTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests/PaceProviderTests
+    dependencies:
+      - target: PaceProviders
+      - target: PaceCore
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.amitray.PaceProviderTests
+
 schemes:
   Pace:
     build:
@@ -66,3 +93,4 @@ schemes:
     test:
       targets:
         - PaceCoreTests
+        - PaceProviderTests

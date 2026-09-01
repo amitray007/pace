@@ -108,6 +108,13 @@ Start `codex app-server --stdio`, perform the JSON-RPC initialization handshake,
 `account/rateLimits/read`, then listen for `account/rateLimits/updated`. Keep one background process
 while Codex data is enabled. Reconnect with bounded backoff if it exits.
 
+The production adapter foundation resolves the Codex executable without relying on an editor or
+harness, replaces ambient `CODEX_HOME` with the selected explicit profile, requests `account/read`
+without proactive token refresh, and rejects accounts that do not expose a verifiable ChatGPT
+email. It renders all returned limit IDs and primary or secondary windows. Its current bounded
+request process and opt-in live smoke test are an intermediate step; the persistent update
+supervisor and app onboarding remain the promotion gate.
+
 The live spike was verified on 2026-08-31 with Codex CLI 0.151.0. The response contained a general
 weekly bucket plus model-specific five-hour and weekly buckets. This proves the UI must render
 returned buckets dynamically.

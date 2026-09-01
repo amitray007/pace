@@ -111,6 +111,12 @@ and failure states.
 
 ## Phase 7: Provider integrations
 
+Status: in progress. A production-separated Codex adapter now discovers explicit `CODEX_HOME`
+profiles, verifies the account returned by the supported app-server protocol, and normalizes every
+returned limit window. Deterministic two-profile tests and an opt-in live smoke check exist. A
+long-running update supervisor, onboarding UI, and app wiring remain before Codex promotion is
+complete; the compatibility-provider spikes remain isolated.
+
 - Promote validated feasibility spikes into production adapters.
 - Add provider-specific account discovery, login, reauthentication, and removal behavior.
 - Keep private compatibility endpoints isolated and locally disableable.
