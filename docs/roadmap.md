@@ -80,9 +80,10 @@ built-in 120 Hz display with no post-startup main-thread delay over 33 ms and no
 scrollbar track click, and a scrollbar-thumb drag pass through the collapsed visual window, and that
 the rail orders out for a full-screen application. A second physical pass confirms on both edges
 that visible provider and settings controls receive input while transparent regions of the expanded
-324 x 416 pt canvas pass browser clicks through. Trackpad momentum, resize handles, horizontal and
-traditional scrollbar variants, Spaces, Stage Manager, a 60 Hz or second-display capture, and
-explicit visual approval remain.
+324 x 416 pt canvas pass browser clicks through. An always-visible traditional AppKit horizontal
+scroller aligned beneath the collapsed canvas also accepts a thumb drag from X 0 to X 332 without
+revealing Pace. Trackpad momentum, resize handles, Spaces, Stage Manager, a 60 Hz or second-display
+capture, and explicit visual approval remain.
 
 - Implement rail path morphing and attached-panel movement with Core Animation.
 - Make every rapid transition interruptible and retargetable.

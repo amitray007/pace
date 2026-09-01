@@ -76,8 +76,14 @@ a third remained clickable beside an attached Claude detail card. Claude and Cod
 and retargeted the correct account detail, and the settings control opened native Settings. The
 mirrored left edge also passed one transparent-space probe and its Claude control opened the detail
 card on the correct side. These checks used isolated deterministic state and requested no system
-permission. They did not cover trackpad momentum, window resize handles, horizontal or traditional
-scrollbar variants, Spaces, Stage Manager, or another display.
+permission.
+
+A third Release check aligned the collapsed 324 x 416 pt canvas exactly over an ignored local
+AppKit window with an always-visible legacy `NSScrollView` horizontal scroller. A drag that began
+inside the overlapping canvas moved the thumb and document from X 0 to X 332. Pace remained in its
+collapsed state. This proves one traditional horizontal scrollbar path without changing the Mac's
+scrollbar preference. The checks did not cover trackpad momentum, window resize handles, Spaces,
+Stage Manager, or another display.
 
 This window footprint is implementation evidence, not the physical pointer exit gate. Rounded
 corners still use bounded rectangular input regions, and scrolling directly over an expanded
