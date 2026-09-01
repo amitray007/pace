@@ -23,10 +23,10 @@ generate:
 	xcodegen generate
 
 format:
-	swift package plugin --allow-writing-to-package-directory swiftformat --cache ignore .
+	swift run swiftformat --cache ignore .
 
 format-check:
-	swift package plugin --allow-writing-to-package-directory swiftformat --cache ignore --lint .
+	swift run swiftformat --cache ignore --lint .
 
 lint:
 	swift package plugin --allow-writing-to-package-directory swiftlint --strict

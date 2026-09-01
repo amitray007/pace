@@ -3,6 +3,19 @@
 Pace measures performance separately from correctness tests. Timing assertions do not run inside
 `make check`, because shared CI hardware can turn a timing fluctuation into a false failure.
 
+## Quality-gate timing
+
+`make format-check` runs the exact SwiftFormat version pinned in `Package.swift` once from the
+repository root. This covers every tracked Swift file without repeating the same scan for each
+Swift package target. Generated files under `.build` remain outside the source-quality gate.
+
+On the development Mac used for the initial measurement, the previous command-plugin invocation
+took 183.84 seconds and performed 18 overlapping scans. The single pinned executable pass took
+13.69 seconds, a 92.6% wall-time reduction. Both commands reported a clean tree. The replacement
+pass examined all 188 tracked Swift files, and a temporary malformed 189th file made the command
+fail as expected. Treat these times as machine-specific observations. Verify coverage and failure
+behavior again if the formatter command or package layout changes.
+
 ## Core benchmark
 
 `make benchmark` builds the benchmark executable with release optimization. It repeatedly creates
