@@ -29,6 +29,18 @@ struct PaceSettingsView: View {
                 }
 
                 Picker(
+                    "Rail size",
+                    selection: Binding(
+                        get: { model.preferences.railScale },
+                        set: model.setRailScale,
+                    ),
+                ) {
+                    ForEach(RailScale.allCases, id: \.self) { scale in
+                        Text(scale.label).tag(scale)
+                    }
+                }
+
+                Picker(
                     "Display",
                     selection: Binding(
                         get: { model.preferences.selectedDisplayID },

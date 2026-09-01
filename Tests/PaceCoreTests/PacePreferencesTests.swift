@@ -10,12 +10,32 @@ struct PacePreferencesTests {
 
         #expect(preferences.surfaceMode == .menuBar)
         #expect(preferences.railEdge == .right)
+        #expect(preferences.railScale == .medium)
         #expect(preferences.railVerticalPosition == .center)
         #expect(preferences.activationMode == .dwellHover)
         #expect(preferences.dwellDelay == 0.2)
         #expect(preferences.activationModifier == .shift)
         #expect(preferences.notificationPolicy == .disabled)
         #expect(preferences.providerOrder == PacePreferences.defaultProviderOrder)
+    }
+
+    @Test
+    func `rail scale steps stay ordered and bracket the reference size`() {
+        // The silhouette is defined by ratios of the rail's width, so a scale
+        // step only changes size. Medium must stay at the reference size so the
+        // default keeps the measured proportions exactly.
+        #expect(RailScale.medium.multiplier == 1)
+        #expect(RailScale.small.multiplier < RailScale.medium.multiplier)
+        #expect(RailScale.medium.multiplier < RailScale.large.multiplier)
+        for scale in RailScale.allCases {
+            #expect(scale.multiplier > 0)
+        }
+
+        // The rail is drawn inside a fixed transparent canvas, so a step that
+        // scales past it would clip the contour instead of enlarging it.
+        for scale in RailScale.allCases {
+            #expect(scale.multiplier <= RailScale.maximumMultiplier)
+        }
     }
 
     @Test
@@ -51,6 +71,7 @@ struct PacePreferencesTests {
         let preferences = try JSONDecoder().decode(PacePreferences.self, from: data)
 
         #expect(preferences.railEdge == .left)
+        #expect(preferences.railScale == .medium)
         #expect(preferences.surfaceMode == .menuBar)
         #expect(preferences.activationMode == .dwellHover)
         #expect(preferences.dwellDelay == 0.2)

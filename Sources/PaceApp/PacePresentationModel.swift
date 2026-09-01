@@ -335,6 +335,10 @@ extension PacePresentationModel {
         updatePreferences { $0.railEdge = edge }
     }
 
+    func setRailScale(_ scale: RailScale) {
+        updatePreferences { $0.railScale = scale }
+    }
+
     func setSelectedDisplayID(_ displayID: String?) {
         updatePreferences { $0.selectedDisplayID = displayID }
     }

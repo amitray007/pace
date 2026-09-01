@@ -39,6 +39,19 @@ extension RailEdge {
     }
 }
 
+extension RailScale {
+    var label: String {
+        switch self {
+        case .small:
+            "Small"
+        case .medium:
+            "Medium"
+        case .large:
+            "Large"
+        }
+    }
+}
+
 extension RailVerticalPosition {
     var label: String {
         switch self {

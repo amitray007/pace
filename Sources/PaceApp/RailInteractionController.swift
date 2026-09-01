@@ -348,7 +348,7 @@ private extension RailInteractionController {
         guard let visualPanel else {
             return .zero
         }
-        let scale = EdgeRailGeometry.displayScale
+        let scale = EdgeRailGeometry.displayScale(for: model.preferences)
         let anchorX = model.preferences.railEdge == .right
             ? visualPanel.frame.maxX
             : visualPanel.frame.minX

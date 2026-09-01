@@ -4,7 +4,18 @@ import SwiftUI
 
 enum EdgeRailGeometry {
     static let canvasSize = NSSize(width: 324, height: 416)
-    static let displayScale: CGFloat = 0.86
+    /// The fraction of the canvas the reference rail fills at the `medium`
+    /// scale step.
+    static let referenceDisplayScale = CGFloat(RailScale.canvasFraction)
+
+    /// The rail's on-screen scale for a set of preferences.
+    ///
+    /// The visual panel and the pointer's hit regions must agree on this, or
+    /// the rail would accept clicks where it is not drawn.
+    static func displayScale(for preferences: PacePreferences) -> CGFloat {
+        referenceDisplayScale * preferences.railScale.multiplier
+    }
+
     static let railWidth: CGFloat = 70
     static let detailWidth: CGFloat = 226
     static let connectorWidth: CGFloat = 28
@@ -88,7 +99,7 @@ struct EdgeRailView: View {
             detailContent(providerIDs: providerIDs)
         }
         .scaleEffect(
-            EdgeRailGeometry.displayScale,
+            EdgeRailGeometry.displayScale(for: model.preferences),
             anchor: model.preferences.railEdge == .right ? .trailing : .leading,
         )
         .frame(

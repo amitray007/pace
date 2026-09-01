@@ -19,6 +19,42 @@ public enum RailEdge: String, CaseIterable, Codable, Sendable {
     case right
 }
 
+/// How large the edge rail is drawn, as a multiplier on the reference size.
+///
+/// The silhouette is defined by ratios of the rail's width, so scaling changes
+/// the rail's size without changing its shape. The range is bounded because the
+/// reference proportions stop being legible outside it: the percentage labels
+/// crowd their rings when small, and the rail starts to intrude on window
+/// content when large.
+public enum RailScale: String, CaseIterable, Codable, Sendable {
+    case small
+    case medium
+    case large
+
+    /// The fraction of the rail's fixed canvas that the reference size fills.
+    /// A step may not scale past this, or the contour would clip instead of
+    /// growing.
+    public static let canvasFraction = 0.86
+
+    /// The largest multiplier that still fits inside the canvas.
+    public static var maximumMultiplier: Double {
+        1 / canvasFraction
+    }
+
+    public var multiplier: Double {
+        switch self {
+        case .small:
+            0.86
+        case .medium:
+            1.0
+        case .large:
+            // The canvas is fixed, so the largest step is the one that still
+            // fits inside it.
+            1.16
+        }
+    }
+}
+
 public enum RailVerticalPosition: String, CaseIterable, Codable, Sendable {
     case top
     case center
@@ -51,6 +87,7 @@ public struct PacePreferences: Codable, Equatable, Sendable {
     public var version: Int
     public var surfaceMode: PaceSurfaceMode
     public var railEdge: RailEdge
+    public var railScale: RailScale
     public var selectedDisplayID: String?
     public var railVerticalPosition: RailVerticalPosition
     public var activationMode: RailActivationMode
@@ -65,6 +102,7 @@ public struct PacePreferences: Codable, Equatable, Sendable {
         version: Int = Self.currentVersion,
         surfaceMode: PaceSurfaceMode = .menuBar,
         railEdge: RailEdge = .right,
+        railScale: RailScale = .medium,
         selectedDisplayID: String? = nil,
         railVerticalPosition: RailVerticalPosition = .center,
         activationMode: RailActivationMode = .dwellHover,
@@ -78,6 +116,7 @@ public struct PacePreferences: Codable, Equatable, Sendable {
         self.version = version
         self.surfaceMode = surfaceMode
         self.railEdge = railEdge
+        self.railScale = railScale
         self.selectedDisplayID = selectedDisplayID
         self.railVerticalPosition = railVerticalPosition
         self.activationMode = activationMode
@@ -91,54 +130,43 @@ public struct PacePreferences: Codable, Equatable, Sendable {
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        let storedVersion = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
+        let storedVersion = try container.value(.version, default: 1)
         let storedActivationMode = try container.decodeIfPresent(
             RailActivationMode.self,
             forKey: .activationMode,
         )
+        // Version 1 shipped modifier-hover as the default. A stored value that
+        // merely matches that default was never a deliberate choice, so it
+        // migrates to the current default rather than persisting.
         let migratesModifierHoverDefault = storedVersion < 2 &&
             storedActivationMode == .modifierHover
         try self.init(
-            version: storedVersion < Self.currentVersion ? Self.currentVersion : storedVersion,
-            surfaceMode: container.decodeIfPresent(
-                PaceSurfaceMode.self,
-                forKey: .surfaceMode,
-            ) ?? .menuBar,
-            railEdge: container.decodeIfPresent(RailEdge.self, forKey: .railEdge) ?? .right,
+            version: max(storedVersion, Self.currentVersion),
+            surfaceMode: container.value(.surfaceMode, default: .menuBar),
+            railEdge: container.value(.railEdge, default: .right),
+            railScale: container.value(.railScale, default: .medium),
             selectedDisplayID: container.decodeIfPresent(
                 String.self,
                 forKey: .selectedDisplayID,
             ),
-            railVerticalPosition: container.decodeIfPresent(
-                RailVerticalPosition.self,
-                forKey: .railVerticalPosition,
-            ) ?? .center,
+            railVerticalPosition: container.value(.railVerticalPosition, default: .center),
             activationMode: migratesModifierHoverDefault
                 ? .dwellHover
                 : storedActivationMode ?? .dwellHover,
-            activationModifier: container.decodeIfPresent(
-                RailActivationModifier.self,
-                forKey: .activationModifier,
-            ) ?? .shift,
+            activationModifier: container.value(.activationModifier, default: .shift),
             dwellDelay: migratesModifierHoverDefault
                 ? 0.2
-                : container.decodeIfPresent(TimeInterval.self, forKey: .dwellDelay) ?? 0.2,
-            dismissalDelay: container.decodeIfPresent(
-                TimeInterval.self,
-                forKey: .dismissalDelay,
-            ) ?? 0.4,
-            hideRailInFullScreen: container.decodeIfPresent(
-                Bool.self,
-                forKey: .hideRailInFullScreen,
-            ) ?? true,
-            notificationPolicy: container.decodeIfPresent(
-                PaceNotificationPolicy.self,
-                forKey: .notificationPolicy,
-            ) ?? .disabled,
-            providerOrder: container.decodeIfPresent(
-                [ProviderID].self,
-                forKey: .providerOrder,
-            ) ?? Self.defaultProviderOrder,
+                : container.value(.dwellDelay, default: 0.2),
+            dismissalDelay: container.value(.dismissalDelay, default: 0.4),
+            hideRailInFullScreen: container.value(
+                .hideRailInFullScreen,
+                default: true,
+            ),
+            notificationPolicy: container.value(.notificationPolicy, default: .disabled),
+            providerOrder: container.value(
+                .providerOrder,
+                default: Self.defaultProviderOrder,
+            ),
         )
     }
 
@@ -156,5 +184,19 @@ public struct PacePreferences: Codable, Equatable, Sendable {
         var seen = Set<ProviderID>()
         let uniqueProviderIDs = providerIDs.filter { seen.insert($0).inserted }
         return uniqueProviderIDs + defaultProviderOrder.filter { seen.insert($0).inserted }
+    }
+}
+
+private extension KeyedDecodingContainer {
+    /// Decodes a value, falling back to `default` when the key is absent.
+    ///
+    /// Preferences files are written by older builds and edited by hand, so
+    /// every key has to be optional with a default. Naming that pattern once
+    /// keeps the decoder readable as a list of keys and their defaults.
+    func value<Value: Decodable>(
+        _ key: Key,
+        default defaultValue: Value,
+    ) throws -> Value {
+        try decodeIfPresent(Value.self, forKey: key) ?? defaultValue
     }
 }
