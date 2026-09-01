@@ -7,13 +7,31 @@ protocol CodexProfileReading: Sendable {
     ) async throws(CodexProviderError) -> CodexProfileSnapshot
 }
 
-struct CodexAppServerReader: CodexProfileReading, Sendable {
-    let executableURL: URL?
-    let timeout: TimeInterval
+protocol CodexProfileEventReading: Sendable {
+    func events(for profile: CodexProfile) async throws(CodexProviderError)
+        -> AsyncStream<CodexProfileEvent>
+}
 
-    init(executableURL: URL? = nil, timeout: TimeInterval = 10) {
-        self.executableURL = executableURL
-        self.timeout = timeout
+protocol CodexProfileSessionReading: CodexProfileEventReading, CodexProfileReading {}
+
+struct CodexAppServerReader: CodexProfileSessionReading, Sendable {
+    private let poolResolver: CodexConnectionPoolResolver
+
+    init(
+        executableURL: URL? = nil,
+        timeout: TimeInterval = 10,
+        reconnectDelays: [Duration] = [
+            .milliseconds(250),
+            .seconds(1),
+            .seconds(5),
+            .seconds(30),
+        ],
+    ) {
+        poolResolver = CodexConnectionPoolResolver(
+            executableURL: executableURL,
+            requestTimeout: timeout,
+            reconnectDelays: reconnectDelays,
+        )
     }
 
     @concurrent
@@ -21,28 +39,25 @@ struct CodexAppServerReader: CodexProfileReading, Sendable {
         profile: CodexProfile,
         includeRateLimits: Bool,
     ) async throws(CodexProviderError) -> CodexProfileSnapshot {
-        let executableURL: URL = if let configuredURL = self.executableURL {
-            configuredURL
-        } else {
-            try CodexExecutableLocator.locate()
-        }
-        let responseData = try CodexAppServerProcess.exchange(
-            executableURL: executableURL,
-            profileDirectory: profile.directory,
-            includeRateLimits: includeRateLimits,
-            timeout: timeout,
+        let connectionPool = try poolResolver.pool()
+        let connection = try await connectionPool.connection(for: profile)
+        let accountData = try await connection.request(
+            method: "account/read",
+            params: #"{"refreshToken":false}"#,
         )
         let decoder = JSONDecoder()
         let account: CodexAccountResponse = try decodeResponse(
-            id: 2,
-            from: responseData,
+            from: accountData,
             decoder: decoder,
         )
         guard account.account != nil else {
             throw .signedOut
         }
         let rateLimits: CodexRateLimitsResponse? = if includeRateLimits {
-            try decodeResponse(id: 3, from: responseData, decoder: decoder)
+            try await decodeResponse(
+                from: connection.request(method: "account/rateLimits/read"),
+                decoder: decoder,
+            )
         } else {
             nil
         }
@@ -50,13 +65,9 @@ struct CodexAppServerReader: CodexProfileReading, Sendable {
     }
 
     private func decodeResponse<Result: Decodable>(
-        id: Int,
-        from responseData: [Int: Data],
+        from data: Data,
         decoder: JSONDecoder,
     ) throws(CodexProviderError) -> Result {
-        guard let data = responseData[id] else {
-            throw .invalidResponse
-        }
         let envelope: CodexRPCEnvelope<Result>
         do {
             envelope = try decoder.decode(CodexRPCEnvelope<Result>.self, from: data)
@@ -71,6 +82,12 @@ struct CodexAppServerReader: CodexProfileReading, Sendable {
         }
         return result
     }
+
+    func events(
+        for profile: CodexProfile,
+    ) async throws(CodexProviderError) -> AsyncStream<CodexProfileEvent> {
+        try await poolResolver.pool().events(for: profile)
+    }
 }
 
 private struct CodexRPCEnvelope<Result: Decodable>: Decodable {
@@ -82,7 +99,7 @@ private struct CodexRPCError: Decodable {
     let code: Int
 }
 
-private enum CodexExecutableLocator {
+enum CodexExecutableLocator {
     static func locate() throws(CodexProviderError) -> URL {
         let fileManager = FileManager.default
         let environment = ProcessInfo.processInfo.environment

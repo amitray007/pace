@@ -1,8 +1,10 @@
 import Foundation
 
 public actor PaceStore {
+    private let mutationGate = PaceStoreMutationGate()
     private let persistence: any PaceStatePersistence
     private var state: PaceState
+    private var stateContinuations: [UUID: AsyncStream<PaceState>.Continuation] = [:]
 
     public init(
         initialState: PaceState = PaceState(),
@@ -21,6 +23,19 @@ public actor PaceStore {
 
     public func currentState() -> PaceState {
         state
+    }
+
+    func stateUpdates() -> AsyncStream<PaceState> {
+        let id = UUID()
+        let pair = AsyncStream<PaceState>.makeStream(
+            bufferingPolicy: .bufferingNewest(1),
+        )
+        stateContinuations[id] = pair.continuation
+        pair.continuation.yield(state)
+        pair.continuation.onTermination = { [weak self] _ in
+            Task { await self?.removeStateContinuation(id) }
+        }
+        return pair.stream
     }
 
     public func accounts(
@@ -50,6 +65,9 @@ public actor PaceStore {
         id: AccountID = AccountID(),
         addedAt: Date = Date(),
     ) async throws -> ProviderAccount {
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+
         let resolvedName = try normalizedDisplayName(
             displayName ?? discoveredAccount.suggestedDisplayName,
         )
@@ -88,6 +106,9 @@ public actor PaceStore {
     }
 
     public func renameAccount(_ accountID: AccountID, to displayName: String) async throws {
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+
         guard let index = state.accounts.firstIndex(where: { $0.id == accountID }) else {
             throw AccountMutationError.unknownAccount(accountID)
         }
@@ -105,6 +126,9 @@ public actor PaceStore {
     }
 
     public func setAccount(_ accountID: AccountID, isEnabled: Bool) async throws {
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+
         guard let index = state.accounts.firstIndex(where: { $0.id == accountID }) else {
             throw AccountMutationError.unknownAccount(accountID)
         }
@@ -119,6 +143,9 @@ public actor PaceStore {
         for providerID: ProviderID,
         accountIDs: [AccountID],
     ) async throws {
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+
         let currentIDs = Set(state.accounts.lazy.filter {
             $0.providerID == providerID
         }.map(\.id))
@@ -138,6 +165,9 @@ public actor PaceStore {
 
     @discardableResult
     public func removeAccount(_ accountID: AccountID) async throws -> ProviderAccount {
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+
         guard let account = state.accounts.first(where: { $0.id == accountID }) else {
             throw AccountMutationError.unknownAccount(accountID)
         }
@@ -152,6 +182,9 @@ public actor PaceStore {
     }
 
     public func selectAccount(_ accountID: AccountID, for providerID: ProviderID) async throws {
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+
         guard let account = state.accounts.first(where: { $0.id == accountID }) else {
             throw AccountMutationError.unknownAccount(accountID)
         }
@@ -172,6 +205,9 @@ public actor PaceStore {
         for accountID: AccountID,
         with snapshots: [LimitSnapshot],
     ) async throws {
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+
         guard let account = state.accounts.first(where: { $0.id == accountID }) else {
             throw AccountMutationError.unknownAccount(accountID)
         }
@@ -188,7 +224,11 @@ public actor PaceStore {
     }
 
     public func applyRefreshOutcomes(_ outcomes: [AccountRefreshOutcome]) async throws {
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+
         var next = state
+        var didApplyOutcome = false
 
         for outcome in outcomes {
             guard let accountIndex = next.accounts.firstIndex(where: {
@@ -196,6 +236,7 @@ public actor PaceStore {
             }) else {
                 continue
             }
+            didApplyOutcome = true
 
             switch outcome {
             case let .failure(accountID, failure):
@@ -229,17 +270,32 @@ public actor PaceStore {
             }
         }
 
+        guard didApplyOutcome else {
+            return
+        }
         try await commit(next)
     }
 
-    private static func accountPrecedes(_ lhs: ProviderAccount, _ rhs: ProviderAccount) -> Bool {
+    private func commit(_ next: PaceState) async throws {
+        try await persistence.save(next)
+        state = next
+        stateContinuations.values.forEach { $0.yield(next) }
+    }
+
+    private func removeStateContinuation(_ id: UUID) {
+        stateContinuations.removeValue(forKey: id)
+    }
+}
+
+private extension PaceStore {
+    static func accountPrecedes(_ lhs: ProviderAccount, _ rhs: ProviderAccount) -> Bool {
         if lhs.order == rhs.order {
             return lhs.addedAt < rhs.addedAt
         }
         return lhs.order < rhs.order
     }
 
-    private func normalizedDisplayName(_ displayName: String) throws -> String {
+    func normalizedDisplayName(_ displayName: String) throws -> String {
         let normalizedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedName.isEmpty else {
             throw AccountMutationError.emptyDisplayName
@@ -247,7 +303,7 @@ public actor PaceStore {
         return normalizedName
     }
 
-    private func ensureIdentityIsUnique(
+    func ensureIdentityIsUnique(
         _ identity: ProviderIdentity,
         providerID: ProviderID,
     ) throws {
@@ -261,7 +317,7 @@ public actor PaceStore {
         }
     }
 
-    private func ensureDisplayNameIsUnique(
+    func ensureDisplayNameIsUnique(
         _ displayName: String,
         providerID: ProviderID,
         excluding accountID: AccountID? = nil,
@@ -278,7 +334,7 @@ public actor PaceStore {
         }
     }
 
-    private func reconcileSelection(for providerID: ProviderID, in state: inout PaceState) {
+    func reconcileSelection(for providerID: ProviderID, in state: inout PaceState) {
         let selectedAccountID = state.selections.first(where: {
             $0.providerID == providerID
         })?.accountID
@@ -300,7 +356,7 @@ public actor PaceStore {
         }
     }
 
-    private static func connectionState(for failure: ProviderFailure) -> AccountConnectionState {
+    static func connectionState(for failure: ProviderFailure) -> AccountConnectionState {
         switch failure {
         case let .failed(code):
             .failed(code: code)
@@ -313,7 +369,7 @@ public actor PaceStore {
         }
     }
 
-    private static func markSnapshotsStale(for accountID: AccountID, in state: inout PaceState) {
+    static func markSnapshotsStale(for accountID: AccountID, in state: inout PaceState) {
         let matchingIndices = state.snapshots.indices.filter {
             state.snapshots[$0].id.accountID == accountID
         }
@@ -321,9 +377,45 @@ public actor PaceStore {
             state.snapshots[index].freshness = .stale
         }
     }
+}
 
-    private func commit(_ next: PaceState) async throws {
-        try await persistence.save(next)
-        state = next
+private final class PaceStoreMutationGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isLocked = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func acquire() async {
+        await withCheckedContinuation { continuation in
+            let resumesImmediately = lock.withLock {
+                if isLocked {
+                    waiters.append(continuation)
+                    return false
+                }
+                isLocked = true
+                return true
+            }
+            if resumesImmediately {
+                continuation.resume()
+            }
+        }
+    }
+
+    func release() {
+        let nextWaiter: CheckedContinuation<Void, Never>? = lock.withLock {
+            guard !waiters.isEmpty else {
+                isLocked = false
+                return nil
+            }
+            return waiters.removeFirst()
+        }
+        nextWaiter?.resume()
+    }
+}
+
+private extension NSLock {
+    func withLock<Result>(_ operation: () -> Result) -> Result {
+        lock()
+        defer { unlock() }
+        return operation()
     }
 }

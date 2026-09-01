@@ -1,16 +1,16 @@
 import Foundation
 import PaceCore
 
-public actor CodexProviderAdapter: ProviderAdapter {
+public struct CodexProviderAdapter: ProviderUpdateStreamingAdapter {
     public nonisolated let providerID = ProviderID.codex
     public nonisolated let capabilities = ProviderCapabilities(
         supportsAccountDiscovery: true,
         supportsMultipleAccounts: true,
-        supportsStreamingUpdates: false,
+        supportsStreamingUpdates: true,
     )
 
     private let profiles: [CodexProfile]
-    private let reader: any CodexProfileReading
+    private let reader: any CodexProfileSessionReading
     private let now: @Sendable () -> Date
 
     public init(
@@ -25,7 +25,7 @@ public actor CodexProviderAdapter: ProviderAdapter {
 
     init(
         profiles: [CodexProfile],
-        reader: any CodexProfileReading,
+        reader: any CodexProfileSessionReading,
         now: @escaping @Sendable () -> Date,
     ) {
         self.profiles = profiles
@@ -105,6 +105,52 @@ public actor CodexProviderAdapter: ProviderAdapter {
         }
     }
 
+    public func updates(for account: ProviderAccount) async -> AsyncStream<ProviderUpdate> {
+        guard account.providerID == .codex,
+              let profile = profile(for: account.credentialBinding)
+        else {
+            return Self.finishedUpdateStream(
+                with: .failure(.unavailable(code: "codex-profile-missing")),
+            )
+        }
+        let events: AsyncStream<CodexProfileEvent>
+        do {
+            events = try await reader.events(for: profile)
+        } catch {
+            return Self.finishedUpdateStream(with: .failure(providerFailure(for: error)))
+        }
+
+        let pair = AsyncStream<ProviderUpdate>.makeStream(
+            bufferingPolicy: .bufferingNewest(8),
+        )
+        let updateTask = Task { [self] in
+            for await event in events {
+                guard !Task.isCancelled else {
+                    break
+                }
+                switch event {
+                case .connectionFailed:
+                    pair.continuation.yield(
+                        .failure(.unavailable(code: "codex-app-server-disconnected")),
+                    )
+                case .rateLimitsChanged, .reconnected:
+                    do {
+                        try await pair.continuation.yield(.refresh(refresh(account)))
+                    } catch let failure as ProviderFailure {
+                        pair.continuation.yield(.failure(failure))
+                    } catch {
+                        pair.continuation.yield(
+                            .failure(.failed(code: "codex-monitor-refresh-failed")),
+                        )
+                    }
+                }
+            }
+            pair.continuation.finish()
+        }
+        pair.continuation.onTermination = { _ in updateTask.cancel() }
+        return pair.stream
+    }
+
     private func profile(for binding: CredentialBinding) -> CodexProfile? {
         guard case let .providerProfile(directory, _) = binding else {
             return nil
@@ -167,5 +213,16 @@ public actor CodexProviderAdapter: ProviderAdapter {
         case .invalidResponse, .processFailed, .protocolFailure:
             .failed(code: "codex-app-server-failed")
         }
+    }
+
+    private static func finishedUpdateStream(
+        with update: ProviderUpdate? = nil,
+    ) -> AsyncStream<ProviderUpdate> {
+        let pair = AsyncStream<ProviderUpdate>.makeStream()
+        if let update {
+            pair.continuation.yield(update)
+        }
+        pair.continuation.finish()
+        return pair.stream
     }
 }

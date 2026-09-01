@@ -111,9 +111,20 @@ while Codex data is enabled. Reconnect with bounded backoff if it exits.
 The production adapter foundation resolves the Codex executable without relying on an editor or
 harness, replaces ambient `CODEX_HOME` with the selected explicit profile, requests `account/read`
 without proactive token refresh, and rejects accounts that do not expose a verifiable ChatGPT
-email. It renders all returned limit IDs and primary or secondary windows. Its current bounded
-request process and opt-in live smoke test are an intermediate step; the persistent update
-supervisor and app onboarding remain the promotion gate.
+email. It renders all returned limit IDs and primary or secondary windows. The earlier bounded
+request process is replaced by one persistent connection per explicit profile. Requests use
+correlated IDs, asynchronous pipe I/O, and bounded timeouts. Sparse
+`account/rateLimits/updated` notifications trigger a full read instead of clearing omitted fields;
+one pending signal closes the read-before-subscribe race. Process exits mark last-good data stale,
+then reconnect with bounded backoff. Shutdown closes stdin, waits briefly, and force-reaps a process
+that ignores termination before a replacement starts.
+
+The generic refresh coordinator applies streamed results to the same store read by both surfaces.
+It reconciles one monitor per enabled account from committed store changes. Registration and
+re-enablement start monitoring; disablement and removal cancel it. Store mutations serialize the
+complete read-save-publish transaction so concurrent account updates cannot overwrite each other.
+An applied delivery and a persistence failure are separate events, which lets both surfaces preserve
+last-good state while showing a save error. Explicit app onboarding remains the promotion gate.
 
 The live spike was verified on 2026-08-31 with Codex CLI 0.151.0. The response contained a general
 weekly bucket plus model-specific five-hour and weekly buckets. This proves the UI must render

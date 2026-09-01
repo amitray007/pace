@@ -27,6 +27,10 @@ final class PaceAppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func applicationWillTerminate(_: Notification) {
+        model.stopProviderUpdates()
+    }
+
     private func scheduleReferenceMotionSequence() {
         let startDelay = ProcessInfo.processInfo.environment["PACE_REFERENCE_MOTION_DELAY"]
             .flatMap(TimeInterval.init) ?? 2

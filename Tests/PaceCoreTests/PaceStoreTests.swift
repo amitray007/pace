@@ -16,16 +16,7 @@ struct PaceStoreTests {
             displayName: "Work",
         )
 
-        try await store.register(
-            personal,
-            id: TestSupport.personalID,
-            addedAt: TestSupport.referenceDate,
-        )
-        try await store.register(
-            work,
-            id: TestSupport.workID,
-            addedAt: TestSupport.referenceDate,
-        )
+        try await registerTestAccounts(personal, work, in: store)
 
         var accounts = await store.accounts(for: .claude)
         #expect(accounts.map(\.displayName) == ["Personal", "Work"])
@@ -135,5 +126,56 @@ struct PaceStoreTests {
                 with: [wrongSnapshot],
             )
         }
+    }
+
+    @Test
+    func `serializes durable mutations across concurrent account updates`() async throws {
+        let persistence = SuspendingPaceStatePersistence()
+        let store = try await PaceStore.open(persistence: persistence)
+        let personal = TestSupport.discoveredAccount(
+            subjectID: "claude-personal",
+            displayName: "Personal",
+        )
+        let work = TestSupport.discoveredAccount(
+            subjectID: "claude-work",
+            displayName: "Work",
+        )
+        try await registerTestAccounts(personal, work, in: store)
+        let baselineSaveCount = await persistence.saveCount
+        await persistence.suspendSaves()
+
+        let personalUpdate = Task {
+            try await store.applyRefreshOutcomes([
+                successfulOutcome(
+                    for: personal,
+                    accountID: TestSupport.personalID,
+                    usedFraction: 0.31,
+                ),
+            ])
+        }
+        let workUpdate = Task {
+            try await store.applyRefreshOutcomes([
+                successfulOutcome(
+                    for: work,
+                    accountID: TestSupport.workID,
+                    usedFraction: 0.72,
+                ),
+            ])
+        }
+
+        await persistence.waitForSaveCount(baselineSaveCount + 1)
+        await persistence.releaseNextSave()
+        await persistence.waitForSaveCount(baselineSaveCount + 2)
+        await persistence.releaseNextSave()
+        try await personalUpdate.value
+        try await workUpdate.value
+
+        let state = await store.currentState()
+        let persistedState = await persistence.storedState
+        #expect(Set(state.snapshots.map(\.id.accountID)) == [
+            TestSupport.personalID,
+            TestSupport.workID,
+        ])
+        #expect(persistedState == state)
     }
 }

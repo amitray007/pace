@@ -75,4 +75,67 @@ public struct RefreshCoordinator: Sendable {
         try await store.applyRefreshOutcomes(outcomes)
         return outcomes
     }
+
+    public func updateStream() async -> AsyncStream<ProviderUpdateDelivery> {
+        AsyncStream(bufferingPolicy: .bufferingNewest(64)) { continuation in
+            let supervisorTask = Task {
+                var monitorTasks: [AccountID: Task<Void, Never>] = [:]
+                let stateUpdates = await store.stateUpdates()
+
+                for await state in stateUpdates {
+                    guard !Task.isCancelled else {
+                        break
+                    }
+                    let accounts = state.accounts.filter(\.isEnabled)
+                    let desiredIDs = Set(accounts.map(\.id))
+
+                    let retiredIDs = monitorTasks.keys.filter { !desiredIDs.contains($0) }
+                    for accountID in retiredIDs {
+                        monitorTasks.removeValue(forKey: accountID)?.cancel()
+                    }
+
+                    for account in accounts where monitorTasks[account.id] == nil {
+                        guard let adapter = adapters[account.providerID]
+                            as? any ProviderUpdateStreamingAdapter
+                        else {
+                            continue
+                        }
+                        monitorTasks[account.id] = Task {
+                            let updates = await adapter.updates(for: account)
+                            for await update in updates {
+                                guard !Task.isCancelled else {
+                                    break
+                                }
+                                let outcome = Self.outcome(for: account.id, update: update)
+                                do {
+                                    try await store.applyRefreshOutcomes([outcome])
+                                    continuation.yield(.applied(outcome))
+                                } catch {
+                                    continuation.yield(
+                                        .persistenceFailed(accountID: account.id),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                monitorTasks.values.forEach { $0.cancel() }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in supervisorTask.cancel() }
+        }
+    }
+
+    private static func outcome(
+        for accountID: AccountID,
+        update: ProviderUpdate,
+    ) -> AccountRefreshOutcome {
+        switch update {
+        case let .failure(failure):
+            .failure(accountID: accountID, failure: failure)
+        case let .refresh(result):
+            .success(accountID: accountID, result: result)
+        }
+    }
 }

@@ -47,8 +47,14 @@ final class PacePresentationModel {
     private let statePersistence: any PaceStatePersistence
     private var hasStarted = false
     private var preferencesStore: PacePreferencesStore?
+    private var providerUpdateTask: Task<Void, Never>?
     private var refreshCoordinator: RefreshCoordinator?
     private var store: PaceStore?
+    private var streamPersistenceFailures: Set<AccountID> = []
+
+    isolated deinit {
+        stopProviderUpdates()
+    }
 
     init(
         environment: [String: String] = ProcessInfo.processInfo.environment,
@@ -151,6 +157,7 @@ final class PacePresentationModel {
             refreshCoordinator = coordinator
             self.store = store
             state = await store.currentState()
+            monitorProviderUpdates(coordinator: coordinator, store: store)
         } catch {
             loadingError = String(describing: error)
         }
@@ -239,12 +246,67 @@ final class PacePresentationModel {
         do {
             try await refreshCoordinator.refreshAll()
             state = await store.currentState()
+            streamPersistenceFailures.removeAll()
             refreshError = nil
         } catch {
             refreshError = "Usage could not be refreshed."
         }
     }
 
+    func stopProviderUpdates() {
+        providerUpdateTask?.cancel()
+        providerUpdateTask = nil
+    }
+
+    private func monitorProviderUpdates(
+        coordinator: RefreshCoordinator,
+        store: PaceStore,
+    ) {
+        stopProviderUpdates()
+        providerUpdateTask = Task { [weak self] in
+            let updates = await coordinator.updateStream()
+            for await update in updates {
+                guard !Task.isCancelled, let self else {
+                    break
+                }
+                switch update {
+                case let .applied(outcome):
+                    state = await store.currentState()
+                    streamPersistenceFailures.remove(outcome.accountID)
+                    refreshError = streamPersistenceFailures.isEmpty
+                        ? nil
+                        : "Usage changed, but the update could not be saved."
+                case let .persistenceFailed(accountID):
+                    streamPersistenceFailures.insert(accountID)
+                    refreshError = "Usage changed, but the update could not be saved."
+                }
+            }
+        }
+    }
+
+    private func updatePreferences(_ update: (inout PacePreferences) -> Void) {
+        var nextPreferences = preferences
+        update(&nextPreferences)
+        guard nextPreferences != preferences else {
+            return
+        }
+        preferences = nextPreferences
+
+        guard !isReferencePreview, let preferencesStore else {
+            return
+        }
+        Task {
+            do {
+                try await preferencesStore.replace(with: nextPreferences)
+                preferencesError = nil
+            } catch {
+                preferencesError = "Settings could not be saved."
+            }
+        }
+    }
+}
+
+extension PacePresentationModel {
     func toggleRail() {
         setRailVisible(!isRailVisible)
     }
@@ -324,27 +386,6 @@ final class PacePresentationModel {
         }
         updatePreferences { preferences in
             preferences.providerOrder.swapAt(sourceIndex, destinationIndex)
-        }
-    }
-
-    private func updatePreferences(_ update: (inout PacePreferences) -> Void) {
-        var nextPreferences = preferences
-        update(&nextPreferences)
-        guard nextPreferences != preferences else {
-            return
-        }
-        preferences = nextPreferences
-
-        guard !isReferencePreview, let preferencesStore else {
-            return
-        }
-        Task {
-            do {
-                try await preferencesStore.replace(with: nextPreferences)
-                preferencesError = nil
-            } catch {
-                preferencesError = "Settings could not be saved."
-            }
         }
     }
 }

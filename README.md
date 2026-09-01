@@ -30,8 +30,11 @@ open.
 
 A production-separated Codex adapter and its original Swift spike read limits through the supported
 local app-server protocol without copying account tokens or calling private web endpoints. The
-adapter supports explicit isolated `CODEX_HOME` profiles; onboarding and persistent update wiring
-remain before live values replace the simulated shell.
+adapter supports explicit isolated `CODEX_HOME` profiles, reuses one supervised process per
+profile, and forwards rate-limit updates into shared state. Request deadlines do not block Swift's
+cooperative executor, and disabling or removing an account stops its monitor and profile process.
+Explicit account onboarding and live app configuration remain before live values replace the
+simulated shell.
 
 A separate Claude compatibility spike verifies OAuth identity before reading usage, supports
 explicit isolated profile directories, and keeps all credential and endpoint code outside the app.

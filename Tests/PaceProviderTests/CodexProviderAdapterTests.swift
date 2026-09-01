@@ -102,6 +102,40 @@ struct CodexProviderAdapterTests {
         }
     }
 
+    @Test
+    func `turns supervised rate-limit signals into normalized provider updates`() async {
+        let profile = profile("personal", displayName: "Personal")
+        let reader = CodexMonitoringStubReader(
+            snapshot: profileSnapshot(email: "person@example.invalid", includesUsage: true),
+        )
+        let adapter = CodexProviderAdapter(
+            profiles: [profile],
+            reader: reader,
+            now: { observedAt },
+        )
+        let account = providerAccount(
+            id: accountID("20000000-0000-0000-0000-000000000001"),
+            profile: profile,
+            email: "person@example.invalid",
+        )
+        let updates = await adapter.updates(for: account)
+        let firstUpdate = Task<ProviderUpdate?, Never> {
+            for await update in updates {
+                return update
+            }
+            return nil
+        }
+
+        reader.send(.rateLimitsChanged)
+
+        guard case let .refresh(result) = try? await taskValue(firstUpdate) else {
+            Issue.record("Expected a normalized refresh update")
+            return
+        }
+        #expect(result.identity == account.identity)
+        #expect(result.snapshots.map(\.usedFraction) == [0.21])
+    }
+
     private func profile(_ name: String, displayName: String) -> CodexProfile {
         CodexProfile(
             directory: URL(filePath: "/profiles/codex/\(name)", directoryHint: .isDirectory),
@@ -177,7 +211,7 @@ struct CodexProviderAdapterTests {
     }
 }
 
-private actor CodexStubReader: CodexProfileReading {
+private actor CodexStubReader: CodexProfileSessionReading {
     let results: [String: Result<CodexProfileSnapshot, CodexProviderError>]
 
     init(results: [String: Result<CodexProfileSnapshot, CodexProviderError>]) {
@@ -192,5 +226,47 @@ private actor CodexStubReader: CodexProfileReading {
             throw .invalidResponse
         }
         return try result.get()
+    }
+
+    func events(
+        for _: CodexProfile,
+    ) -> AsyncStream<CodexProfileEvent> {
+        let pair = AsyncStream<CodexProfileEvent>.makeStream()
+        pair.continuation.finish()
+        return pair.stream
+    }
+}
+
+private final class CodexMonitoringStubReader: @unchecked Sendable {
+    private let continuation: AsyncStream<CodexProfileEvent>.Continuation
+    private let snapshot: CodexProfileSnapshot
+    private let stream: AsyncStream<CodexProfileEvent>
+
+    init(snapshot: CodexProfileSnapshot) {
+        self.snapshot = snapshot
+        let pair = AsyncStream<CodexProfileEvent>.makeStream(
+            bufferingPolicy: .bufferingNewest(8),
+        )
+        stream = pair.stream
+        continuation = pair.continuation
+    }
+
+    func send(_ event: CodexProfileEvent) {
+        continuation.yield(event)
+    }
+}
+
+extension CodexMonitoringStubReader: CodexProfileSessionReading {
+    func read(
+        profile _: CodexProfile,
+        includeRateLimits _: Bool,
+    ) async throws(CodexProviderError) -> CodexProfileSnapshot {
+        snapshot
+    }
+
+    func events(
+        for _: CodexProfile,
+    ) throws(CodexProviderError) -> AsyncStream<CodexProfileEvent> {
+        stream
     }
 }

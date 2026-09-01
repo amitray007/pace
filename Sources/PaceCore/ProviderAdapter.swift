@@ -50,6 +50,15 @@ public protocol ProviderAdapter: Sendable {
     func refresh(_ account: ProviderAccount) async throws(ProviderFailure) -> ProviderRefreshResult
 }
 
+public enum ProviderUpdate: Sendable {
+    case failure(ProviderFailure)
+    case refresh(ProviderRefreshResult)
+}
+
+public protocol ProviderUpdateStreamingAdapter: ProviderAdapter {
+    func updates(for account: ProviderAccount) async -> AsyncStream<ProviderUpdate>
+}
+
 public enum AccountRefreshOutcome: Sendable {
     case failure(accountID: AccountID, failure: ProviderFailure)
     case success(accountID: AccountID, result: ProviderRefreshResult)
@@ -60,4 +69,9 @@ public enum AccountRefreshOutcome: Sendable {
             accountID
         }
     }
+}
+
+public enum ProviderUpdateDelivery: Sendable {
+    case applied(AccountRefreshOutcome)
+    case persistenceFailed(accountID: AccountID)
 }
