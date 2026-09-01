@@ -12,15 +12,24 @@ import SwiftUI
 struct RefreshCountdownView: View {
     let nextRefreshAt: Date?
     let isRefreshing: Bool
+    var showsIcon = true
 
-    /// Drives the countdown. One timer per visible panel, stopped with the view.
+    /// Drives the countdown.
+    ///
+    /// The timer is held in `@State` rather than created inline. A publisher
+    /// built in the view's initializer is replaced on every rebuild, so
+    /// switching provider tabs discarded the connected one and the countdown
+    /// stopped moving until the panel was reopened.
     @State private var now = Date()
-
-    private let tick = Timer.publish(every: 1, on: .main, in: .common)
+    @State private var tick = Timer.publish(every: 1, on: .main, in: .common)
         .autoconnect()
 
     var body: some View {
-        Group {
+        HStack(spacing: 4) {
+            if showsIcon {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 9, weight: .semibold))
+            }
             if isRefreshing {
                 Text("Refreshing")
             } else if let remaining {
@@ -31,6 +40,7 @@ struct RefreshCountdownView: View {
         .font(.system(size: 10, weight: .medium))
         .foregroundStyle(.secondary)
         .onReceive(tick) { now = $0 }
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
     }
 
@@ -45,8 +55,7 @@ struct RefreshCountdownView: View {
             // takes would read as stuck.
             return "Due"
         }
-        let minutes = seconds / 60
-        return String(format: "%d:%02d", minutes, seconds % 60)
+        return String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
 
     private var accessibilityLabel: String {
@@ -59,5 +68,42 @@ struct RefreshCountdownView: View {
         return remaining == "Due"
             ? "Refresh due"
             : "Next refresh in \(remaining)"
+    }
+}
+
+/// The rail's version of the countdown, which states what it is counting.
+///
+/// The rail has no refresh control and no surrounding labels, so a bare
+/// "12:04" there would not say what it referred to.
+struct RailRefreshCountdownView: View {
+    let nextRefreshAt: Date?
+    let isRefreshing: Bool
+
+    @State private var now = Date()
+    @State private var tick = Timer.publish(every: 1, on: .main, in: .common)
+        .autoconnect()
+
+    var body: some View {
+        Group {
+            if isRefreshing {
+                Text("Refreshing")
+            } else if let text {
+                Text(text)
+                    .monospacedDigit()
+            }
+        }
+        .onReceive(tick) { now = $0 }
+        .accessibilityLabel(isRefreshing ? "Refreshing usage" : (text ?? ""))
+    }
+
+    private var text: String? {
+        guard let nextRefreshAt else {
+            return nil
+        }
+        let seconds = Int(nextRefreshAt.timeIntervalSince(now).rounded())
+        guard seconds > 0 else {
+            return "Refreshing shortly"
+        }
+        return String(format: "Refreshes in %d:%02d", seconds / 60, seconds % 60)
     }
 }

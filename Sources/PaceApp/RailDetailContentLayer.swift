@@ -9,6 +9,8 @@ private struct EdgeDetailPanel: View {
     let snapshots: [LimitSnapshot]
     let status: AccountUsageStatus?
     let increasedContrast: Bool
+    let nextRefreshAt: Date?
+    let isRefreshing: Bool
 
     var body: some View {
         let style = ProviderStyle.resolve(providerID)
@@ -51,15 +53,22 @@ private struct EdgeDetailPanel: View {
             Divider()
                 .overlay(Color.white.opacity(0.14))
 
+            // The rail is ambient and sits on the desktop, so it does not carry
+            // the account address. What it shows instead is when the numbers
+            // above it will next change.
             HStack(spacing: 8) {
-                Text(footerTitle(presentation))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .foregroundStyle(footerColor(presentation))
-                Spacer(minLength: 4)
-                Text(presentation.observationText)
-                    .lineLimit(1)
-                    .foregroundStyle(.white.opacity(0.55))
+                if snapshots.isEmpty || presentation.severity != .positive {
+                    Text(presentation.title)
+                        .lineLimit(1)
+                        .foregroundStyle(presentation.color)
+                }
+                Spacer(minLength: 0)
+                RailRefreshCountdownView(
+                    nextRefreshAt: nextRefreshAt,
+                    isRefreshing: isRefreshing,
+                )
+                .lineLimit(1)
+                .foregroundStyle(.white.opacity(0.55))
             }
             .font(.system(size: 8, weight: .medium))
         }
@@ -119,29 +128,8 @@ private struct EdgeDetailPanel: View {
         return "\(percentage)% Used"
     }
 
-    /// The footer carries account identity while usage is healthy, and the
-    /// status title instead when something needs attention.
-    private func footerTitle(_ presentation: UsageStatusPresentation) -> String {
-        guard !snapshots.isEmpty, presentation.severity == .positive else {
-            return presentation.title
-        }
-        guard let account else {
-            return "No account"
-        }
-        guard let planName = account.planName else {
-            return account.displayName
-        }
-        return "\(account.displayName) · \(planName)"
-    }
-
     private var usesIncreasedContrast: Bool {
         colorSchemeContrast == .increased || increasedContrast
-    }
-
-    private func footerColor(_ presentation: UsageStatusPresentation) -> Color {
-        snapshots.isEmpty || presentation.severity == .positive
-            ? .secondary
-            : presentation.color
     }
 
     private func resetText(for snapshot: LimitSnapshot) -> String {
@@ -158,6 +146,8 @@ struct RailDetailContent: Equatable {
     let snapshots: [LimitSnapshot]
     let status: AccountUsageStatus?
     let increasedContrast: Bool
+    let nextRefreshAt: Date?
+    let isRefreshing: Bool
 }
 
 struct RailDetailContentLayerRepresentable: NSViewRepresentable {
@@ -329,6 +319,8 @@ final class RailDetailContentLayerView: NSView {
             snapshots: content.snapshots,
             status: content.status,
             increasedContrast: content.increasedContrast,
+            nextRefreshAt: content.nextRefreshAt,
+            isRefreshing: content.isRefreshing,
         )
     }
 

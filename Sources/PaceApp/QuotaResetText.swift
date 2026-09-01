@@ -2,11 +2,13 @@ import Foundation
 
 /// Reset-time wording shared by the edge rail and the menu panel.
 ///
-/// The reference frames and the running reference application both state the
-/// absolute reset moment rather than a countdown: "Resets Mon 1:09 AM" and
-/// "Resets Wed 11:59 PM". An absolute time stays correct on a surface the user
-/// glances at rather than watches, and it does not need to re-render every
-/// minute to stay honest.
+/// Stated as how long is left rather than as a clock time. "Resets in 2d 18h"
+/// answers how much room remains before the quota returns, which is the
+/// question a usage tool is opened to settle. A clock time makes the reader do
+/// that subtraction themselves, and the further out the reset, the more work it
+/// is: "Resets Sep 12 5:30 AM" is not a useful answer to "can I keep going".
+///
+/// The reference states absolute times, so this is a deliberate departure.
 enum QuotaResetText {
     /// Reset wording for a quota that may not report a reset moment.
     static func description(
@@ -20,37 +22,35 @@ enum QuotaResetText {
         return "Resets \(moment(resetsAt, relativeTo: referenceDate, calendar: calendar))"
     }
 
-    /// The reset moment itself, without the "Resets" prefix.
+    /// The remaining time, without the "Resets" prefix.
     ///
-    /// Today and tomorrow read as a bare time or "Tomorrow", because a weekday
-    /// name for a moment hours away is harder to place than either. Anything
-    /// further out uses the weekday, and anything beyond a week adds the date
-    /// so two resets a week apart never render identically.
+    /// Two units at most, and never a unit smaller than the one below the
+    /// largest: days and hours, or hours and minutes. A reset four days away
+    /// does not need its minutes, and showing them would imply a precision the
+    /// provider's own window does not have.
     static func moment(
         _ resetsAt: Date,
         relativeTo referenceDate: Date,
-        calendar: Calendar = .current,
+        calendar _: Calendar = .current,
     ) -> String {
-        let time = resetsAt.formatted(date: .omitted, time: .shortened)
-
-        if calendar.isDate(resetsAt, inSameDayAs: referenceDate) {
-            return time
-        }
-        if calendar.isDateInTomorrow(resetsAt) {
-            return "Tomorrow \(time)"
+        let remaining = resetsAt.timeIntervalSince(referenceDate)
+        guard remaining > 0 else {
+            // The window has closed but the provider has not reported the new
+            // one yet. Saying "in 0m" would read as broken.
+            return "shortly"
         }
 
-        let days = calendar.dateComponents(
-            [.day],
-            from: calendar.startOfDay(for: referenceDate),
-            to: calendar.startOfDay(for: resetsAt),
-        ).day ?? 0
+        let totalMinutes = Int(remaining / 60)
+        let days = totalMinutes / 1440
+        let hours = (totalMinutes % 1440) / 60
+        let minutes = totalMinutes % 60
 
-        if days > 0, days < 7 {
-            return "\(resetsAt.formatted(.dateTime.weekday(.abbreviated))) \(time)"
+        if days > 0 {
+            return hours > 0 ? "in \(days)d \(hours)h" : "in \(days)d"
         }
-
-        let date = resetsAt.formatted(.dateTime.month(.abbreviated).day())
-        return "\(date) \(time)"
+        if hours > 0 {
+            return minutes > 0 ? "in \(hours)h \(minutes)m" : "in \(hours)h"
+        }
+        return "in \(max(minutes, 1))m"
     }
 }

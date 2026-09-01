@@ -36,6 +36,9 @@ struct MenuPanelView: View {
                 selectedAccountContent
             }
 
+            // Breathing room between the last quota row and the footer rule.
+            // Without it the divider sat directly on the final row's text.
+            Spacer(minLength: 6)
             Divider().overlay(Color.white.opacity(dividerOpacity))
             footer
         }

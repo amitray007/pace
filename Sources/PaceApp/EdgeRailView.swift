@@ -229,6 +229,8 @@ struct EdgeRailView: View {
                 snapshots: account.map { model.snapshots(for: $0.id) } ?? [],
                 status: account.map(model.usageStatus(for:)),
                 increasedContrast: usesIncreasedContrast,
+                nextRefreshAt: model.nextRefreshAt,
+                isRefreshing: model.isRefreshing,
             )
         }
     }

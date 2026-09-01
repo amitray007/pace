@@ -31,13 +31,12 @@ struct MenuQuotaRow: View {
             }
             .frame(height: 4)
 
-            HStack {
-                Text(resetDescription)
-                Spacer()
-                Text(observationDescription)
-            }
-            .font(.system(size: 9))
-            .foregroundStyle(.secondary)
+            // Only the reset. When the data was observed is answered by the
+            // header's countdown, and repeating it per row competed with the
+            // numbers the row exists to show.
+            Text(resetDescription)
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityDescription)
@@ -53,14 +52,19 @@ struct MenuQuotaRow: View {
 
     private var accessibilityDescription: String {
         "\(snapshot.label), \(Int(snapshot.usedFraction * 100)) percent used, " +
-            "\(resetDescription), \(observationDescription)"
+            "\(resetDescription)\(freshnessSuffix)"
+    }
+
+    /// Appended to the accessibility label when the data is not current.
+    private var freshnessSuffix: String {
+        observationDescription.isEmpty ? "" : ", \(observationDescription)"
     }
 
     /// What to say about this snapshot's freshness.
     ///
-    /// Current data says nothing: the header's countdown already states when it
-    /// will next change, and repeating an observation time on every row only
-    /// competed with the numbers. Every other state still names itself, because
+    /// Now used only by the accessibility label, since the row no longer shows
+    /// it. Current data says nothing, because the header's countdown already
+    /// states when it will next change. Every other state names itself, because
     /// those are the cases where the age of the data matters.
     private var observationDescription: String {
         let observation = snapshot.observedAt.formatted(date: .omitted, time: .shortened)
