@@ -60,7 +60,9 @@ struct CursorCredentialLoader: CursorCredentialLoading {
 
     private let keychain: any CursorKeychainReading
 
-    init(keychain: any CursorKeychainReading = CursorSecurityKeychainReader()) {
+    init(
+        keychain: any CursorKeychainReading = CursorCachingKeychainReader(),
+    ) {
         self.keychain = keychain
     }
 
