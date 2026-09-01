@@ -26,6 +26,11 @@ final class PaceAppDelegate: NSObject, NSApplicationDelegate {
         if ProcessInfo.processInfo.environment["PACE_REFERENCE_MOTION"] == "1" {
             scheduleReferenceMotionSequence()
         }
+        if ProcessInfo.processInfo.environment["PACE_REFERENCE_SETTINGS"] == "1" {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                PaceSettingsPresenter.show()
+            }
+        }
     }
 
     func applicationWillTerminate(_: Notification) {
@@ -34,6 +39,9 @@ final class PaceAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidBecomeActive(_: Notification) {
         model.refreshLaunchAtLoginStatus()
+        Task {
+            await model.refreshNotificationAuthorizationStatus()
+        }
     }
 
     func applicationShouldTerminate(

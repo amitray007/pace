@@ -11,10 +11,13 @@ final class PacePresentationModel {
     private(set) var loadingError: String?
     private(set) var launchAtLoginError: String?
     private(set) var launchAtLoginStatus: LaunchAtLoginStatus
+    var notificationAuthorizationStatus: PaceNotificationAuthorizationStatus = .notDetermined
+    var notificationError: String?
     private(set) var preferencesError: String?
     private(set) var refreshError: String?
     private(set) var isLoading = true
     private(set) var isChangingLaunchAtLogin = false
+    var isChangingNotificationAuthorization = false
     private(set) var isRefreshing = false
     var availableGitHubCopilotLogins: [String] = []
     var accountActionError: String?
@@ -31,8 +34,10 @@ final class PacePresentationModel {
     private let simulatedPresentationState: SimulatedPresentationState
     private let preferencesPersistence: any PacePreferencesPersistence
     private let launchAtLoginSetting: LaunchAtLoginSetting
+    let notificationDeliveryController: PaceNotificationDeliveryController
     private let statePersistence: any PaceStatePersistence
     private var hasStarted = false
+    var notificationSettingsTask: Task<Void, Never>?
     private var preferencesStore: PacePreferencesStore?
     private var providerUpdateTask: Task<Void, Never>?
     var accountCoordinator: AccountCoordinator?
@@ -42,6 +47,7 @@ final class PacePresentationModel {
     private var streamPersistenceFailures: Set<AccountID> = []
 
     isolated deinit {
+        notificationSettingsTask?.cancel()
         stopProviderUpdates()
     }
 
@@ -51,6 +57,8 @@ final class PacePresentationModel {
             InMemoryPacePreferencesPersistence(),
         statePersistence: any PaceStatePersistence = InMemoryPaceStatePersistence(),
         launchAtLoginService: any LaunchAtLoginService = SystemLaunchAtLoginService(),
+        notificationDeliveryService: any PaceNotificationDeliveryService =
+            SystemPaceNotificationDeliveryService(),
     ) {
         let previewState = environment["PACE_REFERENCE_PREVIEW"]
             .flatMap(RailPreviewState.init(rawValue:))
@@ -69,6 +77,9 @@ final class PacePresentationModel {
         preferences = initialPreferences
         launchAtLoginSetting = LaunchAtLoginSetting(service: launchAtLoginService)
         launchAtLoginStatus = launchAtLoginSetting.status
+        notificationDeliveryController = PaceNotificationDeliveryController(
+            service: notificationDeliveryService,
+        )
         railPreviewState = previewState ?? .mini
         isReferencePreview = previewState != nil
         forcesIncreasedContrast = environment["PACE_REFERENCE_CONTRAST"] == "increased"
@@ -102,24 +113,6 @@ final class PacePresentationModel {
         return ordered + available.subtracting(ordered).sorted()
     }
 
-    var selectedAccount: ProviderAccount? {
-        selectedAccount(for: activeProviderID)
-    }
-
-    var selectedSnapshots: [LimitSnapshot] {
-        guard let selectedAccount else {
-            return []
-        }
-        return snapshots(for: selectedAccount.id)
-    }
-
-    var selectedUsageStatus: AccountUsageStatus? {
-        guard let selectedAccount else {
-            return nil
-        }
-        return usageStatus(for: selectedAccount)
-    }
-
     func start() async {
         guard !hasStarted else {
             return
@@ -140,6 +133,7 @@ final class PacePresentationModel {
             } catch {
                 preferencesError = "Settings could not be loaded. Defaults are active."
             }
+            await refreshNotificationAuthorizationStatus()
         }
 
         do {
@@ -163,57 +157,6 @@ final class PacePresentationModel {
         } catch {
             loadingError = String(describing: error)
         }
-    }
-
-    func accounts(for providerID: ProviderID) -> [ProviderAccount] {
-        let providerAccounts = state.accounts.filter {
-            $0.providerID == providerID && $0.isEnabled
-        }
-        let hasLiveAccount = providerAccounts.contains {
-            !$0.credentialBinding.isSimulated
-        }
-        return providerAccounts
-            .filter { !hasLiveAccount || !$0.credentialBinding.isSimulated }
-            .sorted { $0.order < $1.order }
-    }
-
-    func selectedAccount(for providerID: ProviderID) -> ProviderAccount? {
-        let selection = state.selections.first { $0.providerID == providerID }
-        return state.accounts.first {
-            $0.id == selection?.accountID && $0.isEnabled
-        } ?? accounts(for: providerID).first
-    }
-
-    func snapshots(for accountID: AccountID) -> [LimitSnapshot] {
-        state.snapshots
-            .filter { $0.id.accountID == accountID }
-    }
-
-    func usageStatus(for account: ProviderAccount) -> AccountUsageStatus {
-        AccountUsageStatus(account: account, snapshots: snapshots(for: account.id))
-    }
-
-    func headlineUsage(for providerID: ProviderID) -> Double? {
-        guard let account = selectedAccount(for: providerID) else {
-            return nil
-        }
-        let snapshots = snapshots(for: account.id)
-        let preferredBucketID: String? = switch providerID {
-        case .claude:
-            "current-session"
-        case .codex:
-            "monthly-limit"
-        case .cursor:
-            "included-usage"
-        case .grok:
-            "included-weekly"
-        case .githubCopilot:
-            "credits"
-        default:
-            nil
-        }
-        return snapshots.first { $0.id.bucketID.rawValue == preferredBucketID }?.usedFraction
-            ?? snapshots.map(\.usedFraction).max()
     }
 
     func selectProvider(_ providerID: ProviderID) {
@@ -257,11 +200,14 @@ final class PacePresentationModel {
         defer {
             isRefreshing = false
         }
+        let previousState = state
         do {
             try await refreshCoordinator.refreshAll()
-            state = await store.currentState()
+            let currentState = await store.currentState()
+            state = currentState
             streamPersistenceFailures.removeAll()
             refreshError = nil
+            await deliverNotifications(previous: previousState, current: currentState)
         } catch {
             refreshError = "Usage could not be refreshed."
         }
@@ -292,11 +238,14 @@ final class PacePresentationModel {
                 }
                 switch update {
                 case let .applied(outcome):
-                    state = await store.currentState()
+                    let previousState = state
+                    let currentState = await store.currentState()
+                    state = currentState
                     streamPersistenceFailures.remove(outcome.accountID)
                     refreshError = streamPersistenceFailures.isEmpty
                         ? nil
                         : "Usage changed, but the update could not be saved."
+                    await deliverNotifications(previous: previousState, current: currentState)
                 case let .persistenceFailed(accountID):
                     streamPersistenceFailures.insert(accountID)
                     refreshError = "Usage changed, but the update could not be saved."
@@ -305,7 +254,7 @@ final class PacePresentationModel {
         }
     }
 
-    private func updatePreferences(_ update: (inout PacePreferences) -> Void) {
+    func updatePreferences(_ update: (inout PacePreferences) -> Void) {
         var nextPreferences = preferences
         update(&nextPreferences)
         guard nextPreferences != preferences else {

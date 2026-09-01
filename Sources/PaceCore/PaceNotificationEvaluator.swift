@@ -10,7 +10,13 @@ public enum NotificationQuietHoursError: Error, Equatable, Sendable {
     case invalidMinute(Int)
 }
 
-public struct NotificationQuietHours: Equatable, Sendable {
+public struct NotificationQuietHours: Codable, Equatable, Sendable {
+    private enum CodingKeys: String, CodingKey {
+        case endMinutesAfterMidnight
+        case startMinutesAfterMidnight
+        case timeZone
+    }
+
     public let startMinutesAfterMidnight: Int
     public let endMinutesAfterMidnight: Int
     public let timeZone: TimeZone
@@ -33,6 +39,21 @@ public struct NotificationQuietHours: Equatable, Sendable {
         self.startMinutesAfterMidnight = startMinutesAfterMidnight
         self.endMinutesAfterMidnight = endMinutesAfterMidnight
         self.timeZone = timeZone
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(
+            startMinutesAfterMidnight: container.decode(
+                Int.self,
+                forKey: .startMinutesAfterMidnight,
+            ),
+            endMinutesAfterMidnight: container.decode(
+                Int.self,
+                forKey: .endMinutesAfterMidnight,
+            ),
+            timeZone: container.decode(TimeZone.self, forKey: .timeZone),
+        )
     }
 
     public func deliveryDate(for date: Date) -> Date? {
@@ -69,7 +90,22 @@ public struct NotificationQuietHours: Equatable, Sendable {
     }
 }
 
-public struct PaceNotificationPolicy: Equatable, Sendable {
+public struct PaceNotificationPolicy: Codable, Equatable, Sendable {
+    private enum CodingKeys: String, CodingKey {
+        case quietHours
+        case resetReminderLeadTime
+        case usageThreshold
+        case warnsWhenDataBecomesStale
+    }
+
+    public static let disabled = Self(
+        usageThreshold: nil,
+        resetReminderLeadTime: nil,
+        warnsWhenDataBecomesStale: false,
+        quietHours: nil,
+        validated: (),
+    )
+
     public let usageThreshold: Double?
     public let resetReminderLeadTime: TimeInterval?
     public let warnsWhenDataBecomesStale: Bool
@@ -100,8 +136,40 @@ public struct PaceNotificationPolicy: Equatable, Sendable {
         self.quietHours = quietHours
     }
 
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(
+            usageThreshold: container.decodeIfPresent(Double.self, forKey: .usageThreshold),
+            resetReminderLeadTime: container.decodeIfPresent(
+                TimeInterval.self,
+                forKey: .resetReminderLeadTime,
+            ),
+            warnsWhenDataBecomesStale: container.decodeIfPresent(
+                Bool.self,
+                forKey: .warnsWhenDataBecomesStale,
+            ) ?? false,
+            quietHours: container.decodeIfPresent(
+                NotificationQuietHours.self,
+                forKey: .quietHours,
+            ),
+        )
+    }
+
     public var isEnabled: Bool {
         usageThreshold != nil || resetReminderLeadTime != nil || warnsWhenDataBecomesStale
+    }
+
+    private init(
+        usageThreshold: Double?,
+        resetReminderLeadTime: TimeInterval?,
+        warnsWhenDataBecomesStale: Bool,
+        quietHours: NotificationQuietHours?,
+        validated _: Void,
+    ) {
+        self.usageThreshold = usageThreshold
+        self.resetReminderLeadTime = resetReminderLeadTime
+        self.warnsWhenDataBecomesStale = warnsWhenDataBecomesStale
+        self.quietHours = quietHours
     }
 }
 

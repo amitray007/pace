@@ -180,6 +180,10 @@ struct PaceSettingsView: View {
                 )
             }
 
+            if !model.isReferencePreview {
+                PaceNotificationSettingsContent(model: model)
+            }
+
             Section("Data") {
                 LabeledContent("Source", value: model.dataSourceDescription)
                 Text(

@@ -35,8 +35,11 @@ action. A signed-build login-cycle check remains part of release validation.
 Notification policy evaluation is deterministic and provider-neutral. It detects per-account
 usage-threshold crossings, reset windows, and stale-data transitions without averaging accounts.
 The default policy is disabled, startup data does not create alerts, and quiet hours hold an event
-until their local end time. Native delivery, Settings controls, and permission requests remain
-separate release work.
+until their local end time. Native Settings controls persist the policy, and a local
+`UserNotifications` adapter schedules alert-only delivery after manual refreshes, account
+refreshes, and provider updates. Pace reads authorization at launch without prompting. It requests
+permission only after the user enables a rule or presses Allow Notifications. Signed-build
+permission and banner-delivery checks remain release validation.
 
 A production-separated Codex adapter and its original Swift spike read limits through the supported
 local app-server protocol without copying account tokens or calling private web endpoints. The

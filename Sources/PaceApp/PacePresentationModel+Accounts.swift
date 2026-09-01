@@ -340,8 +340,11 @@ extension PacePresentationModel {
         guard let refreshCoordinator else {
             return
         }
+        let previousState = state
         _ = try await refreshCoordinator.refresh(accountID)
-        state = await store?.currentState() ?? state
+        let currentState = await store?.currentState() ?? state
+        state = currentState
+        await deliverNotifications(previous: previousState, current: currentState)
     }
 
     private func refreshSimulatedFallbackIfNeeded(for providerID: ProviderID) async throws {

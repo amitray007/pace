@@ -107,8 +107,12 @@ increased-contrast tracks, and owner-only normalized state persistence are wired
 now uses native Service Management with explicit registration, approval, failure, and external
 status handling. A deterministic notification core now evaluates per-account threshold crossings,
 same-cycle reset reminders, stale-data transitions, and quiet-hour holds without requesting system
-permission. A signed-build launch integration check, approved notification settings, native
-delivery, and permission-path testing remain.
+permission. Native Settings now persists usage, reset, stale-data, and quiet-hour rules. A separate
+delivery controller reads authorization without prompting, requests it only after explicit user
+action, and schedules alert-only `UserNotifications` after normalized state transitions. Native
+layout and accessibility review, deterministic delivery tests, and the unsigned universal Release
+build pass. A signed-build launch integration check, final Settings approval, and notification
+permission and banner-delivery testing remain.
 
 - Add menu-bar, rail, and both presentation settings.
 - Add one-provider-at-a-time details and per-provider account selection.

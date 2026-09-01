@@ -143,6 +143,13 @@ Management state instead of a copied preference. Registration is opt-in. If macO
 registered item requires approval, Pace keeps the toggle on, explains the state, and opens Login
 Items only after the user chooses that action.
 
+The Notifications group uses native controls for a usage threshold, reset lead time, stale-data
+warnings, and optional quiet hours. Every rule is off by default. Enabling the first alert rule is
+an explicit permission action; opening Pace or Settings never prompts. If an enabled policy was
+restored before permission was decided, Settings shows an Allow Notifications button. Denied,
+provisional, authorized, and unavailable states use honest text and symbols. Quiet hours delay a
+candidate until their local end time instead of discarding it.
+
 GitHub Copilot account setup stays explicit. Clicking Add GitHub Copilot account asks GitHub CLI
 for its healthy `github.com` accounts, excludes accounts already registered in Pace, and presents
 the remaining usernames in the existing Settings surface. Discovery does not register anything.

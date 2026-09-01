@@ -317,8 +317,16 @@ hit-testing control.
   emits only per-account threshold crossings, same-cycle reset reminders, and new stale-data
   episodes. It ignores disabled accounts and stale bucket values, never averages accounts, and
   marks quiet-hour events with the earliest local delivery date instead of discarding them.
-- Keep native notification delivery and authorization outside the evaluator. The default policy has
-  no active rules, and Pace must not request notification permission at launch.
+- Keep native notification delivery and authorization outside the evaluator. An actor-backed
+  delivery controller maps candidates to provider and account messages, checks authorization, and
+  schedules immediate or quiet-hour-delayed requests through `UNUserNotificationCenter`. Manual
+  refreshes, single-account refreshes, and provider update streams compare the previous and current
+  normalized state before delivery. Policy changes clear pending requests so disabled or changed
+  rules cannot fire with old settings.
+- Keep the default policy disabled. Pace reads authorization at launch and when the app becomes
+  active without prompting. It requests alert-only permission only after the user enables a rule
+  or presses the explicit Allow Notifications control. Denied and unavailable states remain visible
+  in Settings.
 - Treat Service Management as the source of truth for launch at login. Pace reads registration
   status at launch and when it becomes active, changes it only after an explicit Settings toggle,
   and sends approval-required users to Login Items only after they press the provided button.

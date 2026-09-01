@@ -13,6 +13,7 @@ struct PacePreferencesTests {
         #expect(preferences.railVerticalPosition == .center)
         #expect(preferences.activationMode == .modifierHover)
         #expect(preferences.activationModifier == .shift)
+        #expect(preferences.notificationPolicy == .disabled)
         #expect(preferences.providerOrder == PacePreferences.defaultProviderOrder)
     }
 
@@ -51,6 +52,64 @@ struct PacePreferencesTests {
         #expect(preferences.railEdge == .left)
         #expect(preferences.surfaceMode == .menuBar)
         #expect(preferences.activationModifier == .shift)
+        #expect(preferences.notificationPolicy == .disabled)
+    }
+
+    @Test
+    func `round-trips notification rules and quiet hours`() throws {
+        let timeZone = try #require(TimeZone(identifier: "Asia/Kolkata"))
+        let policy = try PaceNotificationPolicy(
+            usageThreshold: 0.85,
+            resetReminderLeadTime: 2 * 60 * 60,
+            warnsWhenDataBecomesStale: true,
+            quietHours: NotificationQuietHours(
+                startMinutesAfterMidnight: 22 * 60,
+                endMinutesAfterMidnight: 8 * 60,
+                timeZone: timeZone,
+            ),
+        )
+        let preferences = PacePreferences(notificationPolicy: policy)
+
+        let data = try JSONEncoder().encode(preferences)
+        let decoded = try JSONDecoder().decode(PacePreferences.self, from: data)
+
+        #expect(decoded.notificationPolicy == policy)
+    }
+
+    @Test
+    func `rejects invalid persisted notification rules`() throws {
+        let invalidThreshold = Data("""
+        {
+          "notificationPolicy": {
+            "usageThreshold": 1.2,
+            "warnsWhenDataBecomesStale": false
+          },
+          "version": 1
+        }
+        """.utf8)
+        let quietHours = try NotificationQuietHours(
+            startMinutesAfterMidnight: 22 * 60,
+            endMinutesAfterMidnight: 8 * 60,
+            timeZone: #require(TimeZone(identifier: "Asia/Kolkata")),
+        )
+        let policy = try PaceNotificationPolicy(quietHours: quietHours)
+        let validData = try JSONEncoder().encode(PacePreferences(notificationPolicy: policy))
+        var root = try #require(
+            JSONSerialization.jsonObject(with: validData) as? [String: Any],
+        )
+        var storedPolicy = try #require(root["notificationPolicy"] as? [String: Any])
+        var storedQuietHours = try #require(storedPolicy["quietHours"] as? [String: Any])
+        storedQuietHours["startMinutesAfterMidnight"] = 8 * 60
+        storedPolicy["quietHours"] = storedQuietHours
+        root["notificationPolicy"] = storedPolicy
+        let invalidQuietHours = try JSONSerialization.data(withJSONObject: root)
+
+        #expect(throws: PaceNotificationPolicyError.invalidUsageThreshold(1.2)) {
+            _ = try JSONDecoder().decode(PacePreferences.self, from: invalidThreshold)
+        }
+        #expect(throws: NotificationQuietHoursError.identicalStartAndEnd) {
+            _ = try JSONDecoder().decode(PacePreferences.self, from: invalidQuietHours)
+        }
     }
 
     @Test

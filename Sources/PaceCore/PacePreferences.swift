@@ -58,6 +58,7 @@ public struct PacePreferences: Codable, Equatable, Sendable {
     public var dwellDelay: TimeInterval
     public var dismissalDelay: TimeInterval
     public var hideRailInFullScreen: Bool
+    public var notificationPolicy: PaceNotificationPolicy
     public var providerOrder: [ProviderID]
 
     public init(
@@ -71,6 +72,7 @@ public struct PacePreferences: Codable, Equatable, Sendable {
         dwellDelay: TimeInterval = 0.6,
         dismissalDelay: TimeInterval = 0.4,
         hideRailInFullScreen: Bool = true,
+        notificationPolicy: PaceNotificationPolicy = .disabled,
         providerOrder: [ProviderID] = Self.defaultProviderOrder,
     ) {
         self.version = version
@@ -83,6 +85,7 @@ public struct PacePreferences: Codable, Equatable, Sendable {
         self.dwellDelay = Self.clamped(dwellDelay, to: 0.2 ... 2)
         self.dismissalDelay = Self.clamped(dismissalDelay, to: 0.1 ... 2)
         self.hideRailInFullScreen = hideRailInFullScreen
+        self.notificationPolicy = notificationPolicy
         self.providerOrder = Self.normalizedProviderOrder(providerOrder)
     }
 
@@ -122,6 +125,10 @@ public struct PacePreferences: Codable, Equatable, Sendable {
                 Bool.self,
                 forKey: .hideRailInFullScreen,
             ) ?? true,
+            notificationPolicy: container.decodeIfPresent(
+                PaceNotificationPolicy.self,
+                forKey: .notificationPolicy,
+            ) ?? .disabled,
             providerOrder: container.decodeIfPresent(
                 [ProviderID].self,
                 forKey: .providerOrder,
