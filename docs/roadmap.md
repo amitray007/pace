@@ -74,8 +74,10 @@ Status: in progress. The rail shell, attached panel, provider switches, rapid re
 dismissal, and reduced-motion path now use presentation-layer-aware Core Animation. The
 deterministic intent engine and permission-free AppKit adapter now implement modifier-hover,
 click-handle, dwell, provider travel, dismissal grace, and scroll, drag, fast-motion, and full-screen
-suppression. Physical scrollbar and drag checks, Instruments frame pacing, 120 Hz hardware checks,
-and explicit visual approval remain.
+suppression. The deterministic Release sequence now passes an Animation Hitches capture on the
+built-in 120 Hz display with no post-startup main-thread delay over 33 ms and no sequence hitch over
+16.67 ms. Physical scrollbar and drag checks, a 60 Hz or second-display capture, and explicit visual
+approval remain.
 
 - Implement rail path morphing and attached-panel movement with Core Animation.
 - Make every rapid transition interruptible and retargetable.
