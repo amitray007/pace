@@ -56,6 +56,34 @@ This benchmark proves deterministic engine cost only. It does not measure the gl
 monitor, target-window updates, Core Animation commits, or physical pointer and scrollbar behavior.
 Those remain running-application and Instruments checks.
 
+## Running-application frame pacing
+
+The deterministic motion sequence has also been captured with the Animation Hitches instrument on
+the development Mac's built-in 120 Hz display. The capture used the unsigned universal Release app,
+the mini initial state, and a three-second delay before reveal. It exercised reveal, provider
+switches, rapid retargeting, and dismissal without provider access or pointer automation.
+
+The initial implementation created and laid out the SwiftUI detail hierarchy on its first reveal.
+That trace contained a 148.39 ms main-thread interaction delay and a 150 ms compositor hitch. Pace
+now prepares one cached detail hierarchy for each visible provider while the rail remains hidden.
+The animated container still owns position and opacity, and provider switches only reveal an
+already prepared hierarchy unless its data or bounds changed.
+
+In the final trace, no post-startup main-thread delay exceeded 33 ms. Between the first reveal at
+three seconds and the end of the deterministic sequence, the largest compositor hitch was 16.67 ms;
+the baseline contained five hitches over 33 ms. Prewarming moves a small amount of work into launch:
+the final capture reported startup delays of 114.01 ms and 33.45 ms before the motion sequence was
+eligible to begin. This is preferable to blocking the first user-triggered reveal, but it remains a
+machine-specific observation rather than a launch-time guarantee.
+
+Do not put the Instruments trace in `make check`. Each deferred trace is hundreds of megabytes and
+requires Xcode to finalize it. Repeat the manual capture after changing the detail hierarchy,
+hosting-view lifecycle, rail motion, or provider assets. Count post-startup delays with the
+`potential-hangs` export and inspect the `hitches` export for the full rendered sequence.
+
+This check covers one built-in 120 Hz display. A 60 Hz display, a second physical display, different
+Mac hardware, and real pointer interaction still require separate running-application review.
+
 ## Visual benchmark
 
 The visual benchmark extracts near-black pixels from a bounded region of the later Claude-detail

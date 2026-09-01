@@ -135,26 +135,28 @@ private struct EdgeDetailPanel: View {
     }
 }
 
-struct RailDetailContentLayerRepresentable: NSViewRepresentable {
-    let providerID: ProviderID?
+struct RailDetailContent: Equatable {
+    let providerID: ProviderID
     let account: ProviderAccount?
     let snapshots: [LimitSnapshot]
     let status: AccountUsageStatus?
+    let increasedContrast: Bool
+}
+
+struct RailDetailContentLayerRepresentable: NSViewRepresentable {
+    let contents: [RailDetailContent]
+    let visibleProviderID: ProviderID?
     let edge: RailEdge
     let panelY: CGFloat
     let reducesMotion: Bool
-    let increasedContrast: Bool
 
     private var state: RailDetailContentState {
         RailDetailContentState(
-            providerID: providerID,
-            account: account,
-            snapshots: snapshots,
-            status: status,
+            contents: contents,
+            visibleProviderID: visibleProviderID,
             edge: edge,
             panelY: panelY,
             reducesMotion: reducesMotion,
-            increasedContrast: increasedContrast,
         )
     }
 
@@ -168,20 +170,19 @@ struct RailDetailContentLayerRepresentable: NSViewRepresentable {
 }
 
 private struct RailDetailContentState {
-    let providerID: ProviderID?
-    let account: ProviderAccount?
-    let snapshots: [LimitSnapshot]
-    let status: AccountUsageStatus?
+    let contents: [RailDetailContent]
+    let visibleProviderID: ProviderID?
     let edge: RailEdge
     let panelY: CGFloat
     let reducesMotion: Bool
-    let increasedContrast: Bool
 }
 
 final class RailDetailContentLayerView: NSView {
-    private let contentView = NSHostingView(rootView: AnyView(EmptyView()))
-    private var providerID: ProviderID?
+    private let contentContainerView = NSView()
+    private var contentViews: [ProviderID: NSHostingView<AnyView>] = [:]
     private var hasReceivedState = false
+    private var renderedContents: [ProviderID: RailDetailContent] = [:]
+    private var visibleProviderID: ProviderID?
 
     override var isFlipped: Bool {
         true
@@ -190,13 +191,13 @@ final class RailDetailContentLayerView: NSView {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
-        contentView.wantsLayer = true
-        contentView.layer?.actions = [
+        contentContainerView.wantsLayer = true
+        contentContainerView.layer?.actions = [
             "position": NSNull(),
             "opacity": NSNull(),
         ]
-        contentView.layer?.opacity = 0
-        addSubview(contentView)
+        contentContainerView.layer?.opacity = 0
+        addSubview(contentContainerView)
     }
 
     @available(*, unavailable)
@@ -205,28 +206,19 @@ final class RailDetailContentLayerView: NSView {
     }
 
     fileprivate func update(_ state: RailDetailContentState) {
-        let previousProviderID = providerID
-        let layer = contentView.layer
+        let previousProviderID = visibleProviderID
+        let layer = contentContainerView.layer
         let currentPosition = layer?.presentation()?.position ?? layer?.position
         let currentOpacity = layer?.presentation()?.opacity ?? layer?.opacity ?? 0
 
-        if let nextProviderID = state.providerID {
-            contentView.rootView = AnyView(
-                EdgeDetailPanel(
-                    providerID: nextProviderID,
-                    account: state.account,
-                    snapshots: state.snapshots,
-                    status: state.status,
-                    increasedContrast: state.increasedContrast,
-                ),
-            )
-            contentView.frame = targetFrame(edge: state.edge, panelY: state.panelY)
-        }
+        contentContainerView.frame = targetFrame(edge: state.edge, panelY: state.panelY)
+        reconcileContentViews(state.contents)
+        updateContentVisibility(state.visibleProviderID)
 
         let targetPosition = layer?.position
-        let isVisible = state.providerID != nil
-        let shouldAnimate = hasReceivedState && previousProviderID != state.providerID
-        providerID = state.providerID
+        let isVisible = state.visibleProviderID != nil
+        let shouldAnimate = hasReceivedState && previousProviderID != state.visibleProviderID
+        visibleProviderID = state.visibleProviderID
         hasReceivedState = true
         setModelOpacity(isVisible ? 1 : 0, on: layer)
 
@@ -251,6 +243,63 @@ final class RailDetailContentLayerView: NSView {
             isReveal: previousProviderID == nil,
             reducesMotion: state.reducesMotion,
         )
+    }
+
+    private func reconcileContentViews(_ contents: [RailDetailContent]) {
+        let retainedProviderIDs = Set(contents.map(\.providerID))
+        let removedProviderIDs = contentViews.keys.filter {
+            !retainedProviderIDs.contains($0)
+        }
+        for providerID in removedProviderIDs {
+            contentViews.removeValue(forKey: providerID)?.removeFromSuperview()
+            renderedContents.removeValue(forKey: providerID)
+        }
+
+        for content in contents {
+            let providerID = content.providerID
+            let isNewContentView = contentViews[providerID] == nil
+            let contentView = contentViews[providerID] ?? makeContentView(for: content)
+            let contentChanged = renderedContents[providerID] != content
+            if contentChanged {
+                contentView.rootView = AnyView(detailPanel(for: content))
+                renderedContents[providerID] = content
+            }
+            let frameChanged = contentView.frame != contentContainerView.bounds
+            if frameChanged {
+                contentView.frame = contentContainerView.bounds
+            }
+            if isNewContentView || contentChanged || frameChanged {
+                contentView.layoutSubtreeIfNeeded()
+                contentView.displayIfNeeded()
+            }
+        }
+    }
+
+    private func makeContentView(
+        for content: RailDetailContent,
+    ) -> NSHostingView<AnyView> {
+        let contentView = NSHostingView(rootView: AnyView(detailPanel(for: content)))
+        contentView.autoresizingMask = [.width, .height]
+        contentContainerView.addSubview(contentView)
+        contentViews[content.providerID] = contentView
+        renderedContents[content.providerID] = content
+        return contentView
+    }
+
+    private func detailPanel(for content: RailDetailContent) -> EdgeDetailPanel {
+        EdgeDetailPanel(
+            providerID: content.providerID,
+            account: content.account,
+            snapshots: content.snapshots,
+            status: content.status,
+            increasedContrast: content.increasedContrast,
+        )
+    }
+
+    private func updateContentVisibility(_ providerID: ProviderID?) {
+        for (contentProviderID, contentView) in contentViews {
+            contentView.isHidden = contentProviderID != providerID
+        }
     }
 
     private func animatePosition(

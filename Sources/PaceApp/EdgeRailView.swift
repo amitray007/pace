@@ -97,19 +97,24 @@ struct EdgeRailView: View {
 
     private func detailContent(providerIDs: [ProviderID]) -> some View {
         let providerID = model.railPreviewState.detailProviderID
-        let account = providerID.flatMap { model.selectedAccount(for: $0) }
-        let status = account.map(model.usageStatus(for:))
+        let contents = providerIDs.map { contentProviderID in
+            let account = model.selectedAccount(for: contentProviderID)
+            return RailDetailContent(
+                providerID: contentProviderID,
+                account: account,
+                snapshots: account.map { model.snapshots(for: $0.id) } ?? [],
+                status: account.map(model.usageStatus(for:)),
+                increasedContrast: usesIncreasedContrast,
+            )
+        }
         let centerY = detailCenterY(providerIDs: providerIDs) ?? 92
         let panelY = min(max(centerY - 69.5, 0), 205)
         return RailDetailContentLayerRepresentable(
-            providerID: providerID,
-            account: account,
-            snapshots: account.map { model.snapshots(for: $0.id) } ?? [],
-            status: status,
+            contents: contents,
+            visibleProviderID: providerID,
             edge: model.preferences.railEdge,
             panelY: panelY,
             reducesMotion: accessibilityReduceMotion,
-            increasedContrast: usesIncreasedContrast,
         )
         .frame(
             width: EdgeRailGeometry.canvasSize.width,
