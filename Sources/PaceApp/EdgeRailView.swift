@@ -12,6 +12,10 @@ enum EdgeRailGeometry {
     static let railTopY: CGFloat = 30
     static let providerCentersY: [CGFloat] = [92, 194, 297]
     static let providerTopY: [CGFloat] = [60, 162, 265]
+    /// Reference ring is 85 px across a 139 px rail, so 0.61 of the rail width.
+    static let ringDiameter: CGFloat = 43
+    /// Reference provider mark fills roughly half the ring's outer diameter.
+    static let markDiameter: CGFloat = 21
 }
 
 struct EdgeRailView: View {
@@ -174,27 +178,34 @@ private struct EdgeProviderRow: View {
         let style = ProviderStyle.resolve(providerID)
         let presentation = status.map { UsageStatusPresentation.resolve($0) }
         Button(action: action) {
-            VStack(spacing: 8) {
+            VStack(spacing: 5) {
                 ZStack {
                     ProgressRingLayerRepresentable(
                         fraction: usage ?? 0,
-                        color: usage == nil
-                            ? NSColor.secondaryLabelColor
-                            : style.accentColor,
+                        // The reference accent encodes remaining headroom, not
+                        // provider identity.
+                        color: UsageLevelPalette.accent(forFraction: usage),
                         increasedContrast: increasedContrast,
                     )
-                    .frame(width: 40, height: 40)
+                    .frame(
+                        width: EdgeRailGeometry.ringDiameter,
+                        height: EdgeRailGeometry.ringDiameter,
+                    )
 
-                    ProviderMark(providerID: providerID, color: .white, size: 13)
+                    ProviderMark(
+                        providerID: providerID,
+                        color: .white,
+                        size: EdgeRailGeometry.markDiameter,
+                    )
                 }
                 if let usage {
                     Text(usage, format: .percent.precision(.fractionLength(0)))
-                        .font(.system(size: 13, weight: .bold).monospacedDigit())
+                        .font(.system(size: 14, weight: .bold).monospacedDigit())
                         .foregroundStyle(.white)
                 } else {
                     Text("—")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.55))
                 }
             }
         }

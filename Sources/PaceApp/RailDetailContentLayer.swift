@@ -21,14 +21,14 @@ private struct EdgeDetailPanel: View {
                 observationText: "Not observed",
             )
         VStack(alignment: .leading, spacing: 8) {
+            // The reference header is only the provider mark and title. The
+            // account identity and plan stay in the footer so the title line
+            // never truncates an address.
             HStack(spacing: 7) {
-                ProviderMark(providerID: providerID, color: .white, size: 10)
+                ProviderMark(providerID: providerID, color: .white, size: 12)
                 Text("\(style.name) Usage")
-                    .font(.system(size: 11, weight: .semibold))
-                Spacer()
-                Text(account?.displayName ?? "No account")
-                    .font(.system(size: 8.5, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 12, weight: .bold))
+                Spacer(minLength: 0)
             }
 
             if snapshots.isEmpty {
@@ -45,7 +45,7 @@ private struct EdgeDetailPanel: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: 48)
             } else {
-                quotaRows(style: style)
+                quotaRows()
             }
             Spacer(minLength: 0)
 
@@ -55,12 +55,14 @@ private struct EdgeDetailPanel: View {
             HStack(spacing: 8) {
                 Text(footerTitle(presentation))
                     .lineLimit(1)
+                    .truncationMode(.middle)
                     .foregroundStyle(footerColor(presentation))
                 Spacer(minLength: 4)
                 Text(presentation.observationText)
                     .lineLimit(1)
+                    .foregroundStyle(.white.opacity(0.55))
             }
-            .font(.system(size: 7.5, weight: .medium))
+            .font(.system(size: 8, weight: .medium))
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -72,43 +74,65 @@ private struct EdgeDetailPanel: View {
         )
     }
 
-    private func quotaRows(style: ProviderStyle) -> some View {
+    /// The reference quota block puts the label and its reset time on one line,
+    /// the bar beneath them, and the used percentage on its own line below the
+    /// bar. Measured from `settings-claude-detail.png`.
+    private func quotaRows() -> some View {
         ForEach(snapshots.prefix(2)) { snapshot in
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(snapshot.label)
-                    Spacer()
-                    Text(
-                        snapshot.usedFraction,
-                        format: .percent.precision(.fractionLength(0)),
-                    )
-                    .monospacedDigit()
+                        .font(.system(size: 9, weight: .semibold))
+                        .lineLimit(1)
+                    Spacer(minLength: 4)
+                    Text(resetText(for: snapshot))
+                        .font(.system(size: 9))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .lineLimit(1)
                 }
-                .font(.system(size: 8.5, weight: .medium))
 
                 GeometryReader { proxy in
                     ZStack(alignment: .leading) {
                         Capsule().fill(
-                            Color.white.opacity(usesIncreasedContrast ? 0.34 : 0.14),
+                            Color.paceUsageTrack(increasedContrast: usesIncreasedContrast),
                         )
                         Capsule()
-                            .fill(style.accent)
-                            .frame(width: proxy.size.width * min(snapshot.usedFraction, 1))
+                            .fill(Color.paceUsageAccent(forFraction: snapshot.usedFraction))
+                            .frame(
+                                width: max(
+                                    proxy.size.width * min(snapshot.usedFraction, 1),
+                                    snapshot.usedFraction > 0 ? 3 : 0,
+                                ),
+                            )
                     }
                 }
-                .frame(height: 3)
+                .frame(height: 3.5)
 
-                Text(resetText(for: snapshot))
-                    .font(.system(size: 7.5))
-                    .foregroundStyle(.secondary)
+                Text(usedText(for: snapshot))
+                    .font(.system(size: 9, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(.white)
             }
         }
     }
 
+    private func usedText(for snapshot: LimitSnapshot) -> String {
+        let percentage = Int((min(max(snapshot.usedFraction, 0), 1) * 100).rounded())
+        return "\(percentage)% Used"
+    }
+
+    /// The footer carries account identity while usage is healthy, and the
+    /// status title instead when something needs attention.
     private func footerTitle(_ presentation: UsageStatusPresentation) -> String {
-        snapshots.isEmpty || presentation.severity == .positive
-            ? account?.planName ?? "Plan unavailable"
-            : presentation.title
+        guard !snapshots.isEmpty, presentation.severity == .positive else {
+            return presentation.title
+        }
+        guard let account else {
+            return "No account"
+        }
+        guard let planName = account.planName else {
+            return account.displayName
+        }
+        return "\(account.displayName) · \(planName)"
     }
 
     private var usesIncreasedContrast: Bool {
