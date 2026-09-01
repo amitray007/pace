@@ -29,7 +29,7 @@ struct ProviderStyle {
         .grok: ("Grok", NSColor(srgbRed: 0.83, green: 0.86, blue: 0.90, alpha: 1)),
         .githubCopilot: (
             "Copilot",
-            NSColor(srgbRed: 0.427, green: 0.635, blue: 1, alpha: 1)
+            NSColor(srgbRed: 0.427, green: 0.635, blue: 1, alpha: 1),
         ),
     ]
 

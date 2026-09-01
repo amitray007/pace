@@ -7,6 +7,7 @@ final class StatusItemController: NSObject {
     private let popover = NSPopover()
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private var keyMonitor: Any?
+    private var activationObserver: (any NSObjectProtocol)?
 
     init(
         model: PacePresentationModel,
@@ -17,7 +18,10 @@ final class StatusItemController: NSObject {
 
         let hostingController = NSHostingController(rootView: MenuPanelView(model: model))
         hostingController.sizingOptions = [.preferredContentSize]
-        popover.behavior = .semitransient
+        // Transient, so clicking anywhere outside the panel closes it. The
+        // semitransient behaviour only dismissed on interaction inside Pace, so
+        // clicking another application left the panel open behind it.
+        popover.behavior = .transient
         popover.contentViewController = hostingController
 
         if let button = statusItem.button {
@@ -42,11 +46,32 @@ final class StatusItemController: NSObject {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             self?.handleKeyEvent(event) ?? event
         }
+
+        // A transient popover closes on an outside click, but switching
+        // applications by other means, such as the keyboard or Mission Control,
+        // is not a click. Closing on deactivation covers those too, so the
+        // panel never stays open over an application the user has moved on to.
+        // Reference capture holds the panel open deliberately without Pace
+        // being frontmost, so it opts out of closing on deactivation.
+        if environment["PACE_REFERENCE_MENU"] != "1" {
+            activationObserver = NotificationCenter.default.addObserver(
+                forName: NSApplication.didResignActiveNotification,
+                object: nil,
+                queue: .main,
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.popover.performClose(nil)
+                }
+            }
+        }
     }
 
     isolated deinit {
         if let keyMonitor {
             NSEvent.removeMonitor(keyMonitor)
+        }
+        if let activationObserver {
+            NotificationCenter.default.removeObserver(activationObserver)
         }
     }
 
