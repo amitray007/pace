@@ -50,6 +50,7 @@ final class PacePresentationModel {
     var activeProviderID: ProviderID = .claude
     var railPreviewState: RailPreviewState
     let forcesIncreasedContrast: Bool
+    let defaultClaudeProfile: ClaudeProfile
     let defaultCodexProfileDirectory: URL
     let defaultGrokProfileDirectory: URL
 
@@ -94,6 +95,7 @@ final class PacePresentationModel {
         railPreviewState = previewState ?? .mini
         isReferencePreview = previewState != nil
         forcesIncreasedContrast = environment["PACE_REFERENCE_CONTRAST"] == "increased"
+        defaultClaudeProfile = ClaudeProfile.current(environment: environment)
         defaultCodexProfileDirectory = environment["CODEX_HOME"]
             .map { URL(filePath: $0, directoryHint: .isDirectory) }
             ?? FileManager.default.homeDirectoryForCurrentUser
@@ -426,25 +428,6 @@ extension PacePresentationModel {
         }
         updatePreferences { preferences in
             preferences.providerOrder.swapAt(sourceIndex, destinationIndex)
-        }
-    }
-}
-
-extension RailPreviewState {
-    init?(providerID: ProviderID) {
-        switch providerID {
-        case .claude:
-            self = .claude
-        case .codex:
-            self = .codex
-        case .cursor:
-            self = .cursor
-        case .githubCopilot:
-            self = .githubCopilot
-        case .grok:
-            self = .grok
-        default:
-            return nil
         }
     }
 }

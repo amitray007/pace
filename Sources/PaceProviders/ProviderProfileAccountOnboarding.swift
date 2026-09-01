@@ -165,9 +165,13 @@ private enum ProfileRegistration {
 
 private extension CredentialBinding {
     var profileDirectory: URL? {
-        guard case let .providerProfile(directory, _) = self else {
-            return nil
+        switch self {
+        case let .claudeProfile(binding):
+            binding.configurationDirectory
+        case let .providerProfile(directory, _):
+            directory
+        default:
+            nil
         }
-        return directory
     }
 }

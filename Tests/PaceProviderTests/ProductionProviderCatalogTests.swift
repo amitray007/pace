@@ -6,6 +6,33 @@ import Testing
 @Suite("Production provider catalog")
 struct ProductionProviderCatalogTests {
     @Test
+    func `builds one Claude adapter from every registered real profile`() {
+        var work = profileAccount(
+            id: "10000000-0000-0000-0000-000000000002",
+            providerID: .claude,
+            path: "/profiles/claude/work",
+            name: "Work",
+        )
+        work.isEnabled = false
+        let personal = profileAccount(
+            id: "10000000-0000-0000-0000-000000000001",
+            providerID: .claude,
+            path: "/profiles/claude/personal",
+            name: "Personal",
+        )
+
+        let profiles = ProductionProviderCatalog.claudeProfiles(for: [work, personal])
+        let adapters = ProductionProviderCatalog.adapters(for: [work, personal])
+
+        #expect(profiles.map(\.directory.path) == [
+            "/profiles/claude/work",
+            "/profiles/claude/personal",
+        ])
+        #expect(profiles.map(\.expectedIdentity) == [work.identity, personal.identity])
+        #expect(adapters.map(\.providerID) == [.claude])
+    }
+
+    @Test
     func `builds one Codex adapter from every registered real profile`() {
         var work = profileAccount(
             id: "20000000-0000-0000-0000-000000000002",
@@ -21,18 +48,18 @@ struct ProductionProviderCatalogTests {
             name: "Personal",
         )
         personal.order = 1
-        let claude = profileAccount(
+        let cursor = profileAccount(
             id: "20000000-0000-0000-0000-000000000003",
-            providerID: .claude,
-            path: "/profiles/claude/personal",
-            name: "Claude",
+            providerID: .cursor,
+            path: "/profiles/cursor/personal",
+            name: "Cursor",
         )
 
         let profiles = ProductionProviderCatalog.codexProfiles(
-            for: [personal, claude, work],
+            for: [personal, cursor, work],
         )
         let adapters = ProductionProviderCatalog.adapters(
-            for: [personal, claude, work],
+            for: [personal, cursor, work],
         )
 
         #expect(profiles.map(\.directory.path) == [
@@ -72,6 +99,12 @@ struct ProductionProviderCatalogTests {
 
     @Test
     func `orders production adapters deterministically`() {
+        let claude = profileAccount(
+            id: "10000000-0000-0000-0000-000000000008",
+            providerID: .claude,
+            path: "/profiles/claude/personal",
+            name: "Claude",
+        )
         let grok = profileAccount(
             id: "30000000-0000-0000-0000-000000000003",
             providerID: .grok,
@@ -97,11 +130,13 @@ struct ProductionProviderCatalogTests {
         )
 
         #expect(
-            ProductionProviderCatalog.adapters(for: [copilot, grok, codex]).map(\.providerID) == [
-                .codex,
-                .grok,
-                .githubCopilot,
-            ],
+            ProductionProviderCatalog.adapters(for: [copilot, grok, codex, claude])
+                .map(\.providerID) == [
+                    .claude,
+                    .codex,
+                    .grok,
+                    .githubCopilot,
+                ],
         )
     }
 

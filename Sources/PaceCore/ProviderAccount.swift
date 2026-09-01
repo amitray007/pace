@@ -21,7 +21,30 @@ public enum ProfileOwnership: String, Codable, Sendable {
     case paceManaged
 }
 
+public struct ClaudeCredentialBinding: Codable, Equatable, Sendable {
+    public let configurationDirectory: URL
+    public let secureStorageDirectory: URL
+    public let keychainService: String
+    public let keychainAccount: String
+    public let ownership: ProfileOwnership
+
+    public init(
+        configurationDirectory: URL,
+        secureStorageDirectory: URL,
+        keychainService: String,
+        keychainAccount: String,
+        ownership: ProfileOwnership,
+    ) {
+        self.configurationDirectory = configurationDirectory
+        self.secureStorageDirectory = secureStorageDirectory
+        self.keychainService = keychainService
+        self.keychainAccount = keychainAccount
+        self.ownership = ownership
+    }
+}
+
 public enum CredentialBinding: Codable, Equatable, Sendable {
+    case claudeProfile(ClaudeCredentialBinding)
     case commandLineAccount(
         tool: String,
         account: String,
@@ -33,6 +56,12 @@ public enum CredentialBinding: Codable, Equatable, Sendable {
 }
 
 enum CredentialSourceKey: Equatable, Hashable, Sendable {
+    case claudeProfile(
+        configurationPath: String,
+        secureStoragePath: String,
+        keychainService: String,
+        keychainAccount: String,
+    )
     case commandLineAccount(tool: String, account: String, configurationPath: String?)
     case providerProfile(path: String)
     case keychain(service: String, account: String)
@@ -41,6 +70,13 @@ enum CredentialSourceKey: Equatable, Hashable, Sendable {
 extension CredentialBinding {
     var sourceKey: CredentialSourceKey? {
         switch self {
+        case let .claudeProfile(binding):
+            .claudeProfile(
+                configurationPath: binding.configurationDirectory.path,
+                secureStoragePath: binding.secureStorageDirectory.path,
+                keychainService: binding.keychainService,
+                keychainAccount: binding.keychainAccount,
+            )
         case let .commandLineAccount(tool, account, configurationDirectory):
             .commandLineAccount(
                 tool: tool.lowercased(),

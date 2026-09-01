@@ -138,8 +138,10 @@ Pace account leaves the GitHub CLI login and OAuth credential unchanged.
 Do not expose internal animation control points or arbitrary theme values in the first release.
 
 The current Providers section keeps provider ordering and account management in the same native
-group. Codex and Grok registration are always explicit: add the current `CODEX_HOME` or `GROK_HOME`,
-or choose another provider profile folder. Each real account has a local name, an enable switch,
-and a remove action. Removing it never deletes the provider profile or credentials. A real account
-suppresses only that provider's simulated fixture while the real account is enabled. Disabling or
-removing the last enabled real account restores and refreshes the fixture.
+group. Claude, Codex, and Grok registration are always explicit: add the current
+`CLAUDE_CONFIG_DIR`, `CODEX_HOME`, or `GROK_HOME`, or choose another provider profile folder. Add
+current Claude account also honors `CLAUDE_SECURESTORAGE_CONFIG_DIR` and retains that exact
+non-secret storage binding. Each real account has a local name, an enable switch, and a remove
+action. Removing it never deletes the provider profile or credentials. A real account suppresses
+only that provider's simulated fixture while the real account is enabled. Disabling or removing
+the last enabled real account restores and refreshes the fixture.

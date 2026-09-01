@@ -20,10 +20,19 @@ struct PersistenceAndScenarioTests {
             identity: ProviderIdentity(subjectID: "claude-personal"),
             suggestedDisplayName: "Personal",
             planName: "Claude Pro",
-            credentialBinding: .providerProfile(
-                directory: URL(filePath: "/profiles/claude-personal", directoryHint: .isDirectory),
+            credentialBinding: .claudeProfile(ClaudeCredentialBinding(
+                configurationDirectory: URL(
+                    filePath: "/profiles/claude-personal",
+                    directoryHint: .isDirectory,
+                ),
+                secureStorageDirectory: URL(
+                    filePath: "/secure/claude-personal",
+                    directoryHint: .isDirectory,
+                ),
+                keychainService: "Claude Code-credentials-01234567",
+                keychainAccount: "test-user",
                 ownership: .paceManaged,
-            ),
+            )),
         )
         try await store.register(
             account,

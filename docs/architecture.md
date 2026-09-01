@@ -88,7 +88,7 @@ all providers expose the same window names or reset behavior.
 | Provider | Source | Confidence | Boundary |
 | --- | --- | --- | --- |
 | Codex | Supported local `codex app-server` JSON-RPC | High | Use `account/rateLimits/read` and `account/rateLimits/updated`. Keep each account in a separate `CODEX_HOME`. |
-| Claude Code | Source-verified OAuth compatibility adapter | Medium | Verify identity before calling the OAuth usage endpoint. Keep each account in a separate `CLAUDE_CONFIG_DIR`. |
+| Claude Code | Source-verified OAuth compatibility adapter | Medium-high | Bind an explicit `CLAUDE_CONFIG_DIR`, verify identity before usage, serialize reads, and rotate only through the same provider-owned source. |
 | Cursor | Source-verified compatibility adapter | Medium | Direct identity and usage reads are proven for one default CLI account. Prove two isolated CLI file profiles before product integration. |
 | Grok | Source-verified Grok Build compatibility adapter | Medium-high | Keep each account in a separate `GROK_HOME`; verify personal and team behavior separately. |
 | GitHub Copilot | GitHub-authenticated usage adapter | Medium-high | Bind every credential to an explicit GitHub identity; never depend on whichever `gh` account happens to be active. |
@@ -157,15 +157,32 @@ returned buckets dynamically.
 
 ### Claude Code
 
-The isolated `claude-usage-spike` reads one or more explicit `CLAUDE_CONFIG_DIR` profiles without a
-running Claude Code process. It resolves a profile-specific Keychain item or credential file,
-requires `user:profile`, verifies `/api/oauth/profile`, and only then reads `/api/oauth/usage`.
-Profiles are checked sequentially because Anthropic rate-limits this endpoint aggressively.
+The production Claude compatibility adapter reads explicit `CLAUDE_CONFIG_DIR` profiles without a
+running Claude Code process. It also matches Claude Code's source-verified
+`CLAUDE_SECURESTORAGE_CONFIG_DIR` precedence, Unicode-normalized Keychain service hash, and current
+user Keychain account selector. Pace persists those non-secret selectors with the account so a
+restart cannot bind a profile to a different credential. It reads only the selected Keychain item
+or owner-private `.credentials.json`, requires `user:profile`, verifies `/api/oauth/profile`, and
+only then reads `/api/oauth/usage`. It rejects redirects, bounds response size and request time, and
+serializes all Claude reads because the usage endpoint rate-limits aggressive polling.
 
-The default profile and a fresh signed-out custom profile were verified on 2026-08-31 with Claude
-Code 2.1.251. The default profile returned Session, Weekly, and a model-scoped Fable bucket. A
-second distinct live account, refresh-token rotation, and Team or Enterprise response shapes remain
-unverified. The spike never refreshes or writes credentials.
+When an access token is near expiry, a registered account verifies its current identity before any
+refresh or credential write. Pace then holds the same current and legacy OAuth refresh locks used
+by Claude Code 2.1.252, reloads the selected credential, and adopts a sibling rotation when one has
+already completed. Its final refresh-token comparison and write run under Claude Code's
+`.storage-write.lock`. File writes preserve unknown credential fields, use an owner-only atomic
+replacement, and reject symbolic links or group-readable files. Keychain writes target the exact
+service and account that supplied the credential. Pace re-verifies identity after every rotation
+before retrying usage. If the provider accepts a rotated refresh token but the local write then
+fails, Pace reports sign-in required. It does not claim that the old refresh token is still valid.
+
+The default profile read-only smoke passed on 2026-09-01 with Claude Code 2.1.252 and no running
+Claude process. Deterministic production tests cover two profiles, persisted secure-storage
+selectors, serialized and cancellable requests, source fallback, scope rejection, identity checks
+before and after rotation, current and legacy OAuth lock ownership, storage-write contention,
+refresh-token comparison, write failure, missing buckets, and polling backoff. A second distinct
+live account, live Keychain and file rotation, and Team or Enterprise response variants remain
+external validation checks.
 
 ### Cursor
 
@@ -293,8 +310,8 @@ hit-testing control.
   with overlay scrollbars, pointer drags, full-screen applications, Spaces, and multiple displays.
 - Select the oldest supported macOS version after the visual prototype proves required APIs.
 - Verify multi-account capabilities independently for every provider.
-- Prove two live Claude config directories and safe credential rotation before promoting the
-  Claude spike.
+- Verify two live Claude config directories plus live Keychain and file rotation without account
+  crossover.
 - Prove two live Cursor Agent file profiles and safe CLI-owned credential rotation before
   promoting the Cursor spike.
 - Measure reference paths, timings, and colors from the source media during the visual phase.

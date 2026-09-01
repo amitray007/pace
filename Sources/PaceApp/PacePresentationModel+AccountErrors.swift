@@ -39,6 +39,8 @@ extension PacePresentationModel {
 
     static func providerName(_ providerID: ProviderID?) -> String {
         switch providerID {
+        case .claude:
+            "Claude"
         case .codex:
             "Codex"
         case .grok:
@@ -87,22 +89,29 @@ extension PacePresentationModel {
         code: String,
         providerName: String,
     ) -> String {
-        if code == "codex-executable-unavailable" {
-            "Install the Codex CLI before adding this account."
-        } else if code == "github-cli-unavailable" {
-            "Install GitHub CLI before adding a GitHub Copilot account."
-        } else if code == "github-cli-failed" {
-            "GitHub CLI could not read this account. Check gh auth status, then try again."
-        } else if code == "github-copilot-not-entitled" {
-            "This GitHub account does not have an available Copilot entitlement."
-        } else if code == "github-copilot-quota-unavailable" {
-            "GitHub Copilot did not return quota details for this account."
-        } else if code == "grok-credential-unsupported" {
-            "This Grok profile uses an API key or custom issuer. Pace only reads first-party "
-                + "Grok sessions."
-        } else {
-            "\(providerName) is unavailable for this profile."
+        let messages = [
+            "codex-executable-unavailable":
+                "Install the Codex CLI before adding this account.",
+            "github-cli-unavailable":
+                "Install GitHub CLI before adding a GitHub Copilot account.",
+            "github-cli-failed":
+                "GitHub CLI could not read this account. Check gh auth status, then try again.",
+            "github-copilot-not-entitled":
+                "This GitHub account does not have an available Copilot entitlement.",
+            "github-copilot-quota-unavailable":
+                "GitHub Copilot did not return quota details for this account.",
+            "grok-credential-unsupported":
+                "This Grok profile uses an API key or custom issuer. "
+                + "Pace only reads first-party Grok sessions.",
+            "claude-profile-scope-missing":
+                "This Claude login cannot read subscription usage. Sign in again with Claude Code.",
+            "claude-credential-changed":
+                "The Claude login changed during refresh. Try again.",
+        ]
+        if let message = messages[code] {
+            return message
         }
+        return "\(providerName) is unavailable for this profile."
     }
 
     private static func accountMutationErrorMessage(_ error: AccountMutationError) -> String {
@@ -121,33 +130,35 @@ extension PacePresentationModel {
 
 private extension ProviderProfileAccountOnboardingError {
     func message(providerID: ProviderID?) -> String {
+        if providerID == .githubCopilot {
+            return gitHubMessage
+        }
         let providerName = switch providerID {
+        case .claude: "Claude"
         case .codex: "Codex"
         case .grok: "Grok"
-        case .githubCopilot: "GitHub Copilot"
         default: "provider"
         }
         return switch self {
         case .identityAlreadyRegistered:
-            if providerID == .githubCopilot {
-                "This GitHub identity is already registered from another GitHub CLI account."
-            } else {
-                "This \(providerName) identity is already registered from another profile folder."
-            }
+            "This \(providerName) identity is already registered from another profile folder."
         case .profileIdentityChanged:
-            if providerID == .githubCopilot {
-                "This GitHub CLI login now belongs to a different GitHub identity. "
-                    + "Remove the old account before adding it again."
-            } else {
-                "This profile folder now belongs to a different \(providerName) identity. "
-                    + "Remove the old account before adding it again."
-            }
+            "This profile folder now belongs to a different \(providerName) identity. "
+                + "Remove the old account before adding it again."
         case .profileNotDiscovered:
-            if providerID == .githubCopilot {
-                "GitHub CLI did not return the selected GitHub account."
-            } else {
-                "\(providerName) did not return an account for the selected profile folder."
-            }
+            "\(providerName) did not return an account for the selected profile folder."
+        }
+    }
+
+    var gitHubMessage: String {
+        switch self {
+        case .identityAlreadyRegistered:
+            "This GitHub identity is already registered from another GitHub CLI account."
+        case .profileIdentityChanged:
+            "This GitHub CLI login now belongs to a different GitHub identity. "
+                + "Remove the old account before adding it again."
+        case .profileNotDiscovered:
+            "GitHub CLI did not return the selected GitHub account."
         }
     }
 }

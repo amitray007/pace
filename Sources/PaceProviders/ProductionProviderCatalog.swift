@@ -6,6 +6,10 @@ public enum ProductionProviderCatalog {
         for accounts: [ProviderAccount],
     ) -> [any ProviderAdapter] {
         var adapters: [any ProviderAdapter] = []
+        let claudeProfiles = claudeProfiles(for: accounts)
+        if !claudeProfiles.isEmpty {
+            adapters.append(ClaudeProviderAdapter(profiles: claudeProfiles))
+        }
         let codexProfiles = codexProfiles(for: accounts)
         if !codexProfiles.isEmpty {
             adapters.append(CodexProviderAdapter(profiles: codexProfiles))
@@ -19,6 +23,51 @@ public enum ProductionProviderCatalog {
             adapters.append(GitHubCopilotProviderAdapter(profiles: githubCopilotProfiles))
         }
         return adapters
+    }
+
+    public static func claudeProfiles(for accounts: [ProviderAccount]) -> [ClaudeProfile] {
+        var seenDirectories: Set<String> = []
+        return accounts
+            .filter { $0.providerID == .claude }
+            .sorted(by: accountPrecedes)
+            .compactMap { account in
+                let profile: ClaudeProfile
+                switch account.credentialBinding {
+                case let .claudeProfile(binding):
+                    profile = ClaudeProfile(
+                        directory: binding.configurationDirectory,
+                        ownership: binding.ownership,
+                        displayName: account.displayName,
+                        expectedIdentity: account.identity,
+                        secureStorageDirectory: binding.secureStorageDirectory,
+                        keychainService: binding.keychainService,
+                        keychainAccount: binding.keychainAccount,
+                    )
+                case let .providerProfile(directory, ownership):
+                    let defaultDirectory = FileManager.default.homeDirectoryForCurrentUser
+                        .appending(path: ".claude", directoryHint: .isDirectory)
+                    let isScoped = directory.path != defaultDirectory.path
+                    profile = ClaudeProfile(
+                        directory: directory,
+                        ownership: ownership,
+                        displayName: account.displayName,
+                        expectedIdentity: account.identity,
+                        usesScopedSecureStorage: isScoped,
+                    )
+                default:
+                    return nil
+                }
+                let sourceKey = [
+                    profile.directory.path,
+                    profile.secureStorageDirectory.path,
+                    profile.keychainService,
+                    profile.keychainAccount,
+                ].joined(separator: "\u{0}")
+                guard seenDirectories.insert(sourceKey).inserted else {
+                    return nil
+                }
+                return profile
+            }
     }
 
     public static func codexProfiles(for accounts: [ProviderAccount]) -> [CodexProfile] {

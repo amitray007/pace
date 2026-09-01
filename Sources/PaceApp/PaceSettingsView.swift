@@ -1,13 +1,9 @@
 import Foundation
 import PaceCore
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct PaceSettingsView: View {
     @Bindable var model: PacePresentationModel
-    @State private var isChoosingCodexProfile = false
-    @State private var isChoosingGrokProfile = false
-    @State private var isChoosingGitHubCopilotAccount = false
 
     var body: some View {
         Form {
@@ -87,77 +83,7 @@ struct PaceSettingsView: View {
                 }
 
                 if !model.isReferencePreview {
-                    ForEach(model.managedAccounts(for: .codex)) { account in
-                        ManagedProviderAccountRow(model: model, account: account)
-                    }
-
-                    HStack(spacing: 8) {
-                        Button("Add current Codex account") {
-                            Task {
-                                await model.addDefaultCodexAccount()
-                            }
-                        }
-                        Button("Choose profile folder...") {
-                            isChoosingCodexProfile = true
-                        }
-                    }
-                    .disabled(model.isLoading || model.isManagingAccounts || model.isRefreshing)
-
-                    Text(
-                        "For another Codex account, sign in with a separate CODEX_HOME, "
-                            + "then choose that folder.",
-                    )
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-
-                    ForEach(model.managedAccounts(for: .grok)) { account in
-                        ManagedProviderAccountRow(model: model, account: account)
-                    }
-
-                    HStack(spacing: 8) {
-                        Button("Add current Grok account") {
-                            Task {
-                                await model.addDefaultGrokAccount()
-                            }
-                        }
-                        Button("Choose Grok profile folder...") {
-                            isChoosingGrokProfile = true
-                        }
-                    }
-                    .disabled(model.isLoading || model.isManagingAccounts || model.isRefreshing)
-
-                    Text(
-                        "For another Grok account, sign in with a separate GROK_HOME, "
-                            + "then choose that folder.",
-                    )
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-
-                    ForEach(model.managedAccounts(for: .githubCopilot)) { account in
-                        ManagedProviderAccountRow(model: model, account: account)
-                    }
-
-                    Button("Add GitHub Copilot account...") {
-                        Task {
-                            if await model.prepareGitHubCopilotAccountSelection() {
-                                isChoosingGitHubCopilotAccount = true
-                            }
-                        }
-                    }
-                    .disabled(model.isLoading || model.isManagingAccounts || model.isRefreshing)
-
-                    Text(
-                        "Pace reads only the GitHub CLI account you select. "
-                            + "Add more accounts with gh auth login.",
-                    )
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-
-                    if let accountActionError = model.accountActionError {
-                        Label(accountActionError, systemImage: "exclamationmark.triangle")
-                            .font(.callout)
-                            .foregroundStyle(.orange)
-                    }
+                    ProviderAccountsSettingsContent(model: model)
                 }
             }
 
@@ -240,60 +166,6 @@ struct PaceSettingsView: View {
         .task {
             await model.start()
         }
-        .fileImporter(
-            isPresented: $isChoosingCodexProfile,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false,
-        ) { result in
-            switch result {
-            case let .success(urls):
-                guard let directory = urls.first else {
-                    return
-                }
-                Task {
-                    await model.addCodexProfile(at: directory)
-                }
-            case let .failure(error):
-                if (error as? CocoaError)?.code != .userCancelled {
-                    model.reportAccountPickerError(error, providerID: .codex)
-                }
-            }
-        }
-        .fileImporter(
-            isPresented: $isChoosingGrokProfile,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false,
-        ) { result in
-            switch result {
-            case let .success(urls):
-                guard let directory = urls.first else {
-                    return
-                }
-                Task {
-                    await model.addGrokProfile(at: directory)
-                }
-            case let .failure(error):
-                if (error as? CocoaError)?.code != .userCancelled {
-                    model.reportAccountPickerError(error, providerID: .grok)
-                }
-            }
-        }
-        .confirmationDialog(
-            "Add GitHub Copilot account",
-            isPresented: $isChoosingGitHubCopilotAccount,
-            titleVisibility: .visible,
-        ) {
-            ForEach(model.availableGitHubCopilotLogins, id: \.self) { login in
-                Button(login) {
-                    Task {
-                        await model.addGitHubCopilotAccount(githubLogin: login)
-                    }
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Choose one authenticated GitHub CLI account.")
-        }
     }
 
     private func delayControl(
@@ -317,94 +189,5 @@ struct PaceSettingsView: View {
                 .foregroundStyle(.secondary)
         }
         .accessibilityElement(children: .contain)
-    }
-}
-
-private struct ManagedProviderAccountRow: View {
-    @Bindable var model: PacePresentationModel
-    let account: ProviderAccount
-    @FocusState private var nameIsFocused: Bool
-    @State private var draftName: String
-    @State private var confirmsRemoval = false
-
-    init(model: PacePresentationModel, account: ProviderAccount) {
-        self.model = model
-        self.account = account
-        _draftName = State(initialValue: account.displayName)
-    }
-
-    var body: some View {
-        HStack(spacing: 8) {
-            ProviderMark(
-                providerID: account.providerID,
-                color: ProviderStyle.resolve(account.providerID).accent,
-                size: 11,
-            )
-            TextField("Account name", text: $draftName)
-                .focused($nameIsFocused)
-                .onSubmit(commitName)
-                .onChange(of: nameIsFocused) { wasFocused, isFocused in
-                    if wasFocused, !isFocused {
-                        commitName()
-                    }
-                }
-
-            Toggle(
-                "Enabled",
-                isOn: Binding(
-                    get: { account.isEnabled },
-                    set: { isEnabled in
-                        Task {
-                            await model.setManagedAccount(account.id, isEnabled: isEnabled)
-                        }
-                    },
-                ),
-            )
-            .labelsHidden()
-            .accessibilityLabel("Enable \(account.displayName)")
-
-            Button(role: .destructive) {
-                confirmsRemoval = true
-            } label: {
-                Image(systemName: "trash")
-            }
-            .buttonStyle(.borderless)
-            .accessibilityLabel("Remove \(account.displayName)")
-        }
-        .disabled(model.isLoading || model.isManagingAccounts || model.isRefreshing)
-        .onChange(of: account.displayName) { _, displayName in
-            if !nameIsFocused {
-                draftName = displayName
-            }
-        }
-        .confirmationDialog(
-            "Remove \(account.displayName)?",
-            isPresented: $confirmsRemoval,
-        ) {
-            Button("Remove Account", role: .destructive) {
-                Task {
-                    await model.removeManagedAccount(account.id)
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text(
-                "Pace will remove its saved usage for this account. "
-                    + "The provider profile and credentials stay unchanged.",
-            )
-        }
-    }
-
-    private func commitName() {
-        let submittedName = draftName
-        guard submittedName != account.displayName else {
-            return
-        }
-        Task {
-            let didRename = await model.renameManagedAccount(account.id, to: submittedName)
-            if !didRename {
-                draftName = account.displayName
-            }
-        }
     }
 }

@@ -29,6 +29,18 @@ extension PacePresentationModel {
             }
     }
 
+    func addDefaultClaudeAccount() async {
+        await addProviderProfile(
+            at: defaultClaudeProfile.directory,
+            providerID: .claude,
+            claudeProfile: defaultClaudeProfile,
+        )
+    }
+
+    func addClaudeProfile(at directory: URL) async {
+        await addProviderProfile(at: directory, providerID: .claude)
+    }
+
     func addDefaultCodexAccount() async {
         await addCodexProfile(at: defaultCodexProfileDirectory)
     }
@@ -115,7 +127,11 @@ extension PacePresentationModel {
         }
     }
 
-    private func addProviderProfile(at directory: URL, providerID: ProviderID) async {
+    private func addProviderProfile(
+        at directory: URL,
+        providerID: ProviderID,
+        claudeProfile: ClaudeProfile? = nil,
+    ) async {
         guard !isReferencePreview, !isLoading, !isManagingAccounts, !isRefreshing,
               let store, let scenario = simulatedScenario
         else {
@@ -134,6 +150,11 @@ extension PacePresentationModel {
 
         do {
             switch providerID {
+            case .claude:
+                _ = try await ClaudeAccountOnboarding().addProfile(
+                    claudeProfile ?? ClaudeProfile(directory: directory, ownership: .existing),
+                    to: store,
+                )
             case .codex:
                 _ = try await CodexAccountOnboarding().addProfile(at: directory, to: store)
             case .grok:

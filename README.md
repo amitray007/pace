@@ -18,9 +18,8 @@ is the dependable default surface. Users can enable either surface or both.
 
 Pace is the settled product name. Its native application foundation now includes provider-neutral
 accounts, normalized quota snapshots, deterministic simulated data, shared selection, refresh
-orchestration, and local persistence. Codex, Grok, and GitHub Copilot now have
-production-separated adapters; the remaining provider spikes stay isolated until their validation
-gates pass.
+orchestration, and local persistence. Claude, Codex, Grok, and GitHub Copilot now have
+production-separated adapters; Cursor stays isolated until its production validation gate passes.
 
 The first static native surfaces now run against a dedicated visual-reference fixture. AppKit owns
 the menu-bar status item and click-through edge panel. Core Animation draws the rail, connector,
@@ -60,8 +59,20 @@ For multiple Grok accounts, authenticate each account with Grok in a separate `G
 choose that folder in Pace. Grok owns login, logout, and credential rotation. Removing an account
 from Pace leaves `auth.json` and the profile directory unchanged.
 
-A separate Claude compatibility spike verifies OAuth identity before reading usage, supports
-explicit isolated profile directories, and keeps all credential and endpoint code outside the app.
+The production Claude compatibility adapter reads one explicit `CLAUDE_CONFIG_DIR` at a time and
+honors Claude Code's `CLAUDE_SECURESTORAGE_CONFIG_DIR` override. It persists the exact non-secret
+storage directory, Keychain service, and Keychain account binding. It verifies the remote account
+and organization before requesting usage, serializes requests across accounts, and polls at a
+conservative 15-minute baseline. Token rotation holds Claude Code's cross-process refresh and
+storage-write locks, reloads the provider-owned credential, and compares the refresh token before
+writing. A concurrent login is adopted or causes one clean restart. Pace never stores a Claude
+token in its own state.
+
+For multiple Claude accounts, authenticate each account through Claude Code with a separate
+`CLAUDE_CONFIG_DIR`, then choose that folder in Pace. Removing an account from Pace leaves its
+Keychain item, fallback file, and profile directory unchanged. If a provider rotates a refresh
+token but the final Keychain or file write fails, Pace requires Claude Code sign-in instead of
+claiming the old token remains valid.
 
 The Cursor compatibility spike verifies identity directly with Cursor before reading usage. It
 supports the default Cursor Agent Keychain login and isolated Cursor Agent file profiles without
