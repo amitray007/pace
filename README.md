@@ -131,6 +131,7 @@ make format         # format Swift sources
 make check          # format check, lint, tests, and macOS app build
 make benchmark      # measure the release-mode simulated refresh pipeline
 make release-preflight # build and verify the unsigned Release application bundle
+make release-archive # create and verify a deterministic unsigned ZIP and SHA-256 file
 make visual-benchmark VISUAL_CAPTURE=path/to/capture.png  # compare the rail silhouette
 make reference-fetch  # download the public reference media into ignored local storage
 make reference-frames # verify and extract the canonical visual-review frames
@@ -144,6 +145,12 @@ version remains subject to the reference rail's AppKit and Core Animation verifi
 `make release-preflight` uses development version `0.1.0` and build number `1` by default. Override
 them with `RELEASE_VERSION` and `RELEASE_BUILD_NUMBER`. The command verifies the generated bundle
 but does not sign, archive, install, notarize, or publish it.
+
+`make release-archive` runs the preflight, writes an immutable versioned ZIP plus `.sha256` file to
+`.build/release-artifacts`, verifies the checksum, tests the ZIP, extracts it, and verifies the
+extracted app again. Repeating the same version and build must produce the same bytes; the command
+refuses to replace a different artifact. It remains unsigned and local. It does not install,
+notarize, upload, or publish anything.
 
 ## Documentation
 

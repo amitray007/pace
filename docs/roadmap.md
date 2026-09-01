@@ -174,13 +174,18 @@ Exit gate: displayed values match each provider's own surface and never cross ac
 Status: in progress. The generated application now has deterministic development version metadata.
 An unsigned local preflight builds the Release configuration and verifies the actual bundle name,
 identifier, version, build number, agent-app mode, deployment target, executable architectures,
-absence of provider credential files, and absence of a code signature. Public identity, supported
-architectures, signing, packaging, installation, and publication remain open.
+absence of provider credential files, and absence of a code signature. A local packaging command
+normalizes ZIP metadata, emits an immutable version-and-build archive plus SHA-256 file, verifies the
+checksum and compressed data, extracts the app, and repeats the bundle verification. Two rebuilds
+of version 0.1.0 build 1 produced the same archive hash, and a changed same-name archive was rejected.
+Public identity, supported architectures, signing, notarization, installation, update behavior,
+automation, and publication remain open.
 
 - Confirm provider-asset permissions.
 - Choose minimum macOS version and architecture support.
 - Keep version injection and unsigned bundle verification reproducible.
-- Add signing, notarization, release archives, checksums, and update behavior.
+- Keep unsigned local release archives and checksums reproducible and immutable.
+- Add signing, notarization, and update behavior after public release identity is settled.
 - Add GitHub Actions and the personal Homebrew tap only when release scope is authorized.
 
 Exit gate: a signed build passes clean-machine installation and privacy checks.

@@ -1,4 +1,4 @@
-.PHONY: benchmark build check format format-check generate interaction-benchmark lint reference-fetch reference-frames release-preflight test visual-benchmark
+.PHONY: benchmark build check format format-check generate interaction-benchmark lint reference-fetch reference-frames release-archive release-preflight test visual-benchmark
 
 VISUAL_CAPTURE ?=
 VISUAL_OUTPUT ?= .local/review/visual-benchmark
@@ -6,6 +6,7 @@ RELEASE_VERSION ?= 0.1.0
 RELEASE_BUILD_NUMBER ?= 1
 RELEASE_BUNDLE_ID ?= com.amitray.Pace.dev
 RELEASE_DERIVED_DATA ?= .build/release-preflight
+RELEASE_ARTIFACTS ?= .build/release-artifacts
 
 benchmark:
 	swift run -c release pace-benchmark core --samples 25 --iterations 20 --max-p95-ms 5
@@ -49,6 +50,12 @@ release-preflight: generate
 		ONLY_ACTIVE_ARCH=NO build
 	bash Scripts/verify-release-bundle.sh \
 		"$(RELEASE_DERIVED_DATA)/Build/Products/Release/Pace.app" \
+		"$(RELEASE_BUNDLE_ID)" "$(RELEASE_VERSION)" "$(RELEASE_BUILD_NUMBER)" "15.0"
+
+release-archive: release-preflight
+	bash Scripts/package-release-artifact.sh \
+		"$(RELEASE_DERIVED_DATA)/Build/Products/Release/Pace.app" \
+		"$(RELEASE_ARTIFACTS)" \
 		"$(RELEASE_BUNDLE_ID)" "$(RELEASE_VERSION)" "$(RELEASE_BUILD_NUMBER)" "15.0"
 
 test:
