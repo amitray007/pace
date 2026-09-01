@@ -69,6 +69,11 @@ final class PacePresentationModel {
         if let previewEdge = environment["PACE_REFERENCE_EDGE"].flatMap(RailEdge.init(rawValue:)) {
             initialPreferences.railEdge = previewEdge
         }
+        if let previewScale = environment["PACE_REFERENCE_SCALE"]
+            .flatMap(RailScale.init(rawValue:))
+        {
+            initialPreferences.railScale = previewScale
+        }
         let previewActivation = environment["PACE_REFERENCE_ACTIVATION"]
             .flatMap(RailActivationMode.init(rawValue:))
         if let previewActivation {

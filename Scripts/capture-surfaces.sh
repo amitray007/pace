@@ -39,6 +39,7 @@ edge=${PACE_CAPTURE_EDGE:-right}
 settle=${PACE_CAPTURE_SETTLE:-2.0}
 margin=${PACE_CAPTURE_MARGIN:-24}
 scenario=${PACE_CAPTURE_SCENARIO:-}
+rail_scale=${PACE_CAPTURE_SCALE:-}
 
 mkdir -p "$output_dir"
 
@@ -59,6 +60,9 @@ for state in "${states[@]}"; do
     if [[ -n $scenario ]]; then
         env_args+=(PACE_SIMULATED_STATE="$scenario")
     fi
+    if [[ -n $rail_scale ]]; then
+        env_args+=(PACE_REFERENCE_SCALE="$rail_scale")
+    fi
 
     env "${env_args[@]}" "$executable" >/dev/null 2>&1 &
     instance_pid=$!
@@ -66,10 +70,10 @@ for state in "${states[@]}"; do
 
     if bounds=$("$bounds_tool"); then
         screencapture -x -o "$output_dir/$state-screen.png"
-        read -r x y width height scale <<<"$bounds"
+        read -r x y width height backing_scale <<<"$bounds"
         /usr/bin/env python3 "$script_dir/crop-region.py" \
             "$output_dir/$state-screen.png" "$output_dir/$state.png" \
-            "$x" "$y" "$width" "$height" "$margin" "$scale"
+            "$x" "$y" "$width" "$height" "$margin" "$backing_scale"
         rm -f "$output_dir/$state-screen.png"
     else
         echo "no Pace window captured for state '$state'" >&2
