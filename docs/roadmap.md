@@ -100,7 +100,10 @@ Observation time, last-good stale data, text-and-symbol status, VoiceOver descri
 provider and account shortcuts, keyboard-reachable quota rows, manual refresh, reduced motion,
 increased-contrast tracks, and owner-only normalized state persistence are wired. Launch-at-login
 now uses native Service Management with explicit registration, approval, failure, and external
-status handling. A signed-build integration check and notification behavior remain.
+status handling. A deterministic notification core now evaluates per-account threshold crossings,
+same-cycle reset reminders, stale-data transitions, and quiet-hour holds without requesting system
+permission. A signed-build launch integration check, approved notification settings, native
+delivery, and permission-path testing remain.
 
 - Add menu-bar, rail, and both presentation settings.
 - Add one-provider-at-a-time details and per-provider account selection.

@@ -313,6 +313,12 @@ hit-testing control.
 - Record provider, account, bucket, source, observation time, and error state.
 - Keep polling local where possible and use provider-safe intervals.
 - Keep notification evaluation local and opt-in.
+- Evaluate notifications from the previous and current normalized state. The pure core evaluator
+  emits only per-account threshold crossings, same-cycle reset reminders, and new stale-data
+  episodes. It ignores disabled accounts and stale bucket values, never averages accounts, and
+  marks quiet-hour events with the earliest local delivery date instead of discarding them.
+- Keep native notification delivery and authorization outside the evaluator. The default policy has
+  no active rules, and Pace must not request notification permission at launch.
 - Treat Service Management as the source of truth for launch at login. Pace reads registration
   status at launch and when it becomes active, changes it only after an explicit Settings toggle,
   and sends approval-required users to Login Items only after they press the provided button.

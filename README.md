@@ -32,6 +32,12 @@ Launch at login is opt-in through the native Settings surface. macOS Service Man
 source of truth, and Pace never opens Login Items or changes registration without a direct user
 action. A signed-build login-cycle check remains part of release validation.
 
+Notification policy evaluation is deterministic and provider-neutral. It detects per-account
+usage-threshold crossings, reset windows, and stale-data transitions without averaging accounts.
+The default policy is disabled, startup data does not create alerts, and quiet hours hold an event
+until their local end time. Native delivery, Settings controls, and permission requests remain
+separate release work.
+
 A production-separated Codex adapter and its original Swift spike read limits through the supported
 local app-server protocol without copying account tokens or calling private web endpoints. The
 adapter supports explicit isolated `CODEX_HOME` profiles, reuses one supervised process per
