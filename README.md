@@ -166,6 +166,7 @@ items, request permission, use provider credentials, or retain the temporary ext
 - [Interaction and motion](docs/interactions.md)
 - [Technical architecture](docs/architecture.md)
 - [Delivery roadmap](docs/roadmap.md)
+- [Local readiness boundary](docs/readiness.md)
 
 ## Product principles
 

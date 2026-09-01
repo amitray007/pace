@@ -44,6 +44,12 @@ failure evidence. A spike is not yet connected to the product UI.
 
 ## Phase 3: Reference harness
 
+Status: complete. The pinned source media passes SHA-256 verification, the canonical review frames
+are reproducibly extracted, the measured visual and motion tokens are recorded, and the dedicated
+deterministic fixture covers the required providers, accounts, quota buckets, reset times, and
+failure states. Unpublished source control points remain unavailable by definition and do not
+replace perceptual review against the source frames.
+
 - Retrieve the supplied image and video into an ignored local reference directory.
 - Extract canonical frames for the mini handle, full rail, each provider panel, dismissal, and the
   settings arc.
