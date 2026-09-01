@@ -18,11 +18,19 @@ enum EdgeRailGeometry {
     static let maximumDetailQuotaRows = 3
     static let railOriginX = detailWidth + connectorWidth
     static let railTopY: CGFloat = 30
-    static let providerCentersY: [CGFloat] = [92, 194, 297]
-    static let providerTopY: [CGFloat] = [60, 162, 265]
-    /// The running reference application draws an 87 px ring track on a 137 px
-    /// rail at 2x, so 43.5 pt on our 70 pt rail.
-    static let ringDiameter: CGFloat = 43.5
+    /// Ring centres use the reference's measured 1.4748 pitch-to-width ratio,
+    /// which is 103.2 pt on a 70 pt rail.
+    static let providerCentersY: [CGFloat] = [92, 195.2, 298.5]
+    /// Each ring row is centred on its provider centre.
+    static var providerTopY: [CGFloat] {
+        providerCentersY.map { $0 - providerRowHeight / 2 }
+    }
+
+    /// Ring top to percentage baseline measures 135 px on a 139 px rail.
+    static let providerRowHeight: CGFloat = 68
+    /// The running reference application draws an 87 px ring track on a 139 px
+    /// rail, so 0.626 of the rail's width.
+    static let ringDiameter: CGFloat = railWidth * 0.6259
     /// Reference provider mark fills roughly 0.42 of the ring's outer diameter.
     static let markDiameter: CGFloat = 21
 
@@ -47,6 +55,7 @@ struct EdgeRailView: View {
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.openSettings) private var openSettings
+    @State private var isSettingsHovered = false
 
     var body: some View {
         let providerIDs = Array(model.visibleProviderIDs.prefix(3))
@@ -60,6 +69,7 @@ struct EdgeRailView: View {
                     providerID: model.railPreviewState.detailProviderID,
                     contents: detailContents(providerIDs: providerIDs),
                 ),
+                showsSettingsCircle: isSettingsHovered,
                 reducesMotion: accessibilityReduceMotion,
             )
 
@@ -104,7 +114,10 @@ struct EdgeRailView: View {
                         model.showRailDetails(for: providerID)
                     },
                 )
-                .frame(width: EdgeRailGeometry.railWidth, height: 64)
+                .frame(
+                    width: EdgeRailGeometry.railWidth,
+                    height: EdgeRailGeometry.providerRowHeight,
+                )
                 .offset(
                     x: railContentOriginX,
                     y: EdgeRailGeometry.providerTopY[index],
@@ -118,17 +131,31 @@ struct EdgeRailView: View {
         )
     }
 
+    /// The settings control.
+    ///
+    /// At rest the reference shows only the shell's arc, with no glyph. The
+    /// gear and its filled circle are the hover state, so the glyph fades in
+    /// with the pointer rather than sitting on the resting silhouette.
     private var settingsMark: some View {
         let circle = RailShellMetrics.settingsCircleRect
         return Button {
             openSettings()
         } label: {
             Image(systemName: "gearshape")
-                .font(.system(size: 20, weight: .medium))
+                .font(.system(size: RailShellMetrics.settingsGlyphSize, weight: .medium))
                 .foregroundStyle(.white)
                 .frame(width: circle.width, height: circle.height)
+                .contentShape(.circle)
         }
         .buttonStyle(.plain)
+        .opacity(isSettingsHovered ? 1 : 0)
+        .animation(
+            .easeOut(duration: RailMotion.contentFadeDuration),
+            value: isSettingsHovered,
+        )
+        .onHover { isHovering in
+            isSettingsHovered = isHovering
+        }
         .offset(x: settingsOriginX, y: circle.minY)
         .accessibilityLabel("Pace settings")
     }
@@ -230,7 +257,7 @@ private struct EdgeProviderRow: View {
         let style = ProviderStyle.resolve(providerID)
         let presentation = status.map { UsageStatusPresentation.resolve($0) }
         Button(action: action) {
-            VStack(spacing: 5) {
+            VStack(spacing: 7) {
                 ZStack {
                     ProgressRingLayerRepresentable(
                         fraction: usage ?? 0,

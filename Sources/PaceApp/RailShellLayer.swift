@@ -7,6 +7,7 @@ struct RailShellLayerRepresentable: NSViewRepresentable {
     let edge: RailEdge
     let detailCenterY: CGFloat?
     let detailHeight: CGFloat
+    let showsSettingsCircle: Bool
     let reducesMotion: Bool
 
     func makeNSView(context _: Context) -> RailShellLayerView {
@@ -19,6 +20,7 @@ struct RailShellLayerRepresentable: NSViewRepresentable {
             edge: edge,
             detailCenterY: detailCenterY,
             detailHeight: detailHeight,
+            showsSettingsCircle: showsSettingsCircle,
             reducesMotion: reducesMotion,
         )
     }
@@ -33,6 +35,7 @@ final class RailShellLayerView: NSView {
     private var detailCenterY: CGFloat?
     private var lastDetailCenterY: CGFloat = 92
     private var detailHeight = EdgeRailGeometry.detailHeight(quotaCount: 2)
+    private var showsSettingsCircle = false
     private var hasReceivedState = false
     private var reducesMotion = false
 
@@ -63,11 +66,13 @@ final class RailShellLayerView: NSView {
         edge: RailEdge,
         detailCenterY: CGFloat?,
         detailHeight: CGFloat,
+        showsSettingsCircle: Bool,
         reducesMotion: Bool,
     ) {
         let previousPreviewState = self.previewState
         let changed = self.previewState != previewState || self.edge != edge ||
-            self.detailCenterY != detailCenterY || self.detailHeight != detailHeight
+            self.detailCenterY != detailCenterY || self.detailHeight != detailHeight ||
+            self.showsSettingsCircle != showsSettingsCircle
         let shouldAnimate = hasReceivedState && changed && !bounds.isEmpty
         self.previewState = previewState
         self.edge = edge
@@ -105,7 +110,9 @@ final class RailShellLayerView: NSView {
             )
             set(
                 settingsLayer,
-                path: transformed(RailShellPaths.settings()),
+                path: transformed(
+                    RailShellPaths.settings(showsCircle: showsSettingsCircle),
+                ),
                 opacity: 0,
                 animated: animated,
                 duration: duration,
@@ -127,7 +134,9 @@ final class RailShellLayerView: NSView {
             )
             set(
                 settingsLayer,
-                path: transformed(RailShellPaths.settings()),
+                path: transformed(
+                    RailShellPaths.settings(showsCircle: showsSettingsCircle),
+                ),
                 opacity: 1,
                 animated: animated,
                 duration: duration,
@@ -237,18 +246,116 @@ final class RailShellLayerView: NSView {
     }
 }
 
-/// Rail silhouette values traced from the reference frames. Reference pixels
-/// convert to canvas points at 70 / 139, the ratio between the rail's 70 pt
-/// width and its 139 px width in `settings-button.png`.
+/// Rail silhouette values, expressed as ratios of the rail's width so the
+/// shape stays identical at any scale.
+///
+/// Every ratio comes from a subpixel trace of the running reference
+/// application, where the rail body measures 139 px wide. Deriving the layout
+/// from one width means a scale preference changes size without changing the
+/// silhouette.
 enum RailShellMetrics {
-    /// Where the rail's straight left edge stops and the bottom contour starts.
-    static let railStraightBottomY: CGFloat = 322
+    /// The rail's width in canvas points at the default scale.
+    static let railWidth = EdgeRailGeometry.railWidth
+
+    /// Ring diameter, 87 px on a 139 px rail.
+    static let ringDiameterRatio: CGFloat = 0.6259
+
+    /// Distance between adjacent ring centres, 205 px on a 139 px rail.
+    static let ringPitchRatio: CGFloat = 1.4748
+
+    /// Distance from the top of the straight body to the first ring's centre,
+    /// 52 px on a 139 px rail.
+    static let firstRingInsetRatio: CGFloat = 0.3705
+
+    /// The resting settings control is a quarter-circle arc below the rail, not
+    /// a filled circle. Its centreline radius is 62.7 px and its stroke is
+    /// 15 px on a 137 px rail.
+    static let settingsArcRadiusRatio: CGFloat = 0.4573
+    static let settingsArcStrokeRatio: CGFloat = 0.1095
+
+    /// The arc's centre, inboard of the screen edge and below the rail body.
+    static let settingsArcCenterInsetRatio: CGFloat = 0.5791
+    static let settingsArcCenterDropRatio: CGFloat = 0.5182
+
+    /// The hover state's filled circle, 90 px on a 139 px rail.
+    static let settingsDiameterRatio: CGFloat = 0.6475
+
+    static var ringDiameter: CGFloat {
+        railWidth * ringDiameterRatio
+    }
+
+    static var ringPitch: CGFloat {
+        railWidth * ringPitchRatio
+    }
+
+    static var contourHeight: CGFloat {
+        RailContour.height(forWidth: railWidth)
+    }
+
+    static var settingsDiameter: CGFloat {
+        railWidth * settingsDiameterRatio
+    }
+
+    static var settingsArcRadius: CGFloat {
+        railWidth * settingsArcRadiusRatio
+    }
+
+    /// The hover glyph, sized against the filled circle it sits in.
+    static var settingsGlyphSize: CGFloat {
+        settingsDiameter * 0.44
+    }
+
+    static var settingsArcStroke: CGFloat {
+        railWidth * settingsArcStrokeRatio
+    }
+
+    /// Centre of the quarter-circle the resting settings arc is drawn on.
+    static var settingsArcCenter: CGPoint {
+        CGPoint(
+            x: EdgeRailGeometry.canvasSize.width
+                - railWidth * settingsArcCenterInsetRatio,
+            y: bodyBottomY + railWidth * settingsArcCenterDropRatio,
+        )
+    }
+
+    /// The first ring's centre, which anchors the whole vertical layout.
+    static var firstRingCenterY: CGFloat {
+        EdgeRailGeometry.providerCentersY[0]
+    }
+
+    /// Where the straight body starts, above the first ring.
+    static var bodyTopY: CGFloat {
+        firstRingCenterY - railWidth * firstRingInsetRatio
+    }
+
+    /// Where the straight body ends, below the last ring by the same inset.
+    static var bodyBottomY: CGFloat {
+        (EdgeRailGeometry.providerCentersY.last ?? firstRingCenterY)
+            + railWidth * firstRingInsetRatio
+    }
+
+    /// Where the top contour meets the screen edge.
+    static var topEdgeY: CGFloat {
+        bodyTopY - contourHeight
+    }
 
     /// Where the bottom contour meets the screen edge.
-    static let railBottomEdgeY: CGFloat = 353
+    static var bottomEdgeY: CGFloat {
+        bodyBottomY + contourHeight
+    }
 
-    /// The detached settings circle, 45 pt across in the reference.
-    static let settingsCircleRect = CGRect(x: 262, y: 358, width: 45, height: 45)
+    /// The detached settings circle, centred on the rail and sitting below the
+    /// bottom contour's negative space.
+    static var settingsCircleRect: CGRect {
+        let diameter = settingsDiameter
+        let center = settingsArcCenter
+        return CGRect(
+            x: center.x - diameter / 2,
+            y: center.y - diameter / 2,
+            width: diameter,
+            height: diameter,
+        )
+    }
 
     static var settingsCircleCenter: CGPoint {
         CGPoint(x: settingsCircleRect.midX, y: settingsCircleRect.midY)
@@ -282,50 +389,82 @@ private enum RailShellPaths {
         return path
     }
 
+    /// The rail body plus its two organic contours.
+    ///
+    /// The contour is the reference's defining feature, so it is built from the
+    /// measured curve rather than from hand-chosen control points. The top and
+    /// bottom are the same curve mirrored, which is why the silhouette reads as
+    /// one shape rather than two rounded ends.
     static func rail() -> CGPath {
         let path = CGMutablePath()
-        let leftX = EdgeRailGeometry.railOriginX
+        let leftX = EdgeRailGeometry.canvasSize.width - RailShellMetrics.railWidth
         let rightX = EdgeRailGeometry.canvasSize.width
-        let topY = EdgeRailGeometry.railTopY
-        path.move(to: CGPoint(x: rightX, y: topY))
-        path.addCompatibleLine(to: CGPoint(x: leftX + 38, y: topY))
-        path.addCurve(
-            to: CGPoint(x: leftX, y: topY + 48),
-            control1: CGPoint(x: leftX + 38, y: topY + 20),
-            control2: CGPoint(x: leftX, y: topY + 20),
+        let width = RailShellMetrics.railWidth
+        let contourHeight = RailShellMetrics.contourHeight
+
+        // Start at the screen edge above the body and sweep in along the top
+        // contour.
+        path.move(to: CGPoint(x: rightX, y: RailShellMetrics.topEdgeY))
+        RailContour.append(
+            to: path,
+            width: width,
+            height: contourHeight,
+            origin: CGPoint(x: rightX, y: RailShellMetrics.topEdgeY),
+            inward: -1,
+            downward: 1,
         )
-        path.addCompatibleLine(to: CGPoint(x: leftX, y: RailShellMetrics.railStraightBottomY))
-        // The reference bottom sweeps outward and then concave into the screen
-        // edge, carving the negative space that the detached settings control
-        // sits in. Traced from settings-button.png rows 1050 through 1124.
-        path.addCurve(
-            to: CGPoint(x: leftX + 16, y: 334),
-            control1: CGPoint(x: leftX, y: 328),
-            control2: CGPoint(x: leftX + 7, y: 332),
+
+        // Straight body.
+        path.addCompatibleLine(to: CGPoint(x: leftX, y: RailShellMetrics.bodyBottomY))
+
+        // Mirror the contour back out to the screen edge.
+        RailContour.appendReversed(
+            to: path,
+            width: width,
+            height: contourHeight,
+            origin: CGPoint(x: rightX, y: RailShellMetrics.bottomEdgeY),
+            inward: -1,
+            downward: -1,
         )
-        path.addCurve(
-            to: CGPoint(x: leftX + 50, y: 340),
-            control1: CGPoint(x: leftX + 26, y: 337),
-            control2: CGPoint(x: leftX + 40, y: 340),
-        )
-        path.addCurve(
-            to: CGPoint(x: rightX, y: RailShellMetrics.railBottomEdgeY),
-            control1: CGPoint(x: leftX + 60, y: 341),
-            control2: CGPoint(x: rightX - 5, y: 347),
-        )
-        path.addCompatibleLine(to: CGPoint(x: rightX, y: topY))
+
+        path.addCompatibleLine(to: CGPoint(x: rightX, y: RailShellMetrics.topEdgeY))
         path.closeSubpath()
         return path
     }
 
-    /// The reference settings control is a detached black circle below the
-    /// rail's concave bottom edge. Its separation from the rail is part of the
-    /// silhouette, so it carries no connecting tab. Measured from
-    /// settings-button.png at x 1429-1518, y 1113-1207.
-    static func settings() -> CGPath {
-        let path = CGMutablePath()
-        path.addEllipse(in: RailShellMetrics.settingsCircleRect)
-        return path
+    /// The resting settings control.
+    ///
+    /// The running reference application draws a round-capped quarter-circle
+    /// arc below the rail rather than a filled circle. The arc runs from
+    /// straight up to straight left, echoing the rail contour's curvature, and
+    /// its separation from the rail is part of the silhouette. The filled
+    /// circle in the reference video is this control's hover state.
+    static func settings(showsCircle: Bool) -> CGPath {
+        if showsCircle {
+            let path = CGMutablePath()
+            path.addEllipse(in: RailShellMetrics.settingsCircleRect)
+            return path
+        }
+        let center = RailShellMetrics.settingsArcCenter
+        let arc = CGMutablePath()
+        // Paths here are authored top-down and flipped once for display, so a
+        // smaller y is higher on screen. The traced arc runs from straight up
+        // round to straight left, which is the quarter from -pi/2 to -pi.
+        arc.addArc(
+            center: center,
+            radius: RailShellMetrics.settingsArcRadius,
+            startAngle: -.pi / 2,
+            endAngle: -.pi,
+            clockwise: true,
+        )
+        return CGPath(
+            __byStroking: arc,
+            transform: nil,
+            lineWidth: RailShellMetrics.settingsArcStroke,
+            lineCap: .round,
+            lineJoin: .round,
+            miterLimit: 10,
+        ) ?? arc
     }
 
     static func detail(centerY: CGFloat, panelHeight: CGFloat) -> CGPath {
