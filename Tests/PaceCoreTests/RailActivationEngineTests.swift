@@ -98,6 +98,58 @@ struct RailActivationEngineTests {
     }
 
     @Test
+    func `a pointer resting in the hotspot activates once suppression expires`() {
+        // The last pointer event can arrive while a suppression window is
+        // still open. A settled pointer sends no more events, so the tick has
+        // to notice the window closing, or the rail never opens until the
+        // user wiggles the pointer.
+        var engine = makeEngine(mode: .dwellHover, dwellDelay: 0.06)
+
+        _ = engine.handle(.scroll, at: 1)
+        _ = engine.handle(.pointerMoved(hotspot(verticalPosition: 100)), at: 1.1)
+        #expect(engine.handle(.tick, at: 1.4).isEmpty)
+
+        // Suppression ends at 1.45; the next tick starts the dwell without
+        // another pointer event, and the dwell completes on the tick after.
+        #expect(engine.handle(.tick, at: 1.5).isEmpty)
+        #expect(engine.phase == .intentPending)
+        #expect(engine.handle(.tick, at: 1.6) == [.reveal])
+    }
+
+    @Test
+    func `a fast arrival that stops on the handle opens without another move`() {
+        // A flick at the handle rides the pinned edge for its last few
+        // samples, which reads as a sweep. That must cost at most the
+        // suppression window, not require the pointer to move again.
+        var engine = makeEngine(mode: .dwellHover, dwellDelay: 0.06)
+
+        _ = engine.handle(
+            .pointerMoved(hotspot(verticalPosition: 100, edgeDistance: 1)),
+            at: 1,
+        )
+        _ = engine.handle(
+            .pointerMoved(hotspot(verticalPosition: 300, edgeDistance: 1)),
+            at: 1.02,
+        )
+        #expect(engine.handle(.tick, at: 1.2).isEmpty)
+
+        // Suppression ends at 1.27. No further pointer events arrive.
+        _ = engine.handle(.tick, at: 1.3)
+        #expect(engine.handle(.tick, at: 1.4) == [.reveal])
+    }
+
+    @Test
+    func `modifier hover recovers from suppression without pointer movement`() {
+        var engine = makeEngine(mode: .modifierHover)
+
+        _ = engine.handle(.modifierChanged(isActive: true), at: 1)
+        _ = engine.handle(.scroll, at: 1)
+        _ = engine.handle(.pointerMoved(hotspot(verticalPosition: 100)), at: 1.1)
+        #expect(engine.handle(.tick, at: 1.4).isEmpty)
+        #expect(engine.handle(.tick, at: 1.5) == [.reveal])
+    }
+
+    @Test
     func `scroll drag and fast edge motion suppress accidental activation`() {
         var engine = makeEngine(mode: .dwellHover, dwellDelay: 0.2)
         _ = engine.handle(.scroll, at: 1)

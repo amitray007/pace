@@ -56,12 +56,16 @@ underneath.
 The implementation must test traditional scrollbars, overlay scrollbars, scroll thumbs, page
 tracks, horizontal scrolling, browser content, editors, and multiple displays.
 
-The current native adapter keeps the 324 x 416 pt visual panel permanently click-through. It uses a
+The current native adapter keeps the 324 x 624 pt visual panel permanently click-through. It uses a
 permission-free global mouse monitor and polls the selected modifier only while activation intent
 is pending or the rail is open. It does not install a keyboard event tap and does not request
 Accessibility or Input Monitoring permission. Separate nonactivating input panels exist only over
-the visible 18 x 70 pt click handle in click mode, or over the visible rail, settings control, and
-attached detail while expanded. Modifier-hover and dwell-hover have no collapsed input window.
+the collapsed handle's 24 x 132 pt pointer target in click mode, or over the visible rail, settings
+control, and attached detail while expanded. Modifier-hover and dwell-hover have no collapsed input
+window; their hover target is a monitor-side band at the screen edge spanning the rail's expanded
+extent, so a generous target cannot intercept any pointer event. All hit regions are derived from
+the same top-down authored geometry the shell draws from, flipped, mirrored, and scaled the same
+way, so they stay glued to the drawn silhouette.
 
 A running Release check on the built-in display used Chrome and an ignored local fixture beneath
 the collapsed dwell-hover rail. Right-edge scrolling moved the document from Y 0 to Y 2184 while

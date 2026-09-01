@@ -204,13 +204,24 @@ final class RailInteractionController {
     }
 
     private func synchronizeTargetPanels() {
-        targetPanels.forEach { $0.orderOut(nil) }
-        targetPanels.removeAll(keepingCapacity: true)
         guard model.isRailVisible, !isScreenExcluded else {
+            removeTargetPanels()
             return
         }
-        let targets = interactionTargets
-        for target in targets where !target.frame.isEmpty {
+        let targets = interactionTargets.filter { !$0.frame.isEmpty }
+        // Interaction panels are real windows. Recreating them while nothing
+        // moved makes the window server churn on every model refresh and
+        // briefly stacks old and new panels, so identical targets keep their
+        // panels.
+        let isUnchanged = targets.count == targetPanels.count &&
+            zip(targets, targetPanels).allSatisfy { target, panel in
+                target.frame == panel.frame
+            }
+        if isUnchanged {
+            return
+        }
+        removeTargetPanels()
+        for target in targets {
             let targetPanel = RailInteractionPanel(
                 frame: target.frame,
                 level: visualPanel?.level,
@@ -223,6 +234,11 @@ final class RailInteractionController {
             targetPanel.orderFrontRegardless()
             targetPanels.append(targetPanel)
         }
+    }
+
+    private func removeTargetPanels() {
+        targetPanels.forEach { $0.orderOut(nil) }
+        targetPanels.removeAll(keepingCapacity: true)
     }
 
     private func handleAccessibilityPress(at location: NSPoint) {
@@ -248,7 +264,7 @@ private extension RailInteractionController {
 
     private func pointerRegion(at location: NSPoint) -> RailPointerRegion {
         if model.railPreviewState == .mini {
-            return hotspotFrame.contains(location) ? .hotspot : .outside
+            return collapsedPointerFrame.contains(location) ? .hotspot : .outside
         }
         if settingsFrame.contains(location) {
             return .settings
@@ -268,53 +284,65 @@ private extension RailInteractionController {
         return .outside
     }
 
+    /// Converts a rect authored in the shell's top-down canvas coordinates
+    /// into the on-screen rect the pointer actually meets: flipped like the
+    /// layer view flips its paths, mirrored for the left edge, and scaled
+    /// around the screen edge. Hit regions must take the same trip the drawing
+    /// takes; the collapsed handle's hotspot once skipped the flip and sat
+    /// 150 pt below the visible handle, which made hovering it feel
+    /// impossible.
+    private func interactionFrame(authored rect: CGRect) -> NSRect {
+        guard let visualPanel else {
+            return .zero
+        }
+        let canvas = EdgeRailGeometry.canvasSize
+        let originX = model.preferences.railEdge == .right
+            ? rect.minX
+            : canvas.width - rect.maxX
+        return scaledInteractionFrame(NSRect(
+            x: visualPanel.frame.minX + originX,
+            y: visualPanel.frame.minY + canvas.height - rect.maxY,
+            width: rect.width,
+            height: rect.height,
+        ))
+    }
+
     /// The collapsed handle's pointer target.
     ///
     /// Derived from the same rect the shell draws the handle from, so shrinking
     /// the handle cannot leave the clickable area somewhere else. The target is
     /// deliberately larger than the visible handle, which stays small.
     private var hotspotFrame: NSRect {
-        guard let visualPanel else {
-            return .zero
-        }
-        let target = RailShellMetrics.handleTargetRect
-        let originX = model.preferences.railEdge == .right
-            ? visualPanel.frame.maxX - target.width
-            : visualPanel.frame.minX
-        return scaledInteractionFrame(NSRect(
-            x: originX,
-            y: visualPanel.frame.minY + target.minY,
-            width: target.width,
-            height: target.height,
-        ))
+        interactionFrame(authored: RailShellMetrics.handleTargetRect)
+    }
+
+    /// The hover modes' pointer target: the edge band the rail opens into.
+    ///
+    /// Hover activation has no input window, so the larger band cannot block
+    /// clicks, scrolling, or drags. Click mode keeps the small handle target,
+    /// because that one backs a real input panel.
+    private var hoverHotspotFrame: NSRect {
+        interactionFrame(authored: RailShellMetrics.hoverTargetRect)
+    }
+
+    private var collapsedPointerFrame: NSRect {
+        model.preferences.activationMode == .clickHandle ? hotspotFrame : hoverHotspotFrame
     }
 
     private var railFrame: NSRect {
-        guard let visualPanel else {
-            return .zero
-        }
-        let originX = model.preferences.railEdge == .right
-            ? visualPanel.frame.minX + EdgeRailGeometry.railOriginX
-            : visualPanel.frame.minX
-        return scaledInteractionFrame(NSRect(
-            x: originX,
-            y: visualPanel.frame.minY + 62,
+        interactionFrame(authored: NSRect(
+            x: EdgeRailGeometry.railOriginX,
+            y: RailShellMetrics.topEdgeY,
             width: EdgeRailGeometry.railWidth,
-            height: 324,
+            height: RailShellMetrics.bottomEdgeY - RailShellMetrics.topEdgeY,
         ))
     }
 
     private var providerFrames: [NSRect] {
-        guard let visualPanel else {
-            return []
-        }
-        let originX = model.preferences.railEdge == .right
-            ? visualPanel.frame.minX + EdgeRailGeometry.railOriginX
-            : visualPanel.frame.minX
-        return EdgeRailGeometry.providerTopY(count: railProviderCount).map { topPosition in
-            scaledInteractionFrame(NSRect(
-                x: originX,
-                y: visualPanel.frame.minY + EdgeRailGeometry.canvasSize.height - topPosition - 64,
+        EdgeRailGeometry.providerTopY(count: railProviderCount).map { topPosition in
+            interactionFrame(authored: NSRect(
+                x: EdgeRailGeometry.railOriginX,
+                y: topPosition,
                 width: EdgeRailGeometry.railWidth,
                 height: 64,
             ))
@@ -322,31 +350,30 @@ private extension RailInteractionController {
     }
 
     private var settingsFrame: NSRect {
-        guard let visualPanel else {
-            return .zero
-        }
-        let localOriginX: CGFloat = model.preferences.railEdge == .right ? 266 : 12
-        return scaledInteractionFrame(NSRect(
-            x: visualPanel.frame.minX + localOriginX,
-            y: visualPanel.frame.minY,
+        let center = RailShellMetrics.settingsCircleCenter
+        return interactionFrame(authored: NSRect(
+            x: center.x - 23,
+            y: center.y - 23,
             width: 46,
             height: 46,
         ))
     }
 
+    /// The drawn detail panel's frame, sized the same way EdgeRailView sizes
+    /// it so the hit region hugs the drawn panel.
     private var detailFrame: NSRect? {
-        guard let visualPanel, let detailCenterY else {
+        guard let detailCenterY else {
             return nil
         }
-        let panelTop = min(max(detailCenterY - 69.5, 0), 205)
-        let originX = model.preferences.railEdge == .right
-            ? visualPanel.frame.minX
-            : visualPanel.frame.maxX - EdgeRailGeometry.detailWidth
-        return scaledInteractionFrame(NSRect(
-            x: originX,
-            y: visualPanel.frame.minY + EdgeRailGeometry.canvasSize.height - panelTop - 139,
+        let quotaCount = model.railPreviewState.detailProviderID
+            .flatMap { providerID in model.selectedAccount(for: providerID) }
+            .map { account in model.snapshots(for: account.id).count } ?? 0
+        let height = EdgeRailGeometry.detailHeight(quotaCount: quotaCount)
+        return interactionFrame(authored: NSRect(
+            x: 0,
+            y: EdgeRailGeometry.detailPanelY(centerY: detailCenterY, height: height),
             width: EdgeRailGeometry.detailWidth,
-            height: 139,
+            height: height,
         ))
     }
 

@@ -211,4 +211,23 @@ enum RailShellMetrics {
             height: height,
         )
     }
+
+    /// The hover modes' target: the whole stretch of edge the open rail will
+    /// occupy, at the handle target's width.
+    ///
+    /// Hover activation installs no input window, so this band stays
+    /// click-through no matter how tall it is. Aiming anywhere along the edge
+    /// the rail expands into is deliberate enough; asking for the small handle
+    /// target meant hunting for an unmarked spot on a tall screen edge.
+    static var hoverTargetRect: CGRect {
+        let handle = handleTargetRect
+        let top = min(topEdgeY, handle.minY)
+        let bottom = max(bottomEdgeY, handle.maxY)
+        return CGRect(
+            x: handle.minX,
+            y: top,
+            width: handle.width,
+            height: bottom - top,
+        )
+    }
 }

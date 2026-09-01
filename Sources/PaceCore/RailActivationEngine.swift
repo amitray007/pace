@@ -248,6 +248,17 @@ public struct RailActivationEngine: Sendable {
     }
 
     private mutating func handleTick(at time: TimeInterval) -> [RailActivationAction] {
+        // A settled pointer sends no more move events, so the tick must rerun
+        // the collapsed evaluation. Without it, a pointer that arrived during
+        // a suppression window (scroll, drag release, or a fast sweep that
+        // ended on the handle) waited in the hotspot forever, and only another
+        // wiggle would start the dwell.
+        if phase == .collapsed || phase == .intentPending, pointerRegion == .hotspot {
+            let actions = evaluateCollapsedActivation(at: time)
+            if !actions.isEmpty {
+                return actions
+            }
+        }
         if dwellIntentIsReady(at: time) {
             return reveal()
         }
