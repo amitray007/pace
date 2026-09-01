@@ -57,7 +57,7 @@ final class RailShellLayerView: NSView {
 
     override func layout() {
         super.layout()
-        updatePaths(animated: false, duration: RailMotion.detailDuration)
+        updatePaths(animated: false, transition: .detail)
     }
 
     func update(_ state: RailShellState) {
@@ -79,7 +79,7 @@ final class RailShellLayerView: NSView {
         }
         updatePaths(
             animated: shouldAnimate,
-            duration: transitionDuration(
+            transition: transition(
                 from: previousPreviewState,
                 to: state.previewState,
             ),
@@ -97,7 +97,10 @@ final class RailShellLayerView: NSView {
         )
     }
 
-    private func updatePaths(animated: Bool, duration: CFTimeInterval) {
+    private func updatePaths(
+        animated: Bool,
+        transition: RailMotion.Transition,
+    ) {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
 
@@ -111,7 +114,7 @@ final class RailShellLayerView: NSView {
                 path: transformed(RailShellPaths.mini()),
                 opacity: 1,
                 animated: animated,
-                duration: duration,
+                transition: transition,
             )
             set(
                 settingsLayer,
@@ -120,14 +123,14 @@ final class RailShellLayerView: NSView {
                 ),
                 opacity: 0,
                 animated: animated,
-                duration: duration,
+                transition: transition,
             )
             set(
                 detailLayer,
                 path: transformed(RailShellPaths.collapsedDetail(centerY: lastDetailCenterY)),
                 opacity: 1,
                 animated: animated,
-                duration: duration,
+                transition: transition,
             )
         } else {
             set(
@@ -135,7 +138,7 @@ final class RailShellLayerView: NSView {
                 path: transformed(RailShellPaths.rail()),
                 opacity: 1,
                 animated: animated,
-                duration: duration,
+                transition: transition,
             )
             set(
                 settingsLayer,
@@ -144,21 +147,24 @@ final class RailShellLayerView: NSView {
                 ),
                 opacity: 1,
                 animated: animated,
-                duration: duration,
+                transition: transition,
             )
-            updateDetailPath(animated: animated, duration: duration)
+            updateDetailPath(animated: animated, transition: transition)
         }
         CATransaction.commit()
     }
 
-    private func updateDetailPath(animated: Bool, duration: CFTimeInterval) {
+    private func updateDetailPath(
+        animated: Bool,
+        transition: RailMotion.Transition,
+    ) {
         guard previewState.detailProviderID != nil else {
             set(
                 detailLayer,
                 path: transformed(RailShellPaths.collapsedDetail(centerY: lastDetailCenterY)),
                 opacity: 1,
                 animated: animated,
-                duration: duration,
+                transition: transition,
             )
             return
         }
@@ -170,20 +176,23 @@ final class RailShellLayerView: NSView {
             ),
             opacity: 1,
             animated: animated,
-            duration: duration,
+            transition: transition,
         )
     }
 
-    private func transitionDuration(
+    /// The reference reveals faster than it dismisses, so the two directions do
+    /// not share a duration or a curve.
+    private func transition(
         from previousState: RailPreviewState,
         to nextState: RailPreviewState,
-    ) -> CFTimeInterval {
+    ) -> RailMotion.Transition {
         if reducesMotion {
-            return RailMotion.reducedMotionFadeDuration
+            return .reduced
         }
-        return previousState == .mini || nextState == .mini
-            ? RailMotion.revealDuration
-            : RailMotion.detailDuration
+        if nextState == .mini {
+            return .dismiss
+        }
+        return previousState == .mini ? .reveal : .detail
     }
 
     private func set(
@@ -191,7 +200,7 @@ final class RailShellLayerView: NSView {
         path: CGPath?,
         opacity: Float,
         animated: Bool,
-        duration: CFTimeInterval,
+        transition: RailMotion.Transition,
     ) {
         let presentationLayer = shapeLayer.presentation()
         let currentPath = presentationLayer?.path ?? shapeLayer.path
@@ -209,8 +218,8 @@ final class RailShellLayerView: NSView {
             let pathAnimation = CABasicAnimation(keyPath: "path")
             pathAnimation.fromValue = currentPath
             pathAnimation.toValue = path
-            pathAnimation.duration = duration
-            pathAnimation.timingFunction = RailMotion.timingFunction
+            pathAnimation.duration = transition.duration
+            pathAnimation.timingFunction = transition.timing
             shapeLayer.add(pathAnimation, forKey: "pace.path")
         }
 
@@ -218,10 +227,11 @@ final class RailShellLayerView: NSView {
             let opacityAnimation = CABasicAnimation(keyPath: "opacity")
             opacityAnimation.fromValue = currentOpacity
             opacityAnimation.toValue = opacity
-            opacityAnimation.duration = reducesMotion
-                ? RailMotion.reducedMotionFadeDuration
-                : min(duration, RailMotion.contentFadeDuration)
-            opacityAnimation.timingFunction = RailMotion.timingFunction
+            let fade = reducesMotion
+                ? RailMotion.Transition.reduced
+                : transition.capped(at: RailMotion.contentFadeDuration)
+            opacityAnimation.duration = fade.duration
+            opacityAnimation.timingFunction = fade.timing
             shapeLayer.add(opacityAnimation, forKey: "pace.opacity")
         }
     }

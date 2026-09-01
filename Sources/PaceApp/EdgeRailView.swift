@@ -152,7 +152,7 @@ struct EdgeRailView: View {
         .buttonStyle(.plain)
         .opacity(isSettingsHovered ? 1 : 0)
         .animation(
-            .easeOut(duration: RailMotion.contentFadeDuration),
+            RailMotion.contentTiming(duration: RailMotion.contentFadeDuration),
             value: isSettingsHovered,
         )
         .onHover { isHovering in
@@ -241,7 +241,7 @@ struct EdgeRailView: View {
             : isVisible
             ? RailMotion.contentFadeDuration
             : RailMotion.contentDismissDuration
-        let animation = Animation.easeOut(duration: duration)
+        let animation = RailMotion.contentTiming(duration: duration)
         return isVisible && !accessibilityReduceMotion
             ? animation.delay(RailMotion.contentRevealDelay)
             : animation
