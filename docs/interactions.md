@@ -63,6 +63,15 @@ Accessibility or Input Monitoring permission. Separate nonactivating input panel
 the visible 18 x 70 pt click handle in click mode, or over the visible rail, settings control, and
 attached detail while expanded. Modifier-hover and dwell-hover have no collapsed input window.
 
+A running Release check on the built-in display used Chrome and an ignored local fixture beneath
+the collapsed dwell-hover rail. Right-edge scrolling moved the document from Y 0 to Y 2184 while
+the rail stayed collapsed. A visible scrollbar track click moved an isolated edge scroller from Y 0
+to Y 802, and dragging its thumb moved it from Y 802 to Y 1664 through the click-through visual
+window. Entering Chrome full screen removed every on-screen Pace window reported by Core Graphics;
+the collapsed rail returned after leaving full screen. This check did not cover trackpad momentum,
+window resize handles, the expanded input regions, horizontal or traditional scrollbar variants,
+Spaces, Stage Manager, or another display.
+
 This window footprint is implementation evidence, not the physical pointer exit gate. Rounded
 corners still use bounded rectangular input regions, and scrolling directly over an expanded
 interactive surface is handled by Pace. Verify real scrollbars, resize handles, dragging, momentum,

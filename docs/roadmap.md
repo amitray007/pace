@@ -76,8 +76,11 @@ deterministic intent engine and permission-free AppKit adapter now implement mod
 click-handle, dwell, provider travel, dismissal grace, and scroll, drag, fast-motion, and full-screen
 suppression. The deterministic Release sequence now passes an Animation Hitches capture on the
 built-in 120 Hz display with no post-startup main-thread delay over 33 ms and no sequence hitch over
-16.67 ms. Physical scrollbar and drag checks, a 60 Hz or second-display capture, and explicit visual
-approval remain.
+16.67 ms. A physical single-display Chrome pass confirms that right-edge scrolling, an overlay
+scrollbar track click, and a scrollbar-thumb drag pass through the collapsed visual window, and that
+the rail orders out for a full-screen application. Trackpad momentum, resize handles, expanded input
+regions, horizontal and traditional scrollbar variants, Spaces, Stage Manager, a 60 Hz or
+second-display capture, and explicit visual approval remain.
 
 - Implement rail path morphing and attached-panel movement with Core Animation.
 - Make every rapid transition interruptible and retargetable.
