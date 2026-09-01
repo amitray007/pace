@@ -404,18 +404,6 @@ extension PacePresentationModel {
         updatePreferences { $0.hideRailInFullScreen = isHidden }
     }
 
-    func setHidesAccountIdentity(_ hidesAccountIdentity: Bool) {
-        updatePreferences { $0.hidesAccountIdentity = hidesAccountIdentity }
-    }
-
-    func setTimeFormat(_ timeFormat: PaceTimeFormat) {
-        updatePreferences { $0.timeFormat = timeFormat }
-    }
-
-    func setUsageDisplayMode(_ mode: UsageDisplayMode) {
-        updatePreferences { $0.usageDisplayMode = mode }
-    }
-
     func moveProvider(_ providerID: ProviderID, by offset: Int) {
         let visibleProviderIDs = visibleProviderIDs
         guard let sourceVisibleIndex = visibleProviderIDs.firstIndex(of: providerID) else {
