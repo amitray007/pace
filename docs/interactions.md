@@ -130,3 +130,8 @@ Keep settings grouped by user intent:
 5. **Accessibility:** reduced motion, contrast, text scale, keyboard shortcuts.
 
 Do not expose internal animation control points or arbitrary theme values in the first release.
+
+The current Providers section keeps provider ordering and account management in the same native
+group. Codex registration is always explicit: add the current `CODEX_HOME` or choose another profile
+folder. Each real account has a local name, an enable switch, and a remove action. Removing it never
+deletes the provider profile or credentials.

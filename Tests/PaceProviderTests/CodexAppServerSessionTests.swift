@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import PaceCore
 @testable import PaceProviders
 import Testing
 
@@ -156,6 +157,48 @@ struct CodexAppServerSessionTests {
     }
 
     @Test
+    func `explicit shutdown closes a cached profile process without a monitor`() async throws {
+        let fixture = try CodexServerFixture()
+        defer { fixture.remove() }
+        let reader = CodexAppServerReader(
+            executableURL: fixture.executableURL,
+            timeout: 3,
+            reconnectDelays: [.milliseconds(10)],
+        )
+        _ = try await reader.read(profile: fixture.profile, includeRateLimits: false)
+        let processID = try fixture.processID()
+        #expect(fixture.processIsRunning(processID))
+
+        await reader.shutdown()
+
+        try await waitUntil { !fixture.processIsRunning(processID) }
+    }
+
+    @Test
+    func `shutdown is terminal and cannot restart a profile process`() async throws {
+        let fixture = try CodexServerFixture()
+        defer { fixture.remove() }
+        let reader = CodexAppServerReader(
+            executableURL: fixture.executableURL,
+            timeout: 3,
+            reconnectDelays: [.milliseconds(10)],
+        )
+        _ = try await reader.read(profile: fixture.profile, includeRateLimits: false)
+        let processID = try fixture.processID()
+
+        await reader.shutdown()
+        try await waitUntil { !fixture.processIsRunning(processID) }
+
+        do {
+            _ = try await reader.read(profile: fixture.profile, includeRateLimits: false)
+            Issue.record("Expected a reader to reject work after shutdown")
+        } catch {
+            #expect(error == .processFailed)
+        }
+        #expect(try fixture.startCount() == 1)
+    }
+
+    @Test
     func `request timeout does not stall unrelated async work`() async throws {
         let fixture = try CodexServerFixture(omitsAccountResponse: true)
         defer { fixture.remove() }
@@ -193,7 +236,7 @@ struct CodexAppServerSessionTests {
     }
 }
 
-private struct CodexServerFixture: Sendable {
+struct CodexServerFixture: Sendable {
     let directory: URL
     let executableURL: URL
     let profile: CodexProfile
@@ -202,6 +245,7 @@ private struct CodexServerFixture: Sendable {
         exitsAfterRateLimitRead: Bool = false,
         ignoresTermination: Bool = false,
         omitsAccountResponse: Bool = false,
+        omitsInitializeResponse: Bool = false,
     ) throws {
         let fileManager = FileManager.default
         directory = fileManager.temporaryDirectory
@@ -217,6 +261,9 @@ private struct CodexServerFixture: Sendable {
         }
         if omitsAccountResponse {
             try Data().write(to: profileDirectory.appending(path: "omit-account-response"))
+        }
+        if omitsInitializeResponse {
+            try Data().write(to: profileDirectory.appending(path: "omit-initialize-response"))
         }
         try Data("person@example.invalid".utf8).write(
             to: profileDirectory.appending(path: "email"),
@@ -314,7 +361,9 @@ private struct CodexServerFixture: Sendable {
         request_id=$(print -r -- "$line" | sed -E 's/.*"id":([0-9]+).*/\1/')
       fi
       if [[ "$line" == *'"method":"initialize"'* ]]; then
-        print -r -- "{\"id\":$request_id,\"result\":{}}"
+        if [[ ! -f "$CODEX_HOME/omit-initialize-response" ]]; then
+          print -r -- "{\"id\":$request_id,\"result\":{}}"
+        fi
       elif [[ "$line" == *'"method":"initialized"'* ]]; then
         initialized=1
       elif [[ "$line" == *'"method":"account/read"'* ]]; then

@@ -72,6 +72,29 @@ actor FailingPaceStatePersistence: PaceStatePersistence {
     }
 }
 
+actor LifecycleTestAdapter: ProviderAdapterLifecycle {
+    nonisolated let providerID = ProviderID.codex
+    nonisolated let capabilities = ProviderCapabilities(
+        supportsAccountDiscovery: true,
+        supportsMultipleAccounts: true,
+        supportsStreamingUpdates: false,
+    )
+
+    private(set) var shutdownCount = 0
+
+    func discoverAccounts() -> [DiscoveredAccount] {
+        []
+    }
+
+    func refresh(_: ProviderAccount) throws(ProviderFailure) -> ProviderRefreshResult {
+        throw .failed(code: "refresh-not-used")
+    }
+
+    func shutdown() {
+        shutdownCount += 1
+    }
+}
+
 actor LifecycleStreamingTestAdapter: ProviderUpdateStreamingAdapter {
     nonisolated let providerID = ProviderID.claude
     nonisolated let capabilities = ProviderCapabilities(
@@ -81,6 +104,9 @@ actor LifecycleStreamingTestAdapter: ProviderUpdateStreamingAdapter {
     )
 
     private let discoveredAccount: DiscoveredAccount
+    private var continuations: [
+        AccountID: AsyncStream<ProviderUpdate>.Continuation
+    ] = [:]
     private var subscriptionCounts: [AccountID: Int] = [:]
     private var terminationCounts: [AccountID: Int] = [:]
 
@@ -101,10 +127,13 @@ actor LifecycleStreamingTestAdapter: ProviderUpdateStreamingAdapter {
             bufferingPolicy: .bufferingNewest(8),
         )
         subscriptionCounts[account.id, default: 0] += 1
-        pair.continuation.onTermination = { [weak self] _ in
-            Task { await self?.recordTermination(for: account.id) }
-        }
+        continuations[account.id] = pair.continuation
         return pair.stream
+    }
+
+    func stopUpdates(for account: ProviderAccount) {
+        continuations.removeValue(forKey: account.id)?.finish()
+        terminationCounts[account.id, default: 0] += 1
     }
 
     func subscriptionCount(for accountID: AccountID) -> Int {
@@ -113,9 +142,5 @@ actor LifecycleStreamingTestAdapter: ProviderUpdateStreamingAdapter {
 
     func terminationCount(for accountID: AccountID) -> Int {
         terminationCounts[accountID, default: 0]
-    }
-
-    private func recordTermination(for accountID: AccountID) {
-        terminationCounts[accountID, default: 0] += 1
     }
 }

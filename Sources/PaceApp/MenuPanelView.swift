@@ -225,7 +225,7 @@ struct MenuPanelView: View {
                     systemImage: "arrow.clockwise",
                 )
             }
-            .disabled(model.isRefreshing)
+            .disabled(model.isLoading || model.isRefreshing || model.isManagingAccounts)
             .keyboardShortcut("r", modifiers: .command)
 
             Button {

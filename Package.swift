@@ -38,7 +38,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "PaceApp",
-            dependencies: ["PaceCore"],
+            dependencies: ["PaceCore", "PaceProviders"],
             resources: [
                 .process("Resources"),
             ],

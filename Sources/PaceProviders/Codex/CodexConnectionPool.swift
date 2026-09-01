@@ -21,6 +21,7 @@ actor CodexConnectionPool {
     private let reconnectDelays: [Duration]
     private let requestTimeout: TimeInterval
     private var connections: [String: CodexAppServerConnection] = [:]
+    private var isShutdown = false
     private var openingConnections: [String: OpeningConnection] = [:]
 
     init(
@@ -46,6 +47,9 @@ actor CodexConnectionPool {
     func connection(
         for profile: CodexProfile,
     ) async throws(CodexProviderError) -> CodexAppServerConnection {
+        guard !isShutdown else {
+            throw .processFailed
+        }
         let key = profile.directory.standardizedFileURL.path
         if let connection = connections[key], connection.isUsable {
             return connection
@@ -70,12 +74,16 @@ actor CodexConnectionPool {
 
         do {
             let candidate = try await result(of: task)
+            guard !isShutdown, openingConnections[key]?.id == openingID else {
+                await candidate.close()
+                throw CodexProviderError.processFailed
+            }
             if openingConnections[key]?.id == openingID {
                 openingConnections.removeValue(forKey: key)
                 connections[key] = candidate
             }
             return candidate
-        } catch {
+        } catch let error as CodexProviderError {
             if openingConnections[key]?.id == openingID {
                 openingConnections.removeValue(forKey: key)
                 if connections[key] === staleConnection {
@@ -83,10 +91,17 @@ actor CodexConnectionPool {
                 }
             }
             throw error
+        } catch {
+            throw .processFailed
         }
     }
 
     func events(for profile: CodexProfile) -> AsyncStream<CodexProfileEvent> {
+        guard !isShutdown else {
+            let pair = AsyncStream<CodexProfileEvent>.makeStream()
+            pair.continuation.finish()
+            return pair.stream
+        }
         let pair = AsyncStream<CodexProfileEvent>.makeStream(
             bufferingPolicy: .bufferingNewest(8),
         )
@@ -99,9 +114,42 @@ actor CodexConnectionPool {
         }
         pair.continuation.onTermination = { [weak self] _ in
             monitorTask.cancel()
-            Task { await self?.cancelOpeningConnection(for: profile) }
+            Task { await self?.close(profile: profile) }
         }
         return pair.stream
+    }
+
+    func close(profile: CodexProfile) async {
+        let key = profile.directory.standardizedFileURL.path
+        let opening = openingConnections.removeValue(forKey: key)
+        opening?.task.cancel()
+        let connection = connections.removeValue(forKey: key)
+        await connection?.close()
+        if let opening, let openedConnection = try? await opening.task.value {
+            await openedConnection.close()
+        }
+    }
+
+    func shutdown() async {
+        isShutdown = true
+        let openings = Array(openingConnections.values)
+        openingConnections.removeAll()
+        openings.forEach { $0.task.cancel() }
+
+        let activeConnections = Array(connections.values)
+        connections.removeAll()
+        await withTaskGroup(of: Void.self) { group in
+            for connection in activeConnections {
+                group.addTask {
+                    await connection.close()
+                }
+            }
+        }
+        for opening in openings {
+            if let connection = try? await opening.task.value {
+                await connection.close()
+            }
+        }
     }
 
     private func monitor(
@@ -179,11 +227,6 @@ actor CodexConnectionPool {
         return Task.isCancelled
     }
 
-    private func cancelOpeningConnection(for profile: CodexProfile) {
-        let key = profile.directory.standardizedFileURL.path
-        openingConnections[key]?.task.cancel()
-    }
-
     private func invalidate(
         _ connection: CodexAppServerConnection,
         for profile: CodexProfile,
@@ -214,6 +257,7 @@ final class CodexConnectionPoolResolver: @unchecked Sendable {
     private let reconnectDelays: [Duration]
     private let requestTimeout: TimeInterval
     private var resolvedPool: CodexConnectionPool?
+    private var isShutdown = false
 
     init(
         executableURL: URL?,
@@ -226,7 +270,11 @@ final class CodexConnectionPoolResolver: @unchecked Sendable {
     }
 
     func pool() throws(CodexProviderError) -> CodexConnectionPool {
-        if let resolvedPool = lock.withLock({ resolvedPool }) {
+        let current = lock.withLock { (isShutdown, resolvedPool) }
+        guard !current.0 else {
+            throw .processFailed
+        }
+        if let resolvedPool = current.1 {
             return resolvedPool
         }
         let executableURL: URL = if let configuredExecutableURL {
@@ -239,13 +287,34 @@ final class CodexConnectionPoolResolver: @unchecked Sendable {
             requestTimeout: requestTimeout,
             reconnectDelays: reconnectDelays,
         )
-        return lock.withLock {
+        let installedPool: CodexConnectionPool? = lock.withLock {
+            guard !isShutdown else {
+                return nil
+            }
             if let resolvedPool {
-                return resolvedPool
+                return Optional(resolvedPool)
             }
             resolvedPool = candidate
-            return candidate
+            return Optional(candidate)
         }
+        guard let installedPool else {
+            throw .processFailed
+        }
+        return installedPool
+    }
+
+    func shutdown() async {
+        let pool = lock.withLock { () -> CodexConnectionPool? in
+            isShutdown = true
+            defer { resolvedPool = nil }
+            return resolvedPool
+        }
+        await pool?.shutdown()
+    }
+
+    func close(profile: CodexProfile) async {
+        let pool = lock.withLock { resolvedPool }
+        await pool?.close(profile: profile)
     }
 }
 

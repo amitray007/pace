@@ -33,13 +33,19 @@ local app-server protocol without copying account tokens or calling private web 
 adapter supports explicit isolated `CODEX_HOME` profiles, reuses one supervised process per
 profile, and forwards rate-limit updates into shared state. Request deadlines do not block Swift's
 cooperative executor, and disabling or removing an account stops its monitor and profile process.
-Explicit account onboarding and live app configuration remain before live values replace the
-simulated shell.
+The Providers settings section now adds the current profile or an explicitly chosen profile folder.
+It never registers an ambient login automatically. A successful add supersedes the simulated Codex
+fixture in the active runtime and presentation. Pace retains that fixture as a deterministic local
+fallback, and the other provider fixtures remain active until their own adapters are promoted.
 
 The account core keeps discovery and registration separate. A discovery request never adds an
 account to Pace. The selected candidate must be added explicitly, can receive a local name, and can
 then be refreshed, disabled, re-enabled, renamed, or removed. The same real provider profile or
 Keychain source cannot be registered twice, even if its reported identity changes.
+
+For multiple Codex accounts, sign each account in through Codex with a separate `CODEX_HOME`, then
+choose that folder in Pace. Codex continues to own its credentials. Removing an account from Pace
+deletes only Pace's normalized usage and profile reference.
 
 A separate Claude compatibility spike verifies OAuth identity before reading usage, supports
 explicit isolated profile directories, and keeps all credential and endpoint code outside the app.
@@ -81,6 +87,9 @@ make visual-benchmark VISUAL_CAPTURE=path/to/capture.png  # compare the rail sil
 make reference-fetch  # download the public reference media into ignored local storage
 make reference-frames # verify and extract the canonical visual-review frames
 ```
+
+Set `PACE_APPLICATION_SUPPORT_DIRECTORY` to an isolated directory when testing the normal app
+without reading or changing the user's saved Pace state.
 
 The current deployment target is macOS 15 for the core foundation. The oldest supported macOS
 version remains subject to the reference rail's AppKit and Core Animation verification.

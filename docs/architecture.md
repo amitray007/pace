@@ -124,7 +124,9 @@ It reconciles one monitor per enabled account from committed store changes. Regi
 re-enablement start monitoring; disablement and removal cancel it. Store mutations serialize the
 complete read-save-publish transaction so concurrent account updates cannot overwrite each other.
 An applied delivery and a persistence failure are separate events, which lets both surfaces preserve
-last-good state while showing a save error. Explicit app onboarding remains the promotion gate.
+last-good state while showing a save error. Runtime replacement explicitly shuts down lifecycle
+adapters before constructing their replacements, so a profile cannot retain an orphaned app-server
+process.
 
 The account coordinator is the presentation-facing boundary for onboarding and account lifecycle.
 Discovery runs only after an explicit user action and does not mutate Pace state. It classifies
@@ -134,6 +136,19 @@ state. A normalized real profile path or Keychain service/account pair can belon
 account per provider; simulated fixtures remain exempt. Rename, enable, disable, per-account
 refresh, and removal all flow through the same coordinator. Removal deletes normalized Pace state
 and never deletes provider-owned credentials or profiles.
+
+The production provider catalog derives one Codex adapter from all registered real Codex profile
+bindings, including disabled accounts that may be re-enabled. App launch promotes this adapter only
+when such a binding exists. The settings flow stops the current runtime, verifies the selected
+profile without opening unrelated registered profiles, registers or re-enables that one account,
+performs an initial refresh, and then rebuilds
+the shared runtime from every registered profile. A verified real Codex account suppresses the
+simulated Codex fixture in the active runtime and presentation. Pace retains the fixture as a
+deterministic fallback if the last real account is removed. A failed initial refresh removes a new
+registration or restores the disabled state of an account that Pace tried to re-enable. This
+transition occurs only after the
+explicit flow succeeds.
+Simulated accounts for providers without production adapters remain unchanged.
 
 The live spike was verified on 2026-08-31 with Codex CLI 0.151.0. The response contained a general
 weekly bucket plus model-specific five-hour and weekly buckets. This proves the UI must render

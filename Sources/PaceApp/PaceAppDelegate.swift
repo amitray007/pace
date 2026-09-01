@@ -13,6 +13,7 @@ final class PaceAppDelegate: NSObject, NSApplicationDelegate {
     )
 
     private var edgePanelController: EdgePanelController?
+    private var terminationTask: Task<Void, Never>?
     private var statusItemController: StatusItemController?
 
     func applicationDidFinishLaunching(_: Notification) {
@@ -29,6 +30,19 @@ final class PaceAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_: Notification) {
         model.stopProviderUpdates()
+    }
+
+    func applicationShouldTerminate(
+        _ sender: NSApplication,
+    ) -> NSApplication.TerminateReply {
+        guard terminationTask == nil else {
+            return .terminateLater
+        }
+        terminationTask = Task { [model] in
+            await model.shutdownProviderRuntime()
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
     }
 
     private func scheduleReferenceMotionSequence() {

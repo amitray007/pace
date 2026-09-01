@@ -12,7 +12,10 @@ protocol CodexProfileEventReading: Sendable {
         -> AsyncStream<CodexProfileEvent>
 }
 
-protocol CodexProfileSessionReading: CodexProfileEventReading, CodexProfileReading {}
+protocol CodexProfileSessionReading: CodexProfileEventReading, CodexProfileReading {
+    func close(profile: CodexProfile) async
+    func shutdown() async
+}
 
 struct CodexAppServerReader: CodexProfileSessionReading, Sendable {
     private let poolResolver: CodexConnectionPoolResolver
@@ -87,6 +90,14 @@ struct CodexAppServerReader: CodexProfileSessionReading, Sendable {
         for profile: CodexProfile,
     ) async throws(CodexProviderError) -> AsyncStream<CodexProfileEvent> {
         try await poolResolver.pool().events(for: profile)
+    }
+
+    func close(profile: CodexProfile) async {
+        await poolResolver.close(profile: profile)
+    }
+
+    func shutdown() async {
+        await poolResolver.shutdown()
     }
 }
 

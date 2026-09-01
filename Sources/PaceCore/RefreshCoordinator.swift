@@ -8,6 +8,7 @@ public enum RefreshCoordinatorError: Error, Equatable, Sendable {
 public struct RefreshCoordinator: Sendable {
     private let adapters: [ProviderID: any ProviderAdapter]
     private let store: PaceStore
+    private let updateSupervisors = UpdateSupervisorRegistry()
 
     public init(store: PaceStore, adapters: [any ProviderAdapter]) throws {
         var adaptersByProvider: [ProviderID: any ProviderAdapter] = [:]
@@ -90,53 +91,106 @@ public struct RefreshCoordinator: Sendable {
     }
 
     public func updateStream() async -> AsyncStream<ProviderUpdateDelivery> {
-        AsyncStream(bufferingPolicy: .bufferingNewest(64)) { continuation in
-            let supervisorTask = Task {
-                var monitorTasks: [AccountID: Task<Void, Never>] = [:]
-                let stateUpdates = await store.stateUpdates()
+        let initialState = await store.currentState()
+        let pair = AsyncStream<ProviderUpdateDelivery>.makeStream(
+            bufferingPolicy: .bufferingNewest(64),
+        )
+        let supervisorID = UUID()
+        let supervisorTask = Task {
+            var monitors: [AccountID: AccountMonitor] = [:]
+            await reconcileMonitors(
+                for: initialState,
+                continuation: pair.continuation,
+                monitors: &monitors,
+            )
+            let stateUpdates = await store.stateUpdates()
 
-                for await state in stateUpdates {
+            for await state in stateUpdates {
+                guard !Task.isCancelled else {
+                    break
+                }
+                await reconcileMonitors(
+                    for: state,
+                    continuation: pair.continuation,
+                    monitors: &monitors,
+                )
+            }
+
+            let remainingMonitors = Array(monitors.values)
+            remainingMonitors.forEach { $0.task.cancel() }
+            for monitor in remainingMonitors {
+                await monitor.adapter.stopUpdates(for: monitor.account)
+                await monitor.task.value
+            }
+            pair.continuation.finish()
+            await updateSupervisors.remove(supervisorID)
+        }
+        await updateSupervisors.insert(supervisorTask, id: supervisorID)
+        pair.continuation.onTermination = { _ in supervisorTask.cancel() }
+        return pair.stream
+    }
+
+    public func shutdownUpdates() async {
+        await updateSupervisors.shutdown()
+    }
+
+    public func shutdownAdapters() async {
+        await shutdownUpdates()
+        await withTaskGroup(of: Void.self) { group in
+            for adapter in adapters.values {
+                guard let lifecycle = adapter as? any ProviderAdapterLifecycle else {
+                    continue
+                }
+                group.addTask {
+                    await lifecycle.shutdown()
+                }
+            }
+        }
+    }
+
+    private func reconcileMonitors(
+        for state: PaceState,
+        continuation: AsyncStream<ProviderUpdateDelivery>.Continuation,
+        monitors: inout [AccountID: AccountMonitor],
+    ) async {
+        let accounts = state.accounts.filter(\.isEnabled)
+        let desiredIDs = Set(accounts.map(\.id))
+
+        let retiredIDs = monitors.keys.filter { !desiredIDs.contains($0) }
+        for accountID in retiredIDs {
+            if let monitor = monitors.removeValue(forKey: accountID) {
+                monitor.task.cancel()
+                await monitor.adapter.stopUpdates(for: monitor.account)
+                await monitor.task.value
+            }
+        }
+
+        for account in accounts where monitors[account.id] == nil {
+            guard let adapter = adapters[account.providerID]
+                as? any ProviderUpdateStreamingAdapter
+            else {
+                continue
+            }
+            let task = Task {
+                let updates = await adapter.updates(for: account)
+                for await update in updates {
                     guard !Task.isCancelled else {
                         break
                     }
-                    let accounts = state.accounts.filter(\.isEnabled)
-                    let desiredIDs = Set(accounts.map(\.id))
-
-                    let retiredIDs = monitorTasks.keys.filter { !desiredIDs.contains($0) }
-                    for accountID in retiredIDs {
-                        monitorTasks.removeValue(forKey: accountID)?.cancel()
-                    }
-
-                    for account in accounts where monitorTasks[account.id] == nil {
-                        guard let adapter = adapters[account.providerID]
-                            as? any ProviderUpdateStreamingAdapter
-                        else {
-                            continue
-                        }
-                        monitorTasks[account.id] = Task {
-                            let updates = await adapter.updates(for: account)
-                            for await update in updates {
-                                guard !Task.isCancelled else {
-                                    break
-                                }
-                                let outcome = Self.outcome(for: account.id, update: update)
-                                do {
-                                    try await store.applyRefreshOutcomes([outcome])
-                                    continuation.yield(.applied(outcome))
-                                } catch {
-                                    continuation.yield(
-                                        .persistenceFailed(accountID: account.id),
-                                    )
-                                }
-                            }
-                        }
+                    let outcome = Self.outcome(for: account.id, update: update)
+                    do {
+                        try await store.applyRefreshOutcomes([outcome])
+                        continuation.yield(.applied(outcome))
+                    } catch {
+                        continuation.yield(.persistenceFailed(accountID: account.id))
                     }
                 }
-
-                monitorTasks.values.forEach { $0.cancel() }
-                continuation.finish()
             }
-            continuation.onTermination = { _ in supervisorTask.cancel() }
+            monitors[account.id] = AccountMonitor(
+                account: account,
+                adapter: adapter,
+                task: task,
+            )
         }
     }
 
@@ -161,6 +215,40 @@ public struct RefreshCoordinator: Sendable {
             return .success(accountID: account.id, result: result)
         } catch let failure {
             return .failure(accountID: account.id, failure: failure)
+        }
+    }
+}
+
+private struct AccountMonitor: Sendable {
+    let account: ProviderAccount
+    let adapter: any ProviderUpdateStreamingAdapter
+    let task: Task<Void, Never>
+}
+
+private actor UpdateSupervisorRegistry {
+    private var isShutdown = false
+    private var tasks: [UUID: Task<Void, Never>] = [:]
+
+    func insert(_ task: Task<Void, Never>, id: UUID) async {
+        guard !isShutdown else {
+            task.cancel()
+            await task.value
+            return
+        }
+        tasks[id] = task
+    }
+
+    func remove(_ id: UUID) {
+        tasks.removeValue(forKey: id)
+    }
+
+    func shutdown() async {
+        isShutdown = true
+        let activeTasks = Array(tasks.values)
+        tasks.removeAll()
+        activeTasks.forEach { $0.cancel() }
+        for task in activeTasks {
+            await task.value
         }
     }
 }

@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import PaceCore
+import PaceProviders
 
 enum RailPreviewState: String, CaseIterable, Identifiable {
     case claude
@@ -30,26 +31,31 @@ enum RailPreviewState: String, CaseIterable, Identifiable {
 @MainActor
 @Observable
 final class PacePresentationModel {
-    private(set) var state = PaceState()
+    var state = PaceState()
     private(set) var preferences: PacePreferences
     private(set) var loadingError: String?
     private(set) var preferencesError: String?
     private(set) var refreshError: String?
     private(set) var isLoading = true
     private(set) var isRefreshing = false
+    var accountActionError: String?
+    var isManagingAccounts = false
     var activeProviderID: ProviderID = .claude
     var railPreviewState: RailPreviewState
     let forcesIncreasedContrast: Bool
+    let defaultCodexProfileDirectory: URL
 
-    private let isReferencePreview: Bool
+    let isReferencePreview: Bool
     private let simulatedPresentationState: SimulatedPresentationState
     private let preferencesPersistence: any PacePreferencesPersistence
     private let statePersistence: any PaceStatePersistence
     private var hasStarted = false
     private var preferencesStore: PacePreferencesStore?
     private var providerUpdateTask: Task<Void, Never>?
-    private var refreshCoordinator: RefreshCoordinator?
-    private var store: PaceStore?
+    var accountCoordinator: AccountCoordinator?
+    var refreshCoordinator: RefreshCoordinator?
+    var simulatedScenario: SimulatedScenario?
+    var store: PaceStore?
     private var streamPersistenceFailures: Set<AccountID> = []
 
     isolated deinit {
@@ -80,6 +86,10 @@ final class PacePresentationModel {
         railPreviewState = previewState ?? .mini
         isReferencePreview = previewState != nil
         forcesIncreasedContrast = environment["PACE_REFERENCE_CONTRAST"] == "increased"
+        defaultCodexProfileDirectory = environment["CODEX_HOME"]
+            .map { URL(filePath: $0, directoryHint: .isDirectory) }
+            ?? FileManager.default.homeDirectoryForCurrentUser
+            .appending(path: ".codex", directoryHint: .isDirectory)
         simulatedPresentationState = environment["PACE_SIMULATED_STATE"]
             .flatMap(SimulatedPresentationState.init(rawValue:)) ?? .current
         self.preferencesPersistence = preferencesPersistence
@@ -150,22 +160,27 @@ final class PacePresentationModel {
             if await store.currentState().accounts.isEmpty {
                 try await scenario.seed(store)
             }
-            let coordinator = try RefreshCoordinator(store: store, adapters: scenario.adapters)
-            for _ in 0 ..< scenario.refreshCycles {
-                try await coordinator.refreshAll()
-            }
-            refreshCoordinator = coordinator
+            try await configureProviderRuntime(
+                store: store,
+                scenario: scenario,
+                refreshAll: true,
+            )
             self.store = store
-            state = await store.currentState()
-            monitorProviderUpdates(coordinator: coordinator, store: store)
+            simulatedScenario = scenario
         } catch {
             loadingError = String(describing: error)
         }
     }
 
     func accounts(for providerID: ProviderID) -> [ProviderAccount] {
-        state.accounts
-            .filter { $0.providerID == providerID && $0.isEnabled }
+        let providerAccounts = state.accounts.filter {
+            $0.providerID == providerID && $0.isEnabled
+        }
+        let hasLiveAccount = providerAccounts.contains {
+            !$0.credentialBinding.isSimulated
+        }
+        return providerAccounts
+            .filter { !hasLiveAccount || !$0.credentialBinding.isSimulated }
             .sorted { $0.order < $1.order }
     }
 
@@ -236,7 +251,9 @@ final class PacePresentationModel {
     }
 
     func refreshAll() async {
-        guard !isRefreshing, let refreshCoordinator, let store else {
+        guard !isLoading, !isRefreshing, !isManagingAccounts,
+              let refreshCoordinator, let store
+        else {
             return
         }
         isRefreshing = true
@@ -258,7 +275,14 @@ final class PacePresentationModel {
         providerUpdateTask = nil
     }
 
-    private func monitorProviderUpdates(
+    func stopProviderUpdatesAndWait() async {
+        let task = providerUpdateTask
+        providerUpdateTask = nil
+        task?.cancel()
+        await task?.value
+    }
+
+    func monitorProviderUpdates(
         coordinator: RefreshCoordinator,
         store: PaceStore,
     ) {
@@ -390,7 +414,7 @@ extension PacePresentationModel {
     }
 }
 
-private extension RailPreviewState {
+extension RailPreviewState {
     init?(providerID: ProviderID) {
         switch providerID {
         case .claude:

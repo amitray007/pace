@@ -1,7 +1,7 @@
 import Foundation
 import PaceCore
 
-public struct CodexProviderAdapter: ProviderUpdateStreamingAdapter {
+public struct CodexProviderAdapter: ProviderAdapterLifecycle, ProviderUpdateStreamingAdapter {
     public nonisolated let providerID = ProviderID.codex
     public nonisolated let capabilities = ProviderCapabilities(
         supportsAccountDiscovery: true,
@@ -19,7 +19,8 @@ public struct CodexProviderAdapter: ProviderUpdateStreamingAdapter {
         timeout: TimeInterval = 10,
     ) {
         self.profiles = profiles
-        reader = CodexAppServerReader(executableURL: executableURL, timeout: timeout)
+        let reader = CodexAppServerReader(executableURL: executableURL, timeout: timeout)
+        self.reader = reader
         now = Date.init
     }
 
@@ -145,10 +146,25 @@ public struct CodexProviderAdapter: ProviderUpdateStreamingAdapter {
                     }
                 }
             }
+            await reader.close(profile: profile)
             pair.continuation.finish()
         }
-        pair.continuation.onTermination = { _ in updateTask.cancel() }
+        pair.continuation.onTermination = { [reader] _ in
+            updateTask.cancel()
+            Task { await reader.close(profile: profile) }
+        }
         return pair.stream
+    }
+
+    public func shutdown() async {
+        await reader.shutdown()
+    }
+
+    public func stopUpdates(for account: ProviderAccount) async {
+        guard let profile = profile(for: account.credentialBinding) else {
+            return
+        }
+        await reader.close(profile: profile)
     }
 
     private func profile(for binding: CredentialBinding) -> CodexProfile? {
@@ -179,7 +195,7 @@ public struct CodexProviderAdapter: ProviderUpdateStreamingAdapter {
     }
 
     private func suggestedName(_ identity: ProviderIdentity) -> String {
-        identity.email?.split(separator: "@").first.map(String.init) ?? "Codex"
+        identity.email ?? "Codex"
     }
 
     private func planName(_ planType: String?) -> String? {

@@ -57,6 +57,15 @@ public enum ProviderUpdate: Sendable {
 
 public protocol ProviderUpdateStreamingAdapter: ProviderAdapter {
     func updates(for account: ProviderAccount) async -> AsyncStream<ProviderUpdate>
+    func stopUpdates(for account: ProviderAccount) async
+}
+
+public extension ProviderUpdateStreamingAdapter {
+    func stopUpdates(for _: ProviderAccount) async {}
+}
+
+public protocol ProviderAdapterLifecycle: ProviderAdapter {
+    func shutdown() async
 }
 
 public enum AccountRefreshOutcome: Sendable {

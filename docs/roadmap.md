@@ -117,11 +117,17 @@ returned limit window. Deterministic two-profile tests and an opt-in live smoke 
 long-running per-profile supervisor now reuses the supported app-server process, refetches sparse
 update notifications, marks disconnects honestly, and reconnects with bounded backoff. Its request
 transport is asynchronous and deadline-bound, account lifecycle changes reconcile monitors, and
-shutdown proves the old process is reaped before replacement. Explicit onboarding and production
-app configuration remain before Codex promotion is complete. The nonvisual onboarding boundary now
-keeps discovery read-only, classifies identity and credential conflicts, adds only the selected
-candidate, enforces one account per real credential source, and exposes rename, enable, disable,
-single-account refresh, and removal. The compatibility-provider spikes remain isolated.
+shutdown proves the old process is reaped before replacement. The production app now registers the
+current or an explicitly chosen `CODEX_HOME`, supersedes the simulated Codex fixture while a real
+account is registered, and keeps all registered profiles in one shared adapter. Runtime replacement
+explicitly closes the previous adapter. The account boundary keeps discovery read-only, classifies
+identity and credential
+conflicts, adds only the selected candidate, enforces one account per real credential source, and
+rolls back registration when the initial refresh fails. It exposes rename, enable, disable,
+single-account refresh, and removal. Isolated native UI checks have
+verified add, restart, rename, disable, re-enable, live bucket rendering, and accessibility labels.
+Removal behavior is covered by store and coordinator tests. The compatibility-provider spikes
+remain isolated.
 
 - Promote validated feasibility spikes into production adapters.
 - Add provider-specific account discovery, login, reauthentication, and removal behavior.

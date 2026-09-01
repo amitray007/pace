@@ -36,6 +36,26 @@ struct CodexProviderAdapterTests {
     }
 
     @Test
+    func `uses the verified email when a profile has no local display name`() async throws {
+        let profile = CodexProfile(
+            directory: URL(filePath: "/profiles/codex/default", directoryHint: .isDirectory),
+            ownership: .existing,
+        )
+        let reader = CodexStubReader(results: [
+            profile.directory.path: .success(profileSnapshot(email: "person@example.invalid")),
+        ])
+        let adapter = CodexProviderAdapter(
+            profiles: [profile],
+            reader: reader,
+            now: { observedAt },
+        )
+
+        let account = try #require(await adapter.discoverAccounts().first)
+
+        #expect(account.suggestedDisplayName == "person@example.invalid")
+    }
+
+    @Test
     func `refresh verifies identity and owns snapshots with the selected account`() async throws {
         let profile = profile("personal", displayName: "Personal")
         let reader = CodexStubReader(results: [
@@ -235,6 +255,10 @@ private actor CodexStubReader: CodexProfileSessionReading {
         pair.continuation.finish()
         return pair.stream
     }
+
+    func shutdown() {}
+
+    func close(profile _: CodexProfile) {}
 }
 
 private final class CodexMonitoringStubReader: @unchecked Sendable {
@@ -269,4 +293,8 @@ extension CodexMonitoringStubReader: CodexProfileSessionReading {
     ) throws(CodexProviderError) -> AsyncStream<CodexProfileEvent> {
         stream
     }
+
+    func shutdown() {}
+
+    func close(profile _: CodexProfile) {}
 }
