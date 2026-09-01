@@ -25,7 +25,8 @@ final class PacePresentationModel {
     /// happen.
     private(set) var nextRefreshAt: Date?
 
-    private var automaticRefreshTask: Task<Void, Never>?
+    /// Held here rather than in the extension, which cannot store state.
+    var automaticRefreshTask: Task<Void, Never>?
     private(set) var isChangingLaunchAtLogin = false
     var isChangingNotificationAuthorization = false
     private(set) var isRefreshing = false
@@ -217,40 +218,17 @@ final class PacePresentationModel {
     /// minutes matches the providers' own baseline so it adds no extra load.
     static let automaticRefreshInterval: TimeInterval = 900
 
-    /// Runs an automatic refresh on a repeating schedule.
-    ///
-    /// Without this, usage only updated at launch or when the user pressed
-    /// refresh, so a panel left open drifted further out of date the longer it
-    /// stayed open.
-    func startAutomaticRefresh() {
-        guard automaticRefreshTask == nil, !isReferencePreview else {
-            return
-        }
-        scheduleNextRefresh()
-        automaticRefreshTask = Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(
-                    for: .seconds(Self.automaticRefreshInterval),
-                )
-                guard !Task.isCancelled else {
-                    return
-                }
-                await self?.refreshAll()
-            }
-        }
-    }
-
-    func stopAutomaticRefresh() {
-        automaticRefreshTask?.cancel()
-        automaticRefreshTask = nil
-        nextRefreshAt = nil
-    }
-
-    private func scheduleNextRefresh() {
+    /// Records when the next automatic refresh is due. Lives here because
+    /// `nextRefreshAt` is private(set) to this type.
+    func scheduleNextRefresh() {
         guard !isReferencePreview else {
             return
         }
         nextRefreshAt = Date().addingTimeInterval(Self.automaticRefreshInterval)
+    }
+
+    func clearNextRefresh() {
+        nextRefreshAt = nil
     }
 
     func refreshAll() async {
@@ -424,6 +402,18 @@ extension PacePresentationModel {
 
     func setHideRailInFullScreen(_ isHidden: Bool) {
         updatePreferences { $0.hideRailInFullScreen = isHidden }
+    }
+
+    func setHidesAccountIdentity(_ hidesAccountIdentity: Bool) {
+        updatePreferences { $0.hidesAccountIdentity = hidesAccountIdentity }
+    }
+
+    func setTimeFormat(_ timeFormat: PaceTimeFormat) {
+        updatePreferences { $0.timeFormat = timeFormat }
+    }
+
+    func setUsageDisplayMode(_ mode: UsageDisplayMode) {
+        updatePreferences { $0.usageDisplayMode = mode }
     }
 
     func moveProvider(_ providerID: ProviderID, by offset: Int) {
