@@ -402,23 +402,19 @@ final class RailDetailContentLayerView: NSView {
         guard currentOpacity != targetOpacity else {
             return
         }
+        // The panel appears rather than fading in, so its shell and its
+        // contents can never arrive at different times.
+        guard RailMotion.animatesDetailAppearance || !isReveal else {
+            layer.removeAnimation(forKey: "pace.detailOpacity")
+            return
+        }
         let animation = CABasicAnimation(keyPath: "opacity")
         animation.fromValue = currentOpacity
         animation.toValue = targetOpacity
-        // The content's fade is derived from the shell's own transition, so it
-        // finishes exactly when the panel stops expanding rather than settling
-        // inside a shape that is still moving.
-        let transition = RailMotion.Transition.detail
         animation.duration = reducesMotion
             ? RailMotion.reducedMotionFadeDuration
-            : isVisible
-            ? transition.contentDuration
             : RailMotion.contentDismissDuration
         animation.timingFunction = RailMotion.timingFunction
-        if isVisible, isReveal, !reducesMotion {
-            animation.beginTime = CACurrentMediaTime() + transition.contentDelay
-            animation.fillMode = .backwards
-        }
         layer.add(animation, forKey: "pace.detailOpacity")
     }
 

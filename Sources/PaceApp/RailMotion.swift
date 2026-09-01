@@ -22,7 +22,11 @@ enum RailMotion {
     static let speedFactor: CFTimeInterval = 0.75
 
     /// The mini handle grows to the full rail. Measured at 0.250 s.
-    static let revealDuration = 0.25 * speedFactor
+    ///
+    /// Opening is scaled harder than the rest. Hovering the handle is the one
+    /// moment the user is waiting on the rail rather than reading it, so the
+    /// reveal answers the pointer almost immediately.
+    static let revealDuration = 0.25 * speedFactor * 0.6
 
     /// The rail collapses back to the mini handle. Measured at 0.300 s.
     /// Dismissal is slower than reveal in the reference, so leaving does not
@@ -45,15 +49,23 @@ enum RailMotion {
     ///
     /// The content's fade occupies the remainder, so it always finishes exactly
     /// when the shell stops moving. Expressing it this way means the two cannot
-    /// drift apart: fixed content timings used to finish at 0.22 s against a
-    /// 0.37 s shell, leaving content fully drawn inside a panel that was still
-    /// expanding.
+    /// drift apart.
     static let contentRevealDelayFraction: CFTimeInterval = 0.3
 
     /// Fraction of a shell transition that the content's own fade occupies.
     static var contentFadeFraction: CFTimeInterval {
         1 - contentRevealDelayFraction
     }
+
+    /// The attached detail panel appears rather than animating open.
+    ///
+    /// The panel is read and dismissed in about a second, so an entrance is
+    /// time spent waiting to read it. Appearing also removes any chance of the
+    /// shell and its contents arriving separately, which is what made the bars
+    /// show up before the panel behind them. The panel still moves between
+    /// provider rows, because that movement is what ties it to the ring it
+    /// belongs to.
+    static let animatesDetailAppearance = false
 
     /// Fitted from the reference reveal, 0.010 root-mean-square.
     static let timingFunction = CAMediaTimingFunction(

@@ -36,6 +36,7 @@ final class RailShellLayerView: NSView {
     private var lastDetailCenterY: CGFloat = 92
     private var detailHeight = EdgeRailGeometry.detailHeight(quotaCount: 2)
     private var showsSettingsCircle = false
+    private var hasShownDetail = false
     private var hasReceivedState = false
     private var reducesMotion = false
 
@@ -204,16 +205,25 @@ final class RailShellLayerView: NSView {
         updateDetailPath(animated: animated, transition: transition)
     }
 
+    /// The detail card's shape.
+    ///
+    /// It appears rather than growing, matching its contents, and only animates
+    /// when travelling between provider rows.
     private func updateDetailPath(
         animated: Bool,
         transition: RailMotion.Transition,
     ) {
+        let isAppearing = previewState.detailProviderID == nil ||
+            !hasShownDetail
+        let animatesShape = animated &&
+            (RailMotion.animatesDetailAppearance || !isAppearing)
+        hasShownDetail = previewState.detailProviderID != nil
         guard previewState.detailProviderID != nil else {
             set(
                 detailLayer,
                 path: transformed(RailShellPaths.collapsedDetail(centerY: lastDetailCenterY)),
                 opacity: 1,
-                animated: animated,
+                animated: animatesShape,
                 transition: transition,
             )
             return
@@ -225,7 +235,7 @@ final class RailShellLayerView: NSView {
                 RailShellPaths.detail(centerY: centerY, panelHeight: detailHeight),
             ),
             opacity: 1,
-            animated: animated,
+            animated: animatesShape,
             transition: transition,
         )
     }
