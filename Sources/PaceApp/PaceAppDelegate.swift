@@ -32,6 +32,10 @@ final class PaceAppDelegate: NSObject, NSApplicationDelegate {
         model.stopProviderUpdates()
     }
 
+    func applicationDidBecomeActive(_: Notification) {
+        model.refreshLaunchAtLoginStatus()
+    }
+
     func applicationShouldTerminate(
         _ sender: NSApplication,
     ) -> NSApplication.TerminateReply {

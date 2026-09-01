@@ -313,6 +313,9 @@ hit-testing control.
 - Record provider, account, bucket, source, observation time, and error state.
 - Keep polling local where possible and use provider-safe intervals.
 - Keep notification evaluation local and opt-in.
+- Treat Service Management as the source of truth for launch at login. Pace reads registration
+  status at launch and when it becomes active, changes it only after an explicit Settings toggle,
+  and sends approval-required users to Login Items only after they press the provided button.
 - Redact account identifiers from diagnostics unless the user explicitly exports them.
 
 ## Unresolved implementation checks

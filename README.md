@@ -28,6 +28,10 @@ selection. Interruptible motion, pointer-safe activation, keyboard access, and h
 states are implemented; hardware interaction testing and final reference-media approval remain
 open.
 
+Launch at login is opt-in through the native Settings surface. macOS Service Management remains the
+source of truth, and Pace never opens Login Items or changes registration without a direct user
+action. A signed-build login-cycle check remains part of release validation.
+
 A production-separated Codex adapter and its original Swift spike read limits through the supported
 local app-server protocol without copying account tokens or calling private web endpoints. The
 adapter supports explicit isolated `CODEX_HOME` profiles, reuses one supervised process per

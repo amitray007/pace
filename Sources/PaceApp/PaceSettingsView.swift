@@ -52,6 +52,43 @@ struct PaceSettingsView: View {
                         Text(position.label).tag(position)
                     }
                 }
+
+                if !model.isReferencePreview {
+                    Toggle(
+                        "Launch Pace at login",
+                        isOn: Binding(
+                            get: { model.launchesAtLogin },
+                            set: model.setLaunchAtLogin,
+                        ),
+                    )
+                    .disabled(
+                        model.isChangingLaunchAtLogin
+                            || model.launchAtLoginStatus == .unavailable,
+                    )
+
+                    if model.launchAtLoginStatus == .requiresApproval {
+                        HStack(spacing: 8) {
+                            Label(
+                                "Approval is required in Login Items.",
+                                systemImage: "exclamationmark.triangle",
+                            )
+                            .foregroundStyle(.orange)
+                            Spacer()
+                            Button("Open Login Items") {
+                                model.openLoginItemsSettings()
+                            }
+                        }
+                    } else if model.launchAtLoginStatus == .unavailable {
+                        Text("Launch at login is unavailable in this build.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let launchAtLoginError = model.launchAtLoginError {
+                        Label(launchAtLoginError, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.orange)
+                    }
+                }
             }
 
             Section("Providers") {

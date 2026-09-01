@@ -3,46 +3,18 @@ import Observation
 import PaceCore
 import PaceProviders
 
-enum RailPreviewState: String, CaseIterable, Identifiable {
-    case claude
-    case codex
-    case cursor
-    case githubCopilot
-    case grok
-    case mini
-    case rail
-
-    var id: Self {
-        self
-    }
-
-    var detailProviderID: ProviderID? {
-        switch self {
-        case .claude:
-            .claude
-        case .codex:
-            .codex
-        case .cursor:
-            .cursor
-        case .githubCopilot:
-            .githubCopilot
-        case .grok:
-            .grok
-        case .mini, .rail:
-            nil
-        }
-    }
-}
-
 @MainActor
 @Observable
 final class PacePresentationModel {
     var state = PaceState()
     private(set) var preferences: PacePreferences
     private(set) var loadingError: String?
+    private(set) var launchAtLoginError: String?
+    private(set) var launchAtLoginStatus: LaunchAtLoginStatus
     private(set) var preferencesError: String?
     private(set) var refreshError: String?
     private(set) var isLoading = true
+    private(set) var isChangingLaunchAtLogin = false
     private(set) var isRefreshing = false
     var availableGitHubCopilotLogins: [String] = []
     var accountActionError: String?
@@ -58,6 +30,7 @@ final class PacePresentationModel {
     let isReferencePreview: Bool
     private let simulatedPresentationState: SimulatedPresentationState
     private let preferencesPersistence: any PacePreferencesPersistence
+    private let launchAtLoginSetting: LaunchAtLoginSetting
     private let statePersistence: any PaceStatePersistence
     private var hasStarted = false
     private var preferencesStore: PacePreferencesStore?
@@ -77,6 +50,7 @@ final class PacePresentationModel {
         preferencesPersistence: any PacePreferencesPersistence =
             InMemoryPacePreferencesPersistence(),
         statePersistence: any PaceStatePersistence = InMemoryPaceStatePersistence(),
+        launchAtLoginService: any LaunchAtLoginService = SystemLaunchAtLoginService(),
     ) {
         let previewState = environment["PACE_REFERENCE_PREVIEW"]
             .flatMap(RailPreviewState.init(rawValue:))
@@ -93,6 +67,8 @@ final class PacePresentationModel {
             initialPreferences.activationMode = previewActivation
         }
         preferences = initialPreferences
+        launchAtLoginSetting = LaunchAtLoginSetting(service: launchAtLoginService)
+        launchAtLoginStatus = launchAtLoginSetting.status
         railPreviewState = previewState ?? .mini
         isReferencePreview = previewState != nil
         forcesIncreasedContrast = environment["PACE_REFERENCE_CONTRAST"] == "increased"
@@ -154,6 +130,7 @@ final class PacePresentationModel {
         }
 
         if !isReferencePreview {
+            refreshLaunchAtLoginStatus()
             do {
                 let preferencesStore = try await PacePreferencesStore.open(
                     persistence: preferencesPersistence,
@@ -351,6 +328,33 @@ final class PacePresentationModel {
 }
 
 extension PacePresentationModel {
+    var launchesAtLogin: Bool {
+        launchAtLoginSetting.isRegistered
+    }
+
+    func refreshLaunchAtLoginStatus() {
+        launchAtLoginSetting.refresh()
+        launchAtLoginStatus = launchAtLoginSetting.status
+    }
+
+    func setLaunchAtLogin(_ isEnabled: Bool) {
+        guard !isReferencePreview, !isChangingLaunchAtLogin else {
+            return
+        }
+        isChangingLaunchAtLogin = true
+        defer { isChangingLaunchAtLogin = false }
+
+        launchAtLoginSetting.setEnabled(isEnabled)
+        launchAtLoginStatus = launchAtLoginSetting.status
+        launchAtLoginError = launchAtLoginSetting.lastOperationFailed
+            ? "Pace could not update Login Items. Check System Settings and try again."
+            : nil
+    }
+
+    func openLoginItemsSettings() {
+        launchAtLoginSetting.openSystemSettings()
+    }
+
     func toggleRail() {
         setRailVisible(!isRailVisible)
     }

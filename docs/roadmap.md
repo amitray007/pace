@@ -99,7 +99,8 @@ missing-bucket, signed-out, unavailable, and failed states without turning missi
 Observation time, last-good stale data, text-and-symbol status, VoiceOver descriptions, direct
 provider and account shortcuts, keyboard-reachable quota rows, manual refresh, reduced motion,
 increased-contrast tracks, and owner-only normalized state persistence are wired. Launch-at-login
-and notification checks remain.
+now uses native Service Management with explicit registration, approval, failure, and external
+status handling. A signed-build integration check and notification behavior remain.
 
 - Add menu-bar, rail, and both presentation settings.
 - Add one-provider-at-a-time details and per-provider account selection.

@@ -129,6 +129,11 @@ Keep settings grouped by user intent:
 4. **Notifications:** thresholds, quiet hours, reset reminders, stale-data warnings.
 5. **Accessibility:** reduced motion, contrast, text scale, keyboard shortcuts.
 
+The Surfaces group also contains the native Launch Pace at login toggle. It reflects Service
+Management state instead of a copied preference. Registration is opt-in. If macOS reports that the
+registered item requires approval, Pace keeps the toggle on, explains the state, and opens Login
+Items only after the user chooses that action.
+
 GitHub Copilot account setup stays explicit. Clicking Add GitHub Copilot account asks GitHub CLI
 for its healthy `github.com` accounts, excludes accounts already registered in Pace, and presents
 the remaining usernames in the existing Settings surface. Discovery does not register anything.
