@@ -54,6 +54,22 @@ extension PacePresentationModel {
         isReferencePreview ? SimulatedScenarios.referenceDate : Date()
     }
 
+    /// The account name to show.
+    ///
+    /// Normally the account's own name. When identities are hidden it becomes
+    /// the provider's name, so the row still says which account is selected
+    /// without publishing its address.
+    func displayName(for account: ProviderAccount) -> String {
+        redactsAccountIdentity
+            ? ProviderStyle.resolve(account.providerID).name + " account"
+            : account.displayName
+    }
+
+    /// Whether addresses are currently hidden.
+    var redactsAccountIdentity: Bool {
+        forcesRedactedIdentity || preferences.hidesAccountIdentity
+    }
+
     func snapshots(for accountID: AccountID) -> [LimitSnapshot] {
         state.snapshots
             .filter { $0.id.accountID == accountID }

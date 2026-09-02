@@ -12,6 +12,7 @@ private struct EdgeDetailPanel: View {
     let nextRefreshAt: Date?
     let isRefreshing: Bool
     let referenceDate: Date
+    let accountName: String
 
     var body: some View {
         let style = ProviderStyle.resolve(providerID)
@@ -75,7 +76,7 @@ private struct EdgeDetailPanel: View {
         .foregroundStyle(.white)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(
-            "\(style.name) usage for \(account?.displayName ?? "no account"). " +
+            "\(style.name) usage for \(accountName). " +
                 "\(presentation.title). \(presentation.detail)",
         )
     }
@@ -150,6 +151,7 @@ struct RailDetailContent: Equatable {
     /// so a second-by-second value would make this unequal on every pass
     /// without changing anything on screen.
     let referenceDate: Date
+    let accountName: String
 }
 
 struct RailDetailContentLayerRepresentable: NSViewRepresentable {
@@ -324,6 +326,7 @@ final class RailDetailContentLayerView: NSView {
             nextRefreshAt: content.nextRefreshAt,
             isRefreshing: content.isRefreshing,
             referenceDate: content.referenceDate,
+            accountName: content.accountName,
         )
     }
 

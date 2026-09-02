@@ -63,6 +63,26 @@ struct MenuBarPresentationTests {
     }
 
     @Test
+    func `account addresses are shown unless hiding is turned on`() {
+        // Hiding is for screenshots and screen sharing, so it must be a
+        // deliberate choice rather than something Pace decides.
+        #expect(PacePreferences().hidesAccountIdentity == false)
+    }
+
+    @Test
+    func `preferences stored before identity hiding existed still load`() throws {
+        let stored = """
+        {"version": 2, "surfaceMode": "menuBar"}
+        """
+        let preferences = try JSONDecoder().decode(
+            PacePreferences.self,
+            from: Data(stored.utf8),
+        )
+
+        #expect(preferences.hidesAccountIdentity == false)
+    }
+
+    @Test
     func `a slot round trips through storage`() throws {
         let preferences = PacePreferences(
             menuBar: MenuBarPresentation(

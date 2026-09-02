@@ -29,6 +29,11 @@ extension PacePresentationModel {
         updatePreferences { $0.menuBar.tint = tint }
     }
 
+    /// Hides account addresses across every surface.
+    func setHidesAccountIdentity(_ hidesAccountIdentity: Bool) {
+        updatePreferences { $0.hidesAccountIdentity = hidesAccountIdentity }
+    }
+
     func setMenuBarShowsPercentSign(_ showsPercentSign: Bool) {
         updatePreferences { $0.menuBar.showsPercentSign = showsPercentSign }
     }

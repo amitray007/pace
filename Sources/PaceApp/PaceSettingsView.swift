@@ -9,6 +9,18 @@ struct PaceSettingsView: View {
         Form {
             Section("Surfaces") {
                 Toggle(
+                    "Hide account addresses",
+                    isOn: Binding(
+                        get: { model.preferences.hidesAccountIdentity },
+                        set: model.setHidesAccountIdentity,
+                    ),
+                )
+                .help(
+                    "Shows the provider name instead of the account address in "
+                        + "every surface, for screenshots and screen sharing.",
+                )
+
+                Toggle(
                     "Show edge rail",
                     isOn: Binding(
                         get: { model.isRailVisible },

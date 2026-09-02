@@ -192,7 +192,7 @@ struct MenuPanelView: View {
                 ),
             ) {
                 ForEach(accounts) { account in
-                    Text(account.displayName).tag(account.id)
+                    Text(model.displayName(for: account)).tag(account.id)
                 }
             }
             .labelsHidden()
@@ -225,6 +225,7 @@ struct MenuPanelView: View {
                     status: model.usageStatus(for: account),
                     accent: ProviderStyle.resolve(model.activeProviderID).accent,
                     increasedContrast: usesIncreasedContrast,
+                    displayName: model.displayName(for: account),
                 )
             }
         }
@@ -313,7 +314,7 @@ struct MenuPanelView: View {
         guard let account = model.selectedAccount else {
             return "No account"
         }
-        return [account.displayName, account.planName]
+        return [model.displayName(for: account), account.planName]
             .compactMap(\.self)
             .joined(separator: " · ")
     }

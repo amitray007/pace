@@ -235,6 +235,7 @@ struct EdgeRailView: View {
                 isRefreshing: model.isRefreshing || model.isPerformingFirstRefresh,
                 referenceDate: model.presentationReferenceDate
                     .rounded(toNearest: 60),
+                accountName: account.map(model.displayName(for:)) ?? "no account",
             )
         }
     }

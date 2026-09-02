@@ -111,6 +111,13 @@ public struct PacePreferences: Codable, Equatable, Sendable {
     public var providerOrder: [ProviderID]
     public var menuBar: MenuBarPresentation
 
+    /// Whether account addresses are hidden in every surface.
+    ///
+    /// For screen sharing, screenshots, and bug reports: the account is still
+    /// identified by its provider and plan, so the surfaces stay readable
+    /// without publishing an address.
+    public var hidesAccountIdentity: Bool
+
     public init(
         version: Int = Self.currentVersion,
         surfaceMode: PaceSurfaceMode = .menuBar,
@@ -126,6 +133,7 @@ public struct PacePreferences: Codable, Equatable, Sendable {
         notificationPolicy: PaceNotificationPolicy = .disabled,
         providerOrder: [ProviderID] = Self.defaultProviderOrder,
         menuBar: MenuBarPresentation = MenuBarPresentation(),
+        hidesAccountIdentity: Bool = false,
     ) {
         self.version = version
         self.surfaceMode = surfaceMode
@@ -141,6 +149,7 @@ public struct PacePreferences: Codable, Equatable, Sendable {
         self.notificationPolicy = notificationPolicy
         self.providerOrder = Self.normalizedProviderOrder(providerOrder)
         self.menuBar = menuBar
+        self.hidesAccountIdentity = hidesAccountIdentity
     }
 
     public init(from decoder: any Decoder) throws {
@@ -183,6 +192,7 @@ public struct PacePreferences: Codable, Equatable, Sendable {
                 default: Self.defaultProviderOrder,
             ),
             menuBar: container.value(.menuBar, default: MenuBarPresentation()),
+            hidesAccountIdentity: container.value(.hidesAccountIdentity, default: false),
         )
     }
 

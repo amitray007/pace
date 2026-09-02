@@ -113,6 +113,9 @@ struct AllAccountsRow: View {
     let status: AccountUsageStatus
     let accent: Color
     let increasedContrast: Bool
+    /// Passed in rather than read off the account so the row honours the
+    /// hide-identity preference.
+    let displayName: String
 
     var body: some View {
         let urgent = snapshots.max { $0.usedFraction < $1.usedFraction }
@@ -122,12 +125,12 @@ struct AllAccountsRow: View {
                 .fill(accent.opacity(0.16))
                 .frame(width: 30, height: 30)
                 .overlay {
-                    Text(account.displayName.prefix(1))
+                    Text(displayName.prefix(1))
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(accent)
                 }
             VStack(alignment: .leading, spacing: 2) {
-                Text(account.displayName)
+                Text(displayName)
                     .font(.system(size: 12, weight: .semibold))
                 Text("\(account.planName ?? "Plan unavailable") · \(presentation.title)")
                     .font(.system(size: 10))
@@ -154,7 +157,7 @@ struct AllAccountsRow: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "\(account.displayName), \(presentation.title). \(presentation.detail)",
+            "\(displayName), \(presentation.title). \(presentation.detail)",
         )
         .focusable()
     }

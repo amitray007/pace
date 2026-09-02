@@ -62,6 +62,11 @@ final class PacePresentationModel {
     let defaultGrokProfileDirectory: URL
 
     let isReferencePreview: Bool
+
+    /// Forces identity redaction regardless of the stored preference, so an
+    /// automated documentation capture never depends on how Pace is configured
+    /// on the machine running it.
+    let forcesRedactedIdentity: Bool
     let simulatedPresentationState: SimulatedPresentationState
     let preferencesPersistence: any PacePreferencesPersistence
     private let launchAtLoginSetting: LaunchAtLoginSetting
@@ -119,6 +124,7 @@ final class PacePresentationModel {
         railPreviewState = previewState ?? .mini
         isReferencePreview = previewState != nil
         forcesIncreasedContrast = environment["PACE_REFERENCE_CONTRAST"] == "increased"
+        forcesRedactedIdentity = environment["PACE_REDACT_IDENTITY"] == "1"
         defaultClaudeProfile = ClaudeProfile.current(environment: environment)
         defaultCodexProfileDirectory = environment["CODEX_HOME"]
             .map { URL(filePath: $0, directoryHint: .isDirectory) }
