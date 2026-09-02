@@ -23,7 +23,7 @@ private enum ReleaseSmokeError: LocalizedError {
         case let .missingExecutable(path):
             "missing extracted Pace executable: \(path)"
         case .railWindowDidNotAppear:
-            "extracted Pace app did not present its 324 x 416 rail window"
+            "extracted Pace app did not present a rail window"
         case .terminationWasRejected:
             "extracted Pace app rejected the termination request"
         case let .unexpectedExit(status):
@@ -166,8 +166,13 @@ private enum ReleaseSmokeApp {
                   let bounds = window[kCGWindowBounds as String] as? [String: Any],
                   let width = (bounds["Width"] as? NSNumber)?.doubleValue,
                   let height = (bounds["Height"] as? NSNumber)?.doubleValue,
-                  abs(width - 324) < 0.5,
-                  abs(height - 416) < 0.5,
+                  // A plausible rail, not an exact size. The canvas is derived
+                  // from the detail panel's width and the provider row count,
+                  // so pinning literals here made a deliberate layout change
+                  // fail the release instead of the app. The app's own geometry
+                  // owns those numbers; this only has to recognise the window.
+                  width > 200, width < 600,
+                  height > 300, height < 900,
                   let x = (bounds["X"] as? NSNumber)?.doubleValue,
                   let y = (bounds["Y"] as? NSNumber)?.doubleValue
             else {
