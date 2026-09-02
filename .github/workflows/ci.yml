@@ -65,6 +65,21 @@ jobs:
       - name: build
         run: make build
 
+  secrets:
+    name: secret scan
+    # Runs on every pull request and push. The repository is public, so a
+    # secret committed once is exposed even if a later commit removes it;
+    # this catches it before the push lands rather than after.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0 # scan history, not just the tip
+
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
   release-preflight:
     name: release bundle verification
     # macos-26 rather than macos-15: the older image's newest toolchain is
