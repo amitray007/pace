@@ -18,7 +18,7 @@ struct MenuBarSettingsContent: View {
             "Colour",
             selection: Binding(
                 get: { model.preferences.menuBar.tint },
-                set: model.setMenuBarTint,
+                set: { model.setMenuBarTint($0) },
             ),
         ) {
             ForEach(MenuBarTint.allCases, id: \.self) { tint in
@@ -31,7 +31,7 @@ struct MenuBarSettingsContent: View {
             "Show percent sign",
             isOn: Binding(
                 get: { model.preferences.menuBar.showsPercentSign },
-                set: model.setMenuBarShowsPercentSign,
+                set: { model.setMenuBarShowsPercentSign($0) },
             ),
         )
         .disabled(model.preferences.menuBar.slots.isEmpty)

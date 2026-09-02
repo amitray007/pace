@@ -10,7 +10,7 @@ struct PaceNotificationSettingsContent: View {
                 "Usage threshold alerts",
                 isOn: Binding(
                     get: { model.usageNotificationsEnabled },
-                    set: model.setUsageNotificationsEnabled,
+                    set: { model.setUsageNotificationsEnabled($0) },
                 ),
             )
 
@@ -21,7 +21,7 @@ struct PaceNotificationSettingsContent: View {
                     Slider(
                         value: Binding(
                             get: { model.notificationUsageThreshold },
-                            set: model.setNotificationUsageThreshold,
+                            set: { model.setNotificationUsageThreshold($0) },
                         ),
                         in: 0.5 ... 0.95,
                         step: 0.05,
@@ -47,7 +47,7 @@ struct PaceNotificationSettingsContent: View {
                 "Reset reminders",
                 isOn: Binding(
                     get: { model.resetNotificationsEnabled },
-                    set: model.setResetNotificationsEnabled,
+                    set: { model.setResetNotificationsEnabled($0) },
                 ),
             )
 
@@ -56,7 +56,7 @@ struct PaceNotificationSettingsContent: View {
                     "Remind before reset",
                     selection: Binding(
                         get: { model.notificationResetLeadTime },
-                        set: model.setNotificationResetLeadTime,
+                        set: { model.setNotificationResetLeadTime($0) },
                     ),
                 ) {
                     Text("15 minutes").tag(TimeInterval(15 * 60))
@@ -71,7 +71,7 @@ struct PaceNotificationSettingsContent: View {
                 "Warn when data becomes stale",
                 isOn: Binding(
                     get: { model.staleDataNotificationsEnabled },
-                    set: model.setStaleDataNotificationsEnabled,
+                    set: { model.setStaleDataNotificationsEnabled($0) },
                 ),
             )
 
@@ -79,7 +79,7 @@ struct PaceNotificationSettingsContent: View {
                 "Quiet hours",
                 isOn: Binding(
                     get: { model.quietHoursEnabled },
-                    set: model.setQuietHoursEnabled,
+                    set: { model.setQuietHoursEnabled($0) },
                 ),
             )
 
@@ -88,7 +88,7 @@ struct PaceNotificationSettingsContent: View {
                     "Quiet from",
                     selection: Binding(
                         get: { model.quietHoursStartDate },
-                        set: model.setQuietHoursStartDate,
+                        set: { model.setQuietHoursStartDate($0) },
                     ),
                     displayedComponents: .hourAndMinute,
                 )
@@ -96,7 +96,7 @@ struct PaceNotificationSettingsContent: View {
                     "Quiet until",
                     selection: Binding(
                         get: { model.quietHoursEndDate },
-                        set: model.setQuietHoursEndDate,
+                        set: { model.setQuietHoursEndDate($0) },
                     ),
                     displayedComponents: .hourAndMinute,
                 )

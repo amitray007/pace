@@ -2,6 +2,14 @@ import Foundation
 import PaceCore
 import SwiftUI
 
+/// The settings surface.
+///
+/// Every `Binding` setter here is written as an explicit closure rather than
+/// as a reference to the model's method. The app builds with
+/// `SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor`, so passing a method directly
+/// makes the compiler emit an isolation-carrying reabstraction thunk, and
+/// generating IR for those thunks crashes Swift 6.2 and 6.3 while compiling
+/// this file. Calling the method inside a closure avoids the conversion.
 struct PaceSettingsView: View {
     @Bindable var model: PacePresentationModel
 
@@ -30,7 +38,7 @@ struct PaceSettingsView: View {
                 "Hide account addresses",
                 isOn: Binding(
                     get: { model.preferences.hidesAccountIdentity },
-                    set: model.setHidesAccountIdentity,
+                    set: { model.setHidesAccountIdentity($0) },
                 ),
             )
             .help(
@@ -42,7 +50,7 @@ struct PaceSettingsView: View {
                 "Show edge rail",
                 isOn: Binding(
                     get: { model.isRailVisible },
-                    set: model.setRailVisible,
+                    set: { model.setRailVisible($0) },
                 ),
             )
 
@@ -50,7 +58,7 @@ struct PaceSettingsView: View {
                 "Screen edge",
                 selection: Binding(
                     get: { model.preferences.railEdge },
-                    set: model.setRailEdge,
+                    set: { model.setRailEdge($0) },
                 ),
             ) {
                 ForEach(RailEdge.allCases, id: \.self) { edge in
@@ -62,7 +70,7 @@ struct PaceSettingsView: View {
                 "Rail size",
                 selection: Binding(
                     get: { model.preferences.railScale },
-                    set: model.setRailScale,
+                    set: { model.setRailScale($0) },
                 ),
             ) {
                 ForEach(RailScale.allCases, id: \.self) { scale in
@@ -74,7 +82,7 @@ struct PaceSettingsView: View {
                 "Display",
                 selection: Binding(
                     get: { model.preferences.selectedDisplayID },
-                    set: model.setSelectedDisplayID,
+                    set: { model.setSelectedDisplayID($0) },
                 ),
             ) {
                 Text("Main display").tag(String?.none)
@@ -87,7 +95,7 @@ struct PaceSettingsView: View {
                 "Vertical position",
                 selection: Binding(
                     get: { model.preferences.railVerticalPosition },
-                    set: model.setRailVerticalPosition,
+                    set: { model.setRailVerticalPosition($0) },
                 ),
             ) {
                 ForEach(RailVerticalPosition.allCases, id: \.self) { position in
@@ -100,7 +108,7 @@ struct PaceSettingsView: View {
                     "Launch Pace at login",
                     isOn: Binding(
                         get: { model.launchesAtLogin },
-                        set: model.setLaunchAtLogin,
+                        set: { model.setLaunchAtLogin($0) },
                     ),
                 )
                 .disabled(
@@ -182,7 +190,7 @@ struct PaceSettingsView: View {
                 "Open rail",
                 selection: Binding(
                     get: { model.preferences.activationMode },
-                    set: model.setActivationMode,
+                    set: { model.setActivationMode($0) },
                 ),
             ) {
                 ForEach(RailActivationMode.allCases, id: \.self) { mode in
@@ -214,7 +222,7 @@ struct PaceSettingsView: View {
                     "Hover delay",
                     value: Binding(
                         get: { model.preferences.dwellDelay },
-                        set: model.setDwellDelay,
+                        set: { model.setDwellDelay($0) },
                     ),
                     range: 0.2 ... 2,
                 )
@@ -224,7 +232,7 @@ struct PaceSettingsView: View {
                 "Dismissal grace",
                 value: Binding(
                     get: { model.preferences.dismissalDelay },
-                    set: model.setDismissalDelay,
+                    set: { model.setDismissalDelay($0) },
                 ),
                 range: 0.1 ... 2,
             )
@@ -233,7 +241,7 @@ struct PaceSettingsView: View {
                 "Hide in full-screen apps",
                 isOn: Binding(
                     get: { model.preferences.hideRailInFullScreen },
-                    set: model.setHideRailInFullScreen,
+                    set: { model.setHideRailInFullScreen($0) },
                 ),
             )
         }
