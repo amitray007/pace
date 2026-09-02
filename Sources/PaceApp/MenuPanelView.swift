@@ -36,9 +36,7 @@ struct MenuPanelView: View {
                 selectedAccountContent
             }
 
-            // Breathing room between the last quota row and the footer rule.
-            // Without it the divider sat directly on the final row's text.
-            Spacer(minLength: 6)
+            refreshSchedule
             Divider().overlay(Color.white.opacity(dividerOpacity))
             footer
         }
@@ -134,12 +132,6 @@ struct MenuPanelView: View {
                 Text(ProviderStyle.resolve(model.activeProviderID).name)
                     .font(.system(size: 14, weight: .semibold))
                 Spacer()
-                // The countdown sits with the provider identity, so the answer
-                // to "when does this change" is on the line the eye lands on.
-                RefreshCountdownView(
-                    nextRefreshAt: model.nextRefreshAt,
-                    isRefreshing: model.isRefreshing,
-                )
                 if model.accounts(for: model.activeProviderID).count > 1 {
                     Button("All accounts") {
                         showsAllAccounts = true
@@ -158,9 +150,15 @@ struct MenuPanelView: View {
             }
             .font(.system(size: 9.5, weight: .medium))
 
-            Text(selectedStatusSubtitle)
-                .font(.system(size: 9))
-                .foregroundStyle(.secondary)
+            // Only a problem is stated here. When the data is healthy its
+            // observation time sits beside the refresh countdown instead, so
+            // the two time facts read together rather than bracketing the
+            // quotas.
+            if let detail = selectedStatusDetail {
+                Text(detail)
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+            }
 
             accountPicker
         }
@@ -220,6 +218,38 @@ struct MenuPanelView: View {
             Spacer()
         }
         .padding(16)
+    }
+
+    /// When the next automatic refresh lands, stated just above the refresh
+    /// control.
+    ///
+    /// This sits with the refresh button rather than in the account header. The
+    /// header answers "whose usage is this"; the countdown answers "when does
+    /// this change", which is the same question the refresh button answers, so
+    /// the two belong together. It also keeps a moving number away from the
+    /// identity line, where it drew the eye away from the reading.
+    private var refreshSchedule: some View {
+        HStack(spacing: 8) {
+            RefreshCountdownView(
+                nextRefreshAt: model.nextRefreshAt,
+                isRefreshing: model.isRefreshing,
+                style: .sentence,
+            )
+            Spacer(minLength: 4)
+            // When the data was last read, paired with when it will next be
+            // read. Shown only when the data is healthy; otherwise the header
+            // is already stating what is wrong with it.
+            if selectedStatusDetail == nil, model.selectedAccount != nil {
+                Text(selectedStatusPresentation.observationText)
+                    .lineLimit(1)
+            }
+        }
+        .font(.system(size: 10, weight: .medium))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 16)
+        // The content above carries its own bottom padding, so this only needs
+        // to clear the divider below.
+        .padding(.bottom, 9)
     }
 
     private var footer: some View {
@@ -290,18 +320,19 @@ struct MenuPanelView: View {
         return UsageStatusPresentation.resolve(status)
     }
 
-    private var selectedStatusSubtitle: String {
+    /// The problem with the current data, or nil when there is none.
+    private var selectedStatusDetail: String? {
         selectedStatusPresentation.severity == .positive
-            ? selectedStatusPresentation.observationText
+            ? nil
             : selectedStatusPresentation.detail
     }
 
     private var panelHeight: CGFloat {
         if showsAllAccounts {
-            return 252
+            return 268
         }
         guard model.selectedAccount != nil else {
-            return 220
+            return 236
         }
 
         let quotaCount = max(model.selectedSnapshots.count, 1)
@@ -310,7 +341,10 @@ struct MenuPanelView: View {
             ? 29
             : 0
         let stateHeight: CGFloat = model.selectedSnapshots.isEmpty ? 36 : 0
-        return 178 + rowsHeight + accountPickerHeight + stateHeight
+        // The base covers the tabs, account header, footer, and the refresh
+        // schedule line above it.
+        let detailHeight: CGFloat = selectedStatusDetail == nil ? 0 : 18
+        return 176 + rowsHeight + accountPickerHeight + stateHeight + detailHeight
     }
 }
 

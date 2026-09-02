@@ -63,9 +63,10 @@ private struct EdgeDetailPanel: View {
                         .foregroundStyle(presentation.color)
                 }
                 Spacer(minLength: 0)
-                RailRefreshCountdownView(
+                RefreshCountdownView(
                     nextRefreshAt: nextRefreshAt,
                     isRefreshing: isRefreshing,
+                    style: .sentence,
                 )
                 .lineLimit(1)
                 .foregroundStyle(.white.opacity(0.55))
