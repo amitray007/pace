@@ -9,9 +9,9 @@ import Foundation
 /// is: "Resets Sep 12 5:30 AM" is not a useful answer to "can I keep going".
 ///
 /// The reference states absolute times, so this is a deliberate departure.
-enum QuotaResetText {
+public enum QuotaResetText {
     /// Reset wording for a quota that may not report a reset moment.
-    static func description(
+    public static func description(
         resetsAt: Date?,
         relativeTo referenceDate: Date,
         calendar: Calendar = .current,
@@ -28,7 +28,7 @@ enum QuotaResetText {
     /// largest: days and hours, or hours and minutes. A reset four days away
     /// does not need its minutes, and showing them would imply a precision the
     /// provider's own window does not have.
-    static func moment(
+    public static func moment(
         _ resetsAt: Date,
         relativeTo referenceDate: Date,
         calendar _: Calendar = .current,

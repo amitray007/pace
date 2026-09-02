@@ -1,3 +1,4 @@
+import Foundation
 import PaceCore
 
 extension PacePresentationModel {
@@ -43,6 +44,16 @@ extension PacePresentationModel {
             ?? availableAccounts.first
     }
 
+    /// The moment reset countdowns and freshness are measured from.
+    ///
+    /// Live surfaces measure from now. Reference previews measure from the
+    /// simulated scenario's fixed date so captured frames stay identical
+    /// between runs; using it on live data made every countdown drift by
+    /// however long ago that date was.
+    var presentationReferenceDate: Date {
+        isReferencePreview ? SimulatedScenarios.referenceDate : Date()
+    }
+
     func snapshots(for accountID: AccountID) -> [LimitSnapshot] {
         state.snapshots
             .filter { $0.id.accountID == accountID }
@@ -73,5 +84,16 @@ extension PacePresentationModel {
         }
         return snapshots.first { $0.id.bucketID.rawValue == preferredBucketID }?.usedFraction
             ?? snapshots.map(\.usedFraction).max()
+    }
+}
+
+extension Date {
+    /// Rounded down to a whole multiple of `interval` seconds.
+    ///
+    /// Used where a value feeds view state that is compared for equality: the
+    /// displayed wording only changes by the minute, so a second-by-second date
+    /// would report a change on every pass without altering anything shown.
+    func rounded(toNearest interval: TimeInterval) -> Date {
+        Date(timeIntervalSince1970: (timeIntervalSince1970 / interval).rounded(.down) * interval)
     }
 }

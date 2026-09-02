@@ -233,6 +233,8 @@ struct EdgeRailView: View {
                 // The startup refresh counts as refreshing here. The rail has
                 // no other way to say that stored numbers are being replaced.
                 isRefreshing: model.isRefreshing || model.isPerformingFirstRefresh,
+                referenceDate: model.presentationReferenceDate
+                    .rounded(toNearest: 60),
             )
         }
     }

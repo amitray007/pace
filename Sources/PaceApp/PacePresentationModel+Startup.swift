@@ -49,6 +49,17 @@ extension PacePresentationModel {
                 scenario: scenario,
                 refreshAll: true,
             )
+
+            // After the providers have been read, so a real account that was
+            // only just discovered still retires its demonstration stand-in.
+            // Nothing refreshes a simulated account, so leaving one in place
+            // beside a live one keeps fixture-dated readings on screen forever.
+            if !isReferencePreview {
+                let retired = try await store.retireSimulatedAccounts()
+                if !retired.isEmpty {
+                    state = await store.currentState()
+                }
+            }
         } catch {
             reportLoadingFailure(String(describing: error))
         }

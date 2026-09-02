@@ -122,7 +122,7 @@ struct MenuPanelView: View {
                     ForEach(model.selectedSnapshots) { snapshot in
                         MenuQuotaRow(
                             snapshot: snapshot,
-                            referenceDate: SimulatedScenarios.referenceDate,
+                            referenceDate: model.presentationReferenceDate,
                             accent: ProviderStyle.resolve(model.activeProviderID).accent,
                             increasedContrast: usesIncreasedContrast,
                         )
@@ -322,7 +322,10 @@ struct MenuPanelView: View {
         guard let status = model.selectedUsageStatus else {
             return .missing(isLoading: model.isPerformingFirstRefresh)
         }
-        return UsageStatusPresentation.resolve(status)
+        return UsageStatusPresentation.resolve(
+            status,
+            referenceDate: model.presentationReferenceDate,
+        )
     }
 
     /// The problem with the current data, or nil when there is none.

@@ -75,6 +75,15 @@ public enum CredentialBinding: Codable, Equatable, Sendable {
     case providerProfile(directory: URL, ownership: ProfileOwnership)
     case keychain(service: String, account: String)
     case simulated
+
+    /// Whether this account is seeded demonstration data rather than a real
+    /// provider connection.
+    public var isSimulated: Bool {
+        if case .simulated = self {
+            return true
+        }
+        return false
+    }
 }
 
 enum CredentialSourceKey: Equatable, Hashable, Sendable {

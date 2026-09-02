@@ -53,9 +53,14 @@ struct UsageStatusPresentation {
         }
     }
 
+    /// - Parameter referenceDate: The moment the wording is relative to.
+    ///   Defaults to now. It used to default to the simulated scenario's fixed
+    ///   date, so every reset countdown and freshness judgement was measured
+    ///   from that date rather than from the present, and drifted further out
+    ///   of date with every day that passed.
     static func resolve(
         _ status: AccountUsageStatus,
-        referenceDate: Date = SimulatedScenarios.referenceDate,
+        referenceDate: Date = Date(),
     ) -> Self {
         if status.hasData {
             return dataPresentation(status, referenceDate: referenceDate)

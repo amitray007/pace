@@ -401,12 +401,3 @@ extension PacePresentationModel {
         ) && isDirectory.boolValue
     }
 }
-
-extension CredentialBinding {
-    var isSimulated: Bool {
-        if case .simulated = self {
-            return true
-        }
-        return false
-    }
-}

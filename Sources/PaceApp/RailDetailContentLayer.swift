@@ -11,10 +11,13 @@ private struct EdgeDetailPanel: View {
     let increasedContrast: Bool
     let nextRefreshAt: Date?
     let isRefreshing: Bool
+    let referenceDate: Date
 
     var body: some View {
         let style = ProviderStyle.resolve(providerID)
-        let presentation = status.map { UsageStatusPresentation.resolve($0) }
+        let presentation = status.map {
+            UsageStatusPresentation.resolve($0, referenceDate: referenceDate)
+        }
             ?? .missing(isLoading: isRefreshing)
         VStack(alignment: .leading, spacing: 8) {
             // The reference header is only the provider mark and title. The
@@ -130,7 +133,7 @@ private struct EdgeDetailPanel: View {
     private func resetText(for snapshot: LimitSnapshot) -> String {
         QuotaResetText.description(
             resetsAt: snapshot.resetsAt,
-            relativeTo: SimulatedScenarios.referenceDate,
+            relativeTo: referenceDate,
         )
     }
 }
@@ -143,6 +146,10 @@ struct RailDetailContent: Equatable {
     let increasedContrast: Bool
     let nextRefreshAt: Date?
     let isRefreshing: Bool
+    /// Rounded to the minute. Reset wording is stated in minutes at its finest,
+    /// so a second-by-second value would make this unequal on every pass
+    /// without changing anything on screen.
+    let referenceDate: Date
 }
 
 struct RailDetailContentLayerRepresentable: NSViewRepresentable {
@@ -316,6 +323,7 @@ final class RailDetailContentLayerView: NSView {
             increasedContrast: content.increasedContrast,
             nextRefreshAt: content.nextRefreshAt,
             isRefreshing: content.isRefreshing,
+            referenceDate: content.referenceDate,
         )
     }
 

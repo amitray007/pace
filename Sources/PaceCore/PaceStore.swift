@@ -205,28 +205,6 @@ public actor PaceStore {
         try await commit(next)
     }
 
-    public func replaceSnapshots(
-        for accountID: AccountID,
-        with snapshots: [LimitSnapshot],
-    ) async throws {
-        await mutationGate.acquire()
-        defer { mutationGate.release() }
-
-        guard let account = state.accounts.first(where: { $0.id == accountID }) else {
-            throw AccountMutationError.unknownAccount(accountID)
-        }
-        guard snapshots.allSatisfy({ snapshot in
-            snapshot.id.accountID == accountID && snapshot.id.providerID == account.providerID
-        }) else {
-            throw AccountMutationError.invalidSnapshots(accountID)
-        }
-
-        var next = state
-        next.snapshots.removeAll(where: { $0.id.accountID == accountID })
-        next.snapshots.append(contentsOf: snapshots)
-        try await commit(next)
-    }
-
     public func applyRefreshOutcomes(_ outcomes: [AccountRefreshOutcome]) async throws {
         await mutationGate.acquire()
         defer { mutationGate.release() }
@@ -275,6 +253,22 @@ public actor PaceStore {
         }
 
         guard didApplyOutcome else {
+            return
+        }
+        try await commit(next)
+    }
+
+    /// Runs a mutation under the gate, committing it only when it changed
+    /// something. Lets operations live in another file without widening access
+    /// to the actor's state.
+    ///
+    /// - Parameter change: Returns whether it modified the state.
+    func mutate(_ change: (inout PaceState) throws -> Bool) async throws {
+        await mutationGate.acquire()
+        defer { mutationGate.release() }
+
+        var next = state
+        guard try change(&next) else {
             return
         }
         try await commit(next)
