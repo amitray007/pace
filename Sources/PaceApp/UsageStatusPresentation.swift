@@ -15,6 +15,31 @@ struct UsageStatusPresentation {
     let severity: Severity
     let observationText: String
 
+    /// What to show when a provider has no usage status yet.
+    ///
+    /// Absence means two different things depending on when it is observed.
+    /// Before the first refresh finishes, the providers simply have not been
+    /// read; afterwards, there is genuinely nothing configured. Telling a user
+    /// with a working account to go add one is worse than saying nothing, so
+    /// the two are distinguished here rather than at each call site.
+    static func missing(isLoading: Bool) -> Self {
+        isLoading
+            ? Self(
+                title: "Loading usage",
+                detail: "Reading this provider's limits.",
+                symbolName: "arrow.clockwise",
+                severity: .neutral,
+                observationText: "Not observed",
+            )
+            : Self(
+                title: "No account configured",
+                detail: "Add an account for this provider to see usage.",
+                symbolName: "person.crop.circle.badge.questionmark",
+                severity: .neutral,
+                observationText: "Not observed",
+            )
+    }
+
     var color: Color {
         switch severity {
         case .error:

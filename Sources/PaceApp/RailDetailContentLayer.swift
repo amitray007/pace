@@ -14,14 +14,8 @@ private struct EdgeDetailPanel: View {
 
     var body: some View {
         let style = ProviderStyle.resolve(providerID)
-        let presentation = status.map { UsageStatusPresentation.resolve($0) } ??
-            UsageStatusPresentation(
-                title: "No account configured",
-                detail: "Add an account for this provider to see usage.",
-                symbolName: "person.crop.circle.badge.questionmark",
-                severity: .neutral,
-                observationText: "Not observed",
-            )
+        let presentation = status.map { UsageStatusPresentation.resolve($0) }
+            ?? .missing(isLoading: isRefreshing)
         VStack(alignment: .leading, spacing: 8) {
             // The reference header is only the provider mark and title. The
             // account identity and plan stay in the footer so the title line

@@ -151,7 +151,7 @@ struct ProviderAccountsSettingsContent: View {
     }
 
     private var accountActionsAreDisabled: Bool {
-        model.isLoading || model.isManagingAccounts || model.isRefreshing
+        model.isProviderRuntimeBusy || model.isManagingAccounts || model.isRefreshing
     }
 
     private func accountRows(for providerID: ProviderID) -> some View {

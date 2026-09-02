@@ -18,18 +18,28 @@ struct MenuPanelView: View {
                     systemImage: "exclamationmark.triangle",
                     description: Text(loadingError),
                 )
-                .frame(maxHeight: .infinity)
+                .frame(minHeight: 120)
             } else if model.isLoading {
                 ProgressView()
                     .controlSize(.small)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(maxWidth: .infinity, minHeight: 120)
             } else if model.selectedAccount == nil {
-                ContentUnavailableView(
-                    "No account configured",
-                    systemImage: "person.crop.circle.badge.questionmark",
-                    description: Text("Add an account for this provider to see usage."),
-                )
-                .frame(maxHeight: .infinity)
+                // Only claim there is no account once the first refresh has
+                // finished. Before that an empty list means the providers have
+                // not been read yet, and saying "No account configured" told
+                // the user to go add one they already have.
+                if model.isPerformingFirstRefresh {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(maxWidth: .infinity, minHeight: 120)
+                } else {
+                    ContentUnavailableView(
+                        "No account configured",
+                        systemImage: "person.crop.circle.badge.questionmark",
+                        description: Text("Add an account for this provider to see usage."),
+                    )
+                    .frame(minHeight: 120)
+                }
             } else if showsAllAccounts {
                 allAccountsContent
             } else {
@@ -40,7 +50,11 @@ struct MenuPanelView: View {
             Divider().overlay(Color.white.opacity(dividerOpacity))
             footer
         }
-        .frame(width: 326, height: panelHeight)
+        // Width is fixed; height follows the content. The hosting controller
+        // sizes the popover to its preferred content size, so a hand-computed
+        // height only ever disagreed with what the views actually laid out, and
+        // the surplus showed up as a gap above the footer.
+        .frame(width: 326)
         .background(Color(red: 0.035, green: 0.035, blue: 0.04))
         .preferredColorScheme(.dark)
         .task {
@@ -115,8 +129,6 @@ struct MenuPanelView: View {
                     }
                 }
             }
-
-            Spacer(minLength: 0)
         }
         .padding(16)
     }
@@ -215,7 +227,6 @@ struct MenuPanelView: View {
                     increasedContrast: usesIncreasedContrast,
                 )
             }
-            Spacer()
         }
         .padding(16)
     }
@@ -232,7 +243,7 @@ struct MenuPanelView: View {
         HStack(spacing: 8) {
             RefreshCountdownView(
                 nextRefreshAt: model.nextRefreshAt,
-                isRefreshing: model.isRefreshing,
+                isRefreshing: model.isRefreshing || model.isPerformingFirstRefresh,
                 style: .sentence,
             )
             Spacer(minLength: 4)
@@ -264,7 +275,7 @@ struct MenuPanelView: View {
                     systemImage: "arrow.clockwise",
                 )
             }
-            .disabled(model.isLoading || model.isRefreshing || model.isManagingAccounts)
+            .disabled(model.isProviderRuntimeBusy || model.isRefreshing || model.isManagingAccounts)
             .keyboardShortcut("r", modifiers: .command)
 
             Button {
@@ -309,13 +320,7 @@ struct MenuPanelView: View {
 
     private var selectedStatusPresentation: UsageStatusPresentation {
         guard let status = model.selectedUsageStatus else {
-            return UsageStatusPresentation(
-                title: "No account configured",
-                detail: "Add an account for this provider to see usage.",
-                symbolName: "person.crop.circle.badge.questionmark",
-                severity: .neutral,
-                observationText: "Not observed",
-            )
+            return .missing(isLoading: model.isPerformingFirstRefresh)
         }
         return UsageStatusPresentation.resolve(status)
     }
@@ -325,26 +330,6 @@ struct MenuPanelView: View {
         selectedStatusPresentation.severity == .positive
             ? nil
             : selectedStatusPresentation.detail
-    }
-
-    private var panelHeight: CGFloat {
-        if showsAllAccounts {
-            return 268
-        }
-        guard model.selectedAccount != nil else {
-            return 236
-        }
-
-        let quotaCount = max(model.selectedSnapshots.count, 1)
-        let rowsHeight = CGFloat(quotaCount * 44 + max(quotaCount - 1, 0) * 14)
-        let accountPickerHeight: CGFloat = model.accounts(for: model.activeProviderID).count > 1
-            ? 29
-            : 0
-        let stateHeight: CGFloat = model.selectedSnapshots.isEmpty ? 36 : 0
-        // The base covers the tabs, account header, footer, and the refresh
-        // schedule line above it.
-        let detailHeight: CGFloat = selectedStatusDetail == nil ? 0 : 18
-        return 176 + rowsHeight + accountPickerHeight + stateHeight + detailHeight
     }
 }
 

@@ -30,6 +30,26 @@ final class PacePresentationModel {
     private(set) var isChangingLaunchAtLogin = false
     var isChangingNotificationAuthorization = false
     private(set) var isRefreshing = false
+
+    /// Whether the first refresh after launch is still running.
+    ///
+    /// Separate from `isLoading`, which now clears as soon as the stored
+    /// snapshots are on screen. This stays true while the providers are being
+    /// read, so a surface can show that stale data is on its way to being
+    /// replaced instead of presenting it as settled.
+    private(set) var isPerformingFirstRefresh = false
+
+    /// Whether the provider runtime is not yet ready to accept work.
+    ///
+    /// Account changes and manual refreshes need the coordinators that
+    /// `configureProviderRuntime` builds. They used to test `isLoading` alone,
+    /// which covered this because it stayed true until the runtime existed.
+    /// `isLoading` now clears earlier so stored snapshots can be shown, so the
+    /// startup refresh is named here as well.
+    var isProviderRuntimeBusy: Bool {
+        isLoading || isPerformingFirstRefresh
+    }
+
     var availableGitHubCopilotLogins: [String] = []
     var accountActionError: String?
     var isManagingAccounts = false
@@ -42,14 +62,14 @@ final class PacePresentationModel {
     let defaultGrokProfileDirectory: URL
 
     let isReferencePreview: Bool
-    private let simulatedPresentationState: SimulatedPresentationState
-    private let preferencesPersistence: any PacePreferencesPersistence
+    let simulatedPresentationState: SimulatedPresentationState
+    let preferencesPersistence: any PacePreferencesPersistence
     private let launchAtLoginSetting: LaunchAtLoginSetting
     let notificationDeliveryController: PaceNotificationDeliveryController
-    private let statePersistence: any PaceStatePersistence
-    private var hasStarted = false
+    let statePersistence: any PaceStatePersistence
+    var hasStarted = false
     var notificationSettingsTask: Task<Void, Never>?
-    private var preferencesStore: PacePreferencesStore?
+    var preferencesStore: PacePreferencesStore?
     private var providerUpdateTask: Task<Void, Never>?
     var accountCoordinator: AccountCoordinator?
     var refreshCoordinator: RefreshCoordinator?
@@ -137,50 +157,31 @@ final class PacePresentationModel {
         return ordered + available.subtracting(ordered).sorted()
     }
 
-    func start() async {
-        guard !hasStarted else {
-            return
-        }
-        hasStarted = true
-        defer {
-            isLoading = false
-        }
+    /// Startup state transitions, kept here because the flags they set are
+    /// `private(set)` to this type while the sequence itself lives in
+    /// `PacePresentationModel+Startup.swift`.
+    func markLoaded() {
+        isLoading = false
+    }
 
-        if !isReferencePreview {
-            refreshLaunchAtLoginStatus()
-            do {
-                let preferencesStore = try await PacePreferencesStore.open(
-                    persistence: preferencesPersistence,
-                )
-                self.preferencesStore = preferencesStore
-                preferences = await preferencesStore.currentPreferences()
-            } catch {
-                preferencesError = "Settings could not be loaded. Defaults are active."
-            }
-            await refreshNotificationAuthorizationStatus()
-        }
+    func beginFirstRefresh() {
+        isPerformingFirstRefresh = true
+    }
 
-        do {
-            let persistence: any PaceStatePersistence = isReferencePreview
-                ? InMemoryPaceStatePersistence()
-                : statePersistence
-            let store = try await PaceStore.open(persistence: persistence)
-            let scenario = try SimulatedScenarios.visualReference(
-                presentationState: simulatedPresentationState,
-            )
-            if await store.currentState().accounts.isEmpty {
-                try await scenario.seed(store)
-            }
-            try await configureProviderRuntime(
-                store: store,
-                scenario: scenario,
-                refreshAll: true,
-            )
-            self.store = store
-            simulatedScenario = scenario
-        } catch {
-            loadingError = String(describing: error)
-        }
+    func endFirstRefresh() {
+        isPerformingFirstRefresh = false
+    }
+
+    func reportLoadingFailure(_ message: String) {
+        loadingError = message
+    }
+
+    func reportPreferencesFailure(_ message: String) {
+        preferencesError = message
+    }
+
+    func adoptPreferences(_ newPreferences: PacePreferences) {
+        preferences = newPreferences
     }
 
     func selectProvider(_ providerID: ProviderID) {
@@ -232,7 +233,7 @@ final class PacePresentationModel {
     }
 
     func refreshAll() async {
-        guard !isLoading, !isRefreshing, !isManagingAccounts,
+        guard !isProviderRuntimeBusy, !isRefreshing, !isManagingAccounts,
               let refreshCoordinator, let store
         else {
             return

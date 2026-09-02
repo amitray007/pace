@@ -82,7 +82,7 @@ struct ManagedProviderAccountRow: View {
     }
 
     private var isManagingAccounts: Bool {
-        model.isLoading || model.isManagingAccounts || model.isRefreshing
+        model.isProviderRuntimeBusy || model.isManagingAccounts || model.isRefreshing
     }
 
     private func commitName() {

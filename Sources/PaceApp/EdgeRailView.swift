@@ -230,7 +230,9 @@ struct EdgeRailView: View {
                 status: account.map(model.usageStatus(for:)),
                 increasedContrast: usesIncreasedContrast,
                 nextRefreshAt: model.nextRefreshAt,
-                isRefreshing: model.isRefreshing,
+                // The startup refresh counts as refreshing here. The rail has
+                // no other way to say that stored numbers are being replaced.
+                isRefreshing: model.isRefreshing || model.isPerformingFirstRefresh,
             )
         }
     }

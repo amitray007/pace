@@ -71,7 +71,7 @@ extension PacePresentationModel {
     }
 
     func prepareGitHubCopilotAccountSelection() async -> Bool {
-        guard !isReferencePreview, !isLoading, !isManagingAccounts, !isRefreshing else {
+        guard !isReferencePreview, !isProviderRuntimeBusy, !isManagingAccounts, !isRefreshing else {
             return false
         }
         isManagingAccounts = true
@@ -106,7 +106,7 @@ extension PacePresentationModel {
     }
 
     func addGitHubCopilotAccount(githubLogin: String) async {
-        guard !isReferencePreview, !isLoading, !isManagingAccounts, !isRefreshing,
+        guard !isReferencePreview, !isProviderRuntimeBusy, !isManagingAccounts, !isRefreshing,
               let store, let scenario = simulatedScenario
         else {
             return
@@ -146,7 +146,7 @@ extension PacePresentationModel {
         claudeProfile: ClaudeProfile? = nil,
         cursorProfile: CursorProfile? = nil,
     ) async {
-        guard !isReferencePreview, !isLoading, !isManagingAccounts, !isRefreshing,
+        guard !isReferencePreview, !isProviderRuntimeBusy, !isManagingAccounts, !isRefreshing,
               let store, let scenario = simulatedScenario
         else {
             return
@@ -227,7 +227,7 @@ extension PacePresentationModel {
     /// resulting blur fired.
     @discardableResult
     func renameManagedAccount(_ accountID: AccountID, to displayName: String) async -> Bool {
-        guard !isLoading, let accountCoordinator else {
+        guard !isProviderRuntimeBusy, let accountCoordinator else {
             return false
         }
         do {
@@ -242,7 +242,7 @@ extension PacePresentationModel {
     }
 
     func setManagedAccount(_ accountID: AccountID, isEnabled: Bool) async {
-        guard !isLoading, !isManagingAccounts, !isRefreshing, let accountCoordinator,
+        guard !isProviderRuntimeBusy, !isManagingAccounts, !isRefreshing, let accountCoordinator,
               let store, let scenario = simulatedScenario,
               let account = state.accounts.first(where: { $0.id == accountID })
         else {
@@ -270,7 +270,7 @@ extension PacePresentationModel {
     }
 
     func removeManagedAccount(_ accountID: AccountID) async {
-        guard !isLoading, !isManagingAccounts, !isRefreshing, let accountCoordinator,
+        guard !isProviderRuntimeBusy, !isManagingAccounts, !isRefreshing, let accountCoordinator,
               let store, let scenario = simulatedScenario
         else {
             return
