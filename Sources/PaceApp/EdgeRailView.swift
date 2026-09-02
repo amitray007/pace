@@ -128,31 +128,55 @@ struct EdgeRailView: View {
         )
         let isExpanded = model.railPreviewState != .mini
         let contents = detailContents(providerIDs: providerIDs)
+        let shellState = RailShellState(
+            providerRowCount: providerIDs.count,
+            previewState: model.railPreviewState,
+            edge: model.preferences.railEdge,
+            detailCenterY: detailCenterY(providerIDs: providerIDs),
+            detailHeight: detailHeight(
+                providerID: model.railPreviewState.detailProviderID,
+                contents: contents,
+            ),
+            showsSettingsCircle: isSettingsHovered,
+            reducesMotion: accessibilityReduceMotion,
+        )
         ZStack(alignment: .topLeading) {
-            RailShellLayerRepresentable(
-                state: RailShellState(
-                    providerRowCount: providerIDs.count,
-                    previewState: model.railPreviewState,
-                    edge: model.preferences.railEdge,
-                    detailCenterY: detailCenterY(providerIDs: providerIDs),
-                    detailHeight: detailHeight(
-                        providerID: model.railPreviewState.detailProviderID,
-                        contents: contents,
-                    ),
-                    showsSettingsCircle: isSettingsHovered,
-                    reducesMotion: accessibilityReduceMotion,
-                ),
+            RailShellLayerRepresentable(state: shellState)
+
+            // Clipped to the shell so the rings can only be seen where the
+            // silhouette already is. Without it they faded in at their final
+            // positions while the shape was still growing toward them, which
+            // read as content arriving rather than the handle expanding.
+            //
+            // The mask is a second instance of the shell view itself, fed the
+            // same state. Its opaque fills are the mask's alpha, its paths are
+            // the shell's paths in the shell's coordinate space, and its
+            // animations run through the same code with the same retargeting,
+            // so the two silhouettes cannot drift apart or fall out of step.
+            //
+            // Only the rail's own contents are masked. The detail panel is
+            // hosted by its own layer and appears with its shell rather than
+            // growing, so it has nothing to be revealed through.
+            ZStack(alignment: .topLeading) {
+                providerRows(providerIDs: providerIDs)
+                    .opacity(isExpanded ? 1 : 0)
+                    .animation(contentAnimation(isVisible: isExpanded), value: isExpanded)
+                    .accessibilityHidden(!isExpanded)
+
+                settingsMark
+                    .opacity(isExpanded ? 1 : 0)
+                    .animation(contentAnimation(isVisible: isExpanded), value: isExpanded)
+                    .accessibilityHidden(!isExpanded)
+            }
+            // The shell flips its paths against its own bounds, so the group
+            // must be the full canvas or the mask lands in the wrong place and
+            // clips the rows it is meant to reveal.
+            .frame(
+                width: EdgeRailGeometry.canvasSize.width,
+                height: EdgeRailGeometry.canvasSize.height,
+                alignment: .topLeading,
             )
-
-            providerRows(providerIDs: providerIDs)
-                .opacity(isExpanded ? 1 : 0)
-                .animation(contentAnimation(isVisible: isExpanded), value: isExpanded)
-                .accessibilityHidden(!isExpanded)
-
-            settingsMark
-                .opacity(isExpanded ? 1 : 0)
-                .animation(contentAnimation(isVisible: isExpanded), value: isExpanded)
-                .accessibilityHidden(!isExpanded)
+            .mask(RailShellLayerRepresentable(state: shellState))
 
             detailContent(providerIDs: providerIDs, contents: contents)
         }

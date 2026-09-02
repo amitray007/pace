@@ -29,6 +29,18 @@ struct RailShellLayerRepresentable: NSViewRepresentable {
     }
 }
 
+/// Draws the rail's silhouette.
+///
+/// `EdgeRailView` also uses a second instance as the mask for the rail's
+/// contents, so the rings are revealed by the same edge that is drawing
+/// around them. Only the fills' alpha matters there, which is why nothing in
+/// this view depends on being visible: it must draw the same shapes, on the
+/// same timing, whether it is seen or used to clip.
+///
+/// The view is not flipped. AppKit sets `isGeometryFlipped` on the backing
+/// layer of a flipped view, and the paths are already flipped once by
+/// `transformed`, so flipping the view as well would turn the silhouette upside
+/// down.
 final class RailShellLayerView: NSView {
     private let detailLayer = CAShapeLayer()
     private let railLayer = CAShapeLayer()

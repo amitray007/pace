@@ -26,7 +26,13 @@ enum RailMotion {
     /// Opening is scaled harder than the rest. Hovering the handle is the one
     /// moment the user is waiting on the rail rather than reading it, so the
     /// reveal answers the pointer almost immediately.
-    static let revealDuration = 0.25 * speedFactor * 0.6
+    ///
+    /// It was scaled to 0.6 while the rows faded in over whatever was behind
+    /// them, because a shorter reveal hid that mismatch. Now that the rows are
+    /// clipped to the silhouette, the growth is the thing being watched, and
+    /// at 112 ms it was over before it read as movement. 146 ms is still well
+    /// under the reference's 250 ms.
+    static let revealDuration = 0.25 * speedFactor * 0.78
 
     /// The rail collapses back to the mini handle. Measured at 0.300 s.
     /// Dismissal is slower than reveal in the reference, so leaving does not
@@ -56,7 +62,14 @@ enum RailMotion {
     /// The content's fade occupies the remainder, so it always finishes exactly
     /// when the shell stops moving. Expressing it this way means the two cannot
     /// drift apart.
-    static let contentRevealDelayFraction: CFTimeInterval = 0.3
+    ///
+    /// This was 0.3 while the rows were drawn at their final positions with
+    /// nothing clipping them, so the fade had to wait for the silhouette to
+    /// reach them. The rows are now masked by the shell, so nothing can appear
+    /// outside it, and the delay only needs to give the shape a visible lead
+    /// so the reveal reads as the shell opening rather than the whole rail
+    /// cross-fading in.
+    static let contentRevealDelayFraction: CFTimeInterval = 0.12
 
     /// Fraction of a shell transition that the content's own fade occupies.
     static var contentFadeFraction: CFTimeInterval {
