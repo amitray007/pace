@@ -41,6 +41,19 @@ final class StatusItemController: NSObject {
             }
         }
 
+        // Writes the panel to a PNG and exits. Screen capture cannot reach a
+        // popover's window reliably, so documentation frames are rendered from
+        // the view itself rather than photographed off the screen.
+        if let path = environment["PACE_CAPTURE_PANEL"] {
+            Task { @MainActor [weak self] in
+                // Long enough for the first refresh to finish, so the frame
+                // shows settled data and a real countdown.
+                try? await Task.sleep(for: .seconds(20))
+                self?.capturePanel(to: path)
+                NSApp.terminate(nil)
+            }
+        }
+
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             self?.handleKeyEvent(event) ?? event
         }
@@ -71,6 +84,22 @@ final class StatusItemController: NSObject {
         if let activationObserver {
             NotificationCenter.default.removeObserver(activationObserver)
         }
+    }
+
+    /// Renders the menu panel to a PNG for documentation.
+    private func capturePanel(to path: String) {
+        guard let view = popover.contentViewController?.view else {
+            return
+        }
+        let bounds = view.bounds
+        guard let rep = view.bitmapImageRepForCachingDisplay(in: bounds) else {
+            return
+        }
+        view.cacheDisplay(in: bounds, to: rep)
+        guard let png = rep.representation(using: .png, properties: [:]) else {
+            return
+        }
+        try? png.write(to: URL(filePath: path))
     }
 
     /// Redraws the status item from the current readings.
