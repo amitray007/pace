@@ -25,16 +25,14 @@ final class StatusItemController: NSObject {
         popover.contentViewController = hostingController
 
         if let button = statusItem.button {
-            button.image = NSImage(
-                systemSymbolName: "gauge.with.dots.needle.67percent",
-                accessibilityDescription: "Pace",
-            )
             button.imagePosition = .imageOnly
             button.target = self
             button.action = #selector(togglePopover)
-            button.toolTip = "Pace usage limits"
-            button.setAccessibilityLabel("Pace usage limits")
         }
+        // Width follows the configured slots, so the item cannot stay square.
+        statusItem.length = NSStatusItem.variableLength
+        renderStatusItem()
+        observeStatusItemContent()
 
         if environment["PACE_REFERENCE_MENU"] == "1" {
             Task { @MainActor [weak self] in
@@ -72,6 +70,42 @@ final class StatusItemController: NSObject {
         }
         if let activationObserver {
             NotificationCenter.default.removeObserver(activationObserver)
+        }
+    }
+
+    /// Redraws the status item from the current readings.
+    private func renderStatusItem() {
+        guard let button = statusItem.button else {
+            return
+        }
+        let readings = model.menuBarReadings
+        button.image = StatusItemImage.image(
+            for: readings,
+            showsPercentSign: model.preferences.menuBar.showsPercentSign,
+            tint: model.preferences.menuBar.tint,
+        )
+        let description = StatusItemAccessibility.description(for: readings)
+        button.toolTip = description
+        button.setAccessibilityLabel(description)
+    }
+
+    /// Redraws whenever the readings or the menu-bar preference change.
+    ///
+    /// `withObservationTracking` fires once per change, so it re-arms itself
+    /// after each one. Without re-arming the status item would update on the
+    /// first refresh and then stop.
+    private func observeStatusItemContent() {
+        withObservationTracking {
+            _ = model.menuBarReadings
+            _ = model.preferences.menuBar
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self else {
+                    return
+                }
+                self.renderStatusItem()
+                self.observeStatusItemContent()
+            }
         }
     }
 

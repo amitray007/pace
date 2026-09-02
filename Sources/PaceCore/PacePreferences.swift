@@ -109,6 +109,7 @@ public struct PacePreferences: Codable, Equatable, Sendable {
     public var hideRailInFullScreen: Bool
     public var notificationPolicy: PaceNotificationPolicy
     public var providerOrder: [ProviderID]
+    public var menuBar: MenuBarPresentation
 
     public init(
         version: Int = Self.currentVersion,
@@ -124,6 +125,7 @@ public struct PacePreferences: Codable, Equatable, Sendable {
         hideRailInFullScreen: Bool = true,
         notificationPolicy: PaceNotificationPolicy = .disabled,
         providerOrder: [ProviderID] = Self.defaultProviderOrder,
+        menuBar: MenuBarPresentation = MenuBarPresentation(),
     ) {
         self.version = version
         self.surfaceMode = surfaceMode
@@ -138,6 +140,7 @@ public struct PacePreferences: Codable, Equatable, Sendable {
         self.hideRailInFullScreen = hideRailInFullScreen
         self.notificationPolicy = notificationPolicy
         self.providerOrder = Self.normalizedProviderOrder(providerOrder)
+        self.menuBar = menuBar
     }
 
     public init(from decoder: any Decoder) throws {
@@ -179,6 +182,7 @@ public struct PacePreferences: Codable, Equatable, Sendable {
                 .providerOrder,
                 default: Self.defaultProviderOrder,
             ),
+            menuBar: container.value(.menuBar, default: MenuBarPresentation()),
         )
     }
 

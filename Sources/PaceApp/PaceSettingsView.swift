@@ -103,6 +103,10 @@ struct PaceSettingsView: View {
                 }
             }
 
+            Section("Menu bar") {
+                MenuBarSettingsContent(model: model)
+            }
+
             Section("Providers") {
                 ForEach(Array(model.visibleProviderIDs.enumerated()), id: \.element) { item in
                     let (index, providerID) = item

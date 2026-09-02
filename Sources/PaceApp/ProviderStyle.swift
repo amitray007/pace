@@ -78,7 +78,7 @@ struct ProviderMark: View {
     }
 }
 
-private enum ProviderMarkResources {
+enum ProviderMarkResources {
     private static var images: [String: NSImage] = [:]
 
     static func image(for providerID: ProviderID) -> NSImage? {
