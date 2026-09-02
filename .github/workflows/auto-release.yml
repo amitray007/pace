@@ -1,47 +1,53 @@
-name: Release
+name: Auto release
 
-# Runs when a v* release is published. Builds the Release bundle at the tagged
-# commit, verifies and checksums the archive, attaches it to this repository's
-# release, and — gated on HOMEBREW_TAP_ENABLED — publishes the archive to
-# amitray007/homebrew-tap's own release and pushes the rendered cask there.
+# Cuts a patch release for every push to main that changes what ships.
 #
-# Failure path: every step before "upload the archive to this release" is local
-# to the runner, so a failed run publishes nothing. The tap steps recreate their
-# tag, so a failed run can be re-run from the release page. Manual recovery:
-# re-run this workflow for the tag, or build locally with `make release-archive`
-# and follow the tap's AGENTS.md.
+# The version is derived from the latest v* tag rather than stored in the
+# repository, so there is no version commit to push back to main and no chance
+# of the file and the tag disagreeing. `make release-archive` already injects
+# RELEASE_VERSION at build time.
+#
+# Pushes that only touch documentation, media, or workflow files do not
+# release: a README fix should not ask every user to approve their keychain
+# items again for a new binary. Edit the paths-ignore list to change that.
+#
+# Failure path: the release is created only after the build, the bundle
+# verification, and the artifact smoke test all pass, so a failed run publishes
+# nothing and leaves no tag behind.
 
 on:
-  release:
-    types: [published]
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - ".github/**"
+      - "LICENSE"
   workflow_dispatch:
     inputs:
-      tag:
-        description: The v* release tag to build and publish
+      bump:
+        description: Which component to increase
         required: true
-        type: string
+        default: patch
+        type: choice
+        options: [patch, minor, major]
 
 permissions:
-  contents: write # upload the archive to this repository's release
+  contents: write # create the tag and the release
 
 concurrency:
-  group: release
+  group: auto-release
   cancel-in-progress: false
 
 jobs:
-  macos:
-    name: build · verify · publish
-    # macos-26 rather than macos-15: the older image's newest toolchain is
-    # Swift 6.2.4, whose IR generator crashes building PaceSettingsView.swift.
+  release:
+    name: version · build · publish
     runs-on: macos-26
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          # Build the released code, not the branch tip, on either trigger.
-          ref: ${{ inputs.tag || github.event.release.tag_name }}
+          fetch-depth: 0 # tags are the version source
 
-      # Matches ci.yml: the default Xcode is too old and the image's point
-      # releases change, so select the newest installed rather than a path.
       - name: select the newest Xcode
         run: |
           set -euo pipefail
@@ -49,27 +55,38 @@ jobs:
             | sed 's|.*/Xcode_||; s|\.app$||' \
             | sort -V | tail -1)
           test -n "$NEWEST" || { echo "::error::no versioned Xcode found"; exit 1; }
-          echo "Selecting Xcode $NEWEST"
           sudo xcode-select -switch "/Applications/Xcode_${NEWEST}.app"
           swift --version
 
       - name: install xcodegen
         run: brew install xcodegen
 
-      - name: resolve version from tag
+      - name: work out the next version
         id: version
         run: |
           set -euo pipefail
-          TAG='${{ inputs.tag || github.event.release.tag_name }}'
-          case "$TAG" in
-            v*) ;;
-            *) echo "::error::release tag '$TAG' is not a v* version tag"; exit 1 ;;
-          esac
-          VERSION="${TAG#v}"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tap_tag=pace-v$VERSION" >> "$GITHUB_OUTPUT"
-          # The build number is the run number, so a rebuild of the same
-          # version is still a distinct, traceable artifact.
+          LATEST=$(git tag -l 'v*' --sort=-v:refname | head -1)
+          if [ -z "$LATEST" ]; then
+            # First release. project.yml's MARKETING_VERSION is the starting
+            # point so the first tag matches what the repository already claims.
+            NEXT=$(grep -m1 'MARKETING_VERSION:' project.yml | sed 's/.*: *//')
+            echo "no tags yet, starting at $NEXT"
+          else
+            CURRENT="${LATEST#v}"
+            IFS=. read -r MAJOR MINOR PATCH <<< "$CURRENT"
+            case "${{ inputs.bump || 'patch' }}" in
+              major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+              minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+              *)     PATCH=$((PATCH + 1)) ;;
+            esac
+            NEXT="${MAJOR}.${MINOR}.${PATCH}"
+            echo "$LATEST -> v$NEXT"
+          fi
+          if git rev-parse "v$NEXT" >/dev/null 2>&1; then
+            echo "::error::tag v$NEXT already exists"; exit 1
+          fi
+          echo "version=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "tap_tag=pace-v$NEXT" >> "$GITHUB_OUTPUT"
           echo "build=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
 
       - name: focused verification
@@ -77,7 +94,7 @@ jobs:
           make lint
           make test
 
-      # Builds Release, checks the bundle identifier, version, and minimum
+      # Builds Release, checks the bundle's identifier, version, and minimum
       # system version, zips it, and writes a SHA-256 beside it.
       - name: build and package the release archive
         id: package
@@ -94,21 +111,28 @@ jobs:
           echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
           echo "archive=$ARCHIVE" >> "$GITHUB_OUTPUT"
 
-      # Unpacks the archive that will actually ship and launches it, rather
-      # than trusting that the source built.
+      # Unpacks and launches the archive that will actually ship rather than
+      # trusting that the source built.
       - name: smoke-test the produced artifact
         run: |
           make release-smoke \
             RELEASE_VERSION='${{ steps.version.outputs.version }}' \
             RELEASE_BUILD_NUMBER='${{ steps.version.outputs.build }}'
 
-      - name: upload the archive to this release
+      # Everything above is local to the runner. The tag is created only once
+      # the artifact exists and works, so a failed run leaves nothing behind.
+      - name: tag and release on this repository
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload 'v${{ steps.version.outputs.version }}' \
+          set -euo pipefail
+          VERSION='${{ steps.version.outputs.version }}'
+          gh release create "v$VERSION" \
             '${{ steps.package.outputs.archive }}' \
-            '${{ steps.package.outputs.archive }}.sha256' --clobber
+            '${{ steps.package.outputs.archive }}.sha256' \
+            --target '${{ github.sha }}' \
+            --title "Pace $VERSION" \
+            --generate-notes
 
       - name: publish the archive to the homebrew-tap release
         if: vars.HOMEBREW_TAP_ENABLED == 'true'

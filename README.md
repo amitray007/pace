@@ -100,6 +100,11 @@ records "Always Allow" against the binary's own code hash for any signature that
 Developer ID, so each new build needs one approval per credential. See
 [keychain approvals](#keychain-approvals).
 
+Every push to main that changes code cuts a patch release: the workflow reads the latest `v*` tag,
+increases it by 0.0.1, builds and smoke-tests the archive, and only then creates the tag, the
+GitHub release, and the Homebrew cask. Pushes that touch only documentation do not release. Use the
+"Auto release" workflow's manual run to bump the minor or major component instead.
+
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the layout and the rules the code holds itself to.
 
 ## Unsigned builds
