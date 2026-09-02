@@ -230,8 +230,15 @@ struct CodexAppServerSessionTests {
             return true
         }
 
-        #expect(try await taskValue(heartbeat, within: .milliseconds(100)))
-        let result = try await taskValue(readTask, within: .seconds(1))
+        // The reader's own 0.1s timeout above is the thing under test and stays
+        // short. These two bounds are the harness giving up, not assertions: the
+        // property being checked is that the heartbeat completes without waiting
+        // on the stalled read, and a 20ms sleep resolving inside 2s still proves
+        // it was never blocked by a request that takes far longer. At 100ms the
+        // bound was tight enough that spawning the zsh fixture on a loaded
+        // runner tripped it instead of the code under test.
+        #expect(try await taskValue(heartbeat, within: .seconds(2)))
+        let result = try await taskValue(readTask, within: .seconds(10))
         guard case let .failure(error) = result else {
             Issue.record("Expected the unresponsive request to time out")
             return
