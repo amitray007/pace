@@ -186,8 +186,17 @@ struct RailActivationEngineTests {
             .pointerMoved(sample(region: .rail(providerIndex: 1))),
             at: 2,
         )
-        #expect(engine.handle(.tick, at: 2.07).isEmpty)
-        #expect(engine.handle(.tick, at: 2.08) == [.selectProvider(index: 1)])
+        // Expressed against the configured delay rather than a literal, so
+        // tuning it for responsiveness does not silently invalidate the test.
+        let hoverDelay = RailActivationConfiguration(
+            mode: .clickHandle,
+            dwellDelay: 0.6,
+            dismissalDelay: 0.4,
+        ).providerHoverDelay
+        #expect(engine.handle(.tick, at: 2 + hoverDelay - 0.01).isEmpty)
+        #expect(
+            engine.handle(.tick, at: 2 + hoverDelay) == [.selectProvider(index: 1)],
+        )
 
         _ = engine.handle(.pointerMoved(sample(region: .outside)), at: 3)
         #expect(engine.phase == .dismissalPending)

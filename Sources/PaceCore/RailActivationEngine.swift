@@ -47,6 +47,12 @@ public struct RailActivationConfiguration: Equatable, Sendable {
     public var mode: RailActivationMode
     public var dwellDelay: TimeInterval
     public var dismissalDelay: TimeInterval
+    /// How long the pointer must rest on a provider before its panel opens.
+    ///
+    /// This exists only to reject a pointer brushing past an adjacent ring on
+    /// its way somewhere else. The travel corridor already protects the
+    /// diagonal move from a ring into the open panel, so this can be short
+    /// enough to feel like the panel answers the pointer directly.
     public var providerHoverDelay: TimeInterval
     public var scrollSuppressionDuration: TimeInterval
     public var dragReleaseSuppressionDuration: TimeInterval
@@ -61,7 +67,7 @@ public struct RailActivationConfiguration: Equatable, Sendable {
         mode: RailActivationMode,
         dwellDelay: TimeInterval,
         dismissalDelay: TimeInterval,
-        providerHoverDelay: TimeInterval = 0.08,
+        providerHoverDelay: TimeInterval = 0.045,
         scrollSuppressionDuration: TimeInterval = 0.45,
         dragReleaseSuppressionDuration: TimeInterval = 0.2,
         fastPointerSuppressionDuration: TimeInterval = 0.25,
