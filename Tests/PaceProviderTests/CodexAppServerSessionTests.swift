@@ -12,7 +12,7 @@ struct CodexAppServerSessionTests {
         defer { fixture.remove() }
         let reader = CodexAppServerReader(
             executableURL: fixture.executableURL,
-            timeout: 2,
+            timeout: 10,
             reconnectDelays: [.milliseconds(10)],
         )
         let events = try await reader.events(for: fixture.profile)
@@ -38,9 +38,13 @@ struct CodexAppServerSessionTests {
     func `reports exit and reconnects with bounded backoff`() async throws {
         let fixture = try CodexServerFixture(exitsAfterRateLimitRead: true)
         defer { fixture.remove() }
+        // This asserts that a dropped session reconnects, not how quickly it
+        // does. The fixture is a zsh script, so a run has to spawn a shell,
+        // let it exit, and spawn it again; on a loaded machine that exceeded a
+        // two-second budget often enough to fail roughly one run in three.
         let reader = CodexAppServerReader(
             executableURL: fixture.executableURL,
-            timeout: 2,
+            timeout: 10,
             reconnectDelays: [.milliseconds(10)],
         )
         let events = try await reader.events(for: fixture.profile)
@@ -74,7 +78,7 @@ struct CodexAppServerSessionTests {
         )
         let reader = CodexAppServerReader(
             executableURL: fixture.executableURL,
-            timeout: 3,
+            timeout: 10,
             reconnectDelays: [.milliseconds(10)],
         )
 
@@ -96,7 +100,7 @@ struct CodexAppServerSessionTests {
         defer { fixture.remove() }
         let reader = CodexAppServerReader(
             executableURL: fixture.executableURL,
-            timeout: 2,
+            timeout: 10,
             reconnectDelays: [.milliseconds(10)],
         )
 
@@ -137,7 +141,7 @@ struct CodexAppServerSessionTests {
         defer { fixture.remove() }
         let reader = CodexAppServerReader(
             executableURL: fixture.executableURL,
-            timeout: 2,
+            timeout: 10,
             reconnectDelays: [.milliseconds(10)],
         )
         let events = try await reader.events(for: fixture.profile)
@@ -162,7 +166,7 @@ struct CodexAppServerSessionTests {
         defer { fixture.remove() }
         let reader = CodexAppServerReader(
             executableURL: fixture.executableURL,
-            timeout: 3,
+            timeout: 10,
             reconnectDelays: [.milliseconds(10)],
         )
         _ = try await reader.read(profile: fixture.profile, includeRateLimits: false)
@@ -180,7 +184,7 @@ struct CodexAppServerSessionTests {
         defer { fixture.remove() }
         let reader = CodexAppServerReader(
             executableURL: fixture.executableURL,
-            timeout: 3,
+            timeout: 10,
             reconnectDelays: [.milliseconds(10)],
         )
         _ = try await reader.read(profile: fixture.profile, includeRateLimits: false)
