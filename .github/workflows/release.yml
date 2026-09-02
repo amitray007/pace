@@ -38,8 +38,18 @@ jobs:
           # Build the released code, not the branch tip, on either trigger.
           ref: ${{ inputs.tag || github.event.release.tag_name }}
 
-      - name: select Xcode
-        run: sudo xcode-select -switch /Applications/Xcode_26.app
+      # Matches ci.yml: the default Xcode is too old and the image's point
+      # releases change, so select the newest installed rather than a path.
+      - name: select the newest Xcode
+        run: |
+          set -euo pipefail
+          NEWEST=$(ls -d /Applications/Xcode_*.app 2>/dev/null \
+            | sed 's|.*/Xcode_||; s|\.app$||' \
+            | sort -V | tail -1)
+          test -n "$NEWEST" || { echo "::error::no versioned Xcode found"; exit 1; }
+          echo "Selecting Xcode $NEWEST"
+          sudo xcode-select -switch "/Applications/Xcode_${NEWEST}.app"
+          swift --version
 
       - name: install xcodegen
         run: brew install xcodegen
