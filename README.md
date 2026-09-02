@@ -94,9 +94,11 @@ make check      # format, lint, test, build
 make install    # build Release, sign locally, install to /Applications
 ```
 
-`make install` creates a self-signed certificate the first time it runs, so macOS keeps your
-keychain approvals between builds. An ad-hoc signature changes identity on every build, which makes
-the system prompt every time.
+`make install` creates a self-signed certificate the first time it runs so the installed app keeps
+one code identity across rebuilds. It does not carry keychain approvals across rebuilds: macOS
+records "Always Allow" against the binary's own code hash for any signature that is not an Apple
+Developer ID, so each new build needs one approval per credential. See
+[keychain approvals](#keychain-approvals).
 
 [CONTRIBUTING.md](CONTRIBUTING.md) covers the layout and the rules the code holds itself to.
 
@@ -108,6 +110,19 @@ flag and applies an ad-hoc signature so the app will open. Doing it by hand mean
 
 An unsigned build carries no cryptographic proof of who produced it. If that matters to you, build
 from source.
+
+## Keychain approvals
+
+Pace reads the login credentials that Claude Code and Cursor keep in your login keychain. It never
+shows the macOS keychain dialog on its own: not at launch, not on a scheduled refresh, and not when
+you press Refresh. An account whose credential macOS has not yet released to Pace shows "Keychain
+access needed" with an "Allow keychain access" button in the menu panel and in Settings. Pressing
+it shows the macOS dialog once for each credential. Enter your login password and choose **Always
+Allow**; plain Allow approves one read only.
+
+Without an Apple Developer ID, macOS ties that approval to the exact binary, so every Pace update
+asks again, once per credential. Nothing in the app can change that. It is how macOS classifies
+applications that are not signed by an Apple-issued certificate.
 
 ## License
 

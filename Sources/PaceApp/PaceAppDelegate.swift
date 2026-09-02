@@ -1,5 +1,6 @@
 import AppKit
 import PaceCore
+import PaceProviders
 
 @MainActor
 final class PaceAppDelegate: NSObject, NSApplicationDelegate {
@@ -17,6 +18,12 @@ final class PaceAppDelegate: NSObject, NSApplicationDelegate {
     private var statusItemController: StatusItemController?
 
     func applicationDidFinishLaunching(_: Notification) {
+        // Before the first provider read. Pace reads credentials that Claude
+        // Code and Cursor own, and macOS would otherwise ask for the login
+        // password at launch, once per keychain item. Access is granted from
+        // the account's own "Allow keychain access" action instead.
+        KeychainInteractionPolicy.disableAutomaticPrompts()
+
         statusItemController = StatusItemController(model: model)
         edgePanelController = EdgePanelController(model: model)
 

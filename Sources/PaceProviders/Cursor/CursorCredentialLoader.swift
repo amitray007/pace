@@ -22,19 +22,15 @@ struct CursorSecurityKeychainReader: CursorKeychainReading {
         service: String,
         account: String,
     ) throws(CursorProviderError) -> CursorKeychainRecord? {
-        // `LAContext.interactionNotAllowed` only suppresses LocalAuthentication
-        // UI, such as a Touch ID sheet. It does not suppress the classic
-        // keychain authorization dialog that asks for the login password when
-        // an item's access control does not already admit this application.
-        // `kSecUseAuthenticationUIFail` is what suppresses that dialog, failing
-        // with `errSecInteractionNotAllowed` instead of showing it.
-        //
-        // The two are not combined: supplying `kSecUseAuthenticationContext`
-        // makes the context's policy win and the UI key is ignored, which is
-        // what left the password dialog appearing.
-        //
-        // Pace reads a credential another application owns and has a fallback
-        // for every failure, so it must never be the reason a dialog appears.
+        // Whether this read may show the macOS keychain dialog is decided by
+        // `KeychainInteractionPolicy`, not by the query. Cursor stores these
+        // items in the login keychain, and that keychain ignores
+        // `kSecUseAuthenticationUI`; it only honours the process-wide
+        // `SecKeychainSetUserInteractionAllowed` setting. While prompts are
+        // disabled a read Pace is not admitted to fails with
+        // `errSecAuthFailed` or `errSecInteractionNotAllowed`, which is
+        // reported as `credentialAccessDenied` so the user can be offered a
+        // deliberate, prompted read instead of an interruption.
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -42,7 +38,6 @@ struct CursorSecurityKeychainReader: CursorKeychainReading {
             kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
             kSecMatchLimit as String: kSecMatchLimitOne,
             kSecReturnData as String: true,
-            kSecUseAuthenticationUI as String: kSecUseAuthenticationUIFail,
         ]
         var result: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
@@ -55,7 +50,7 @@ struct CursorSecurityKeychainReader: CursorKeychainReading {
         case errSecItemNotFound:
             return nil
         case errSecInteractionNotAllowed, errSecAuthFailed, errSecUserCanceled:
-            throw .credentialReadFailed
+            throw .credentialAccessDenied
         default:
             throw .credentialReadFailed
         }

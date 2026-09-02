@@ -31,6 +31,25 @@ struct CursorCredentialLoaderTests {
     }
 
     @Test
+    func `a keychain that refuses without asking reports access denied`() throws {
+        // Under `KeychainInteractionPolicy` a refused read is the expected
+        // state for a build macOS has not admitted yet. It must stay distinct
+        // from a broken read so the account can offer a prompted retry.
+        let home = try makeProfileHome()
+        defer { try? FileManager.default.removeItem(at: home) }
+        try writeConfiguration(authenticationID: "auth0|default", home: home)
+        let keychain = CursorStubKeychain(records: [
+            CursorCredentialLoader.accessTokenService: .failure(.credentialAccessDenied),
+        ])
+
+        #expect(throws: CursorProviderError.credentialAccessDenied) {
+            try CursorCredentialLoader(keychain: keychain).load(
+                for: .current(homeDirectory: home),
+            )
+        }
+    }
+
+    @Test
     func `loads only an owner private isolated credential file`() throws {
         let home = try makeProfileHome()
         defer { try? FileManager.default.removeItem(at: home) }

@@ -165,8 +165,19 @@ public struct CursorProviderAdapter: ProviderUpdateStreamingAdapter {
             .signedOut
         case .cancelled:
             .unavailable(code: "cursor-request-cancelled")
+        default:
+            providerAvailabilityFailure(for: error)
+        }
+    }
+
+    private func providerAvailabilityFailure(for error: CursorProviderError) -> ProviderFailure {
+        switch error {
         case .credentialChanged:
             .unavailable(code: "cursor-credential-changed")
+        case .credentialAccessDenied:
+            // Listed in `KeychainInteractionPolicy.authorizationRequiredCodes`:
+            // the account is fine, macOS just has not admitted Pace yet.
+            .unavailable(code: "cursor-credential-needs-authorization")
         case .credentialReadFailed, .insecureCredentialFile:
             .unavailable(code: "cursor-credential-unavailable")
         case .invalidCredential:
@@ -177,6 +188,8 @@ public struct CursorProviderAdapter: ProviderUpdateStreamingAdapter {
             .failed(code: "cursor-response-invalid")
         case .requestFailed, .transportFailed:
             .unavailable(code: "cursor-service-unavailable")
+        default:
+            .failed(code: "cursor-request-failed")
         }
     }
 }

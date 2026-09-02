@@ -109,6 +109,12 @@ extension PacePresentationModel {
                 "This Claude login cannot read subscription usage. Sign in again with Claude Code.",
             "claude-credential-changed":
                 "The Claude login changed during refresh. Try again.",
+            "claude-credential-needs-authorization":
+                "macOS has not let Pace read the Claude Code login from your keychain. "
+                + "Use Allow keychain access, then choose Always Allow.",
+            "cursor-credential-needs-authorization":
+                "macOS has not let Pace read the Cursor Agent login from your keychain. "
+                + "Use Allow keychain access, then choose Always Allow.",
             "cursor-credential-changed":
                 "The Cursor Agent login changed during refresh. Try again.",
             "cursor-credential-unavailable":

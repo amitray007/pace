@@ -1,4 +1,5 @@
 import PaceCore
+import PaceProviders
 import SwiftUI
 
 struct UsageStatusPresentation: Equatable {
@@ -156,6 +157,10 @@ struct UsageStatusPresentation: Equatable {
             title = retainsLastGoodData ? "Stale data" : "Rate limited"
             symbolName = "hourglass"
             severity = .warning
+        case .unavailable where KeychainInteractionPolicy.needsAuthorization(issue):
+            title = retainsLastGoodData ? "Stale data" : "Keychain access needed"
+            symbolName = "key"
+            severity = .warning
         case .unavailable:
             title = retainsLastGoodData ? "Stale data" : "Usage unavailable"
             symbolName = "wifi.exclamationmark"
@@ -189,6 +194,9 @@ struct UsageStatusPresentation: Equatable {
                 formatter.unitsStyle = .full
                 return "Try again \(formatter.localizedString(for: $0, relativeTo: referenceDate))."
             } ?? "The provider asked Pace to wait before refreshing."
+        case .unavailable where KeychainInteractionPolicy.needsAuthorization(issue):
+            "macOS has not let Pace read this login from your keychain. "
+                + "Use Allow keychain access, then choose Always Allow."
         case .unavailable:
             "The provider could not return usage."
         case .failed:

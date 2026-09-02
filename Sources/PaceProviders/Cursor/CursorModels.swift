@@ -128,6 +128,10 @@ struct CursorUsageResult: Equatable, Sendable {
 
 enum CursorProviderError: Error, Equatable, Sendable {
     case cancelled
+    /// macOS would not release a keychain item without asking the user, and
+    /// asking was not allowed. The credential exists and is intact; a read
+    /// under `KeychainInteractionPolicy.allowingPrompts` resolves it.
+    case credentialAccessDenied
     case credentialChanged
     case credentialReadFailed
     case identityMismatch

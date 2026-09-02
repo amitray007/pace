@@ -51,6 +51,10 @@ struct ManagedProviderAccountRow: View {
             .disabled(isManagingAccounts)
             .accessibilityLabel("Enable \(account.displayName)")
 
+            if model.needsKeychainAuthorization(account) {
+                KeychainAccessButton(model: model, account: account)
+            }
+
             Button(role: .destructive) {
                 confirmsRemoval = true
             } label: {

@@ -5,15 +5,18 @@
 # The installed bundle is signed with a local self-signed identity so macOS sees
 # the same code identity across rebuilds.
 #
-# This matters for the keychain. A signed bundle's designated requirement is
-# derived from its identifier and certificate, so it is stable when the binary
-# changes. An ad-hoc signature's designated requirement is the binary's own
-# CDHash, so every rebuild is a different application as far as macOS is
-# concerned, and every stored "Always Allow" decision stops matching. Signing
-# the same way each time is what lets a credential be approved once.
+# A signed bundle's designated requirement is derived from its identifier and
+# certificate, so it is stable when the binary changes, while an ad-hoc
+# signature's designated requirement is the binary's own CDHash. Service
+# Management login items and UserNotifications authorization depend on that
+# stability, and so does the application list on a keychain item.
 #
-# Service Management login items and UserNotifications authorization depend on
-# the same stability.
+# It does not make keychain approvals survive a rebuild. securityd also keeps a
+# partition list on each item, and a certificate that Apple did not issue is
+# classified there by CDHash, so every build still needs one approval per
+# credential. Pace never raises that dialog on its own; the user grants access
+# from the account's "Allow keychain access" action, so the launch check below
+# does not prompt.
 #
 # This is a local development install. It is not notarized and it is not a
 # distribution artifact.
@@ -83,8 +86,9 @@ trap 'rm -rf "$staged_path"' EXIT
 ditto "$app_path" "$staged_path/$app_name"
 
 # Sign with the local identity, falling back to ad-hoc so a machine without the
-# identity still gets a working install. The fallback re-prompts for keychain
-# access after every build, so it reports that rather than failing silently.
+# identity still gets a working install. The fallback changes the bundle's
+# designated requirement on every build, so it reports that rather than
+# failing silently.
 if security find-identity -v -p codesigning \
     | grep -Fq "$signing_identity"; then
     # No hardened runtime here. It enforces library validation, which requires
@@ -96,7 +100,7 @@ if security find-identity -v -p codesigning \
     signature_kind=$signing_identity
 else
     echo "note: '$signing_identity' not found; signing ad-hoc." >&2
-    echo "note: keychain approvals will not survive a rebuild." >&2
+    echo "note: the code identity will change on every rebuild." >&2
     echo "note: run Scripts/create-signing-identity.sh to fix this." >&2
     codesign --force --deep --sign - --timestamp=none "$staged_path/$app_name"
     signature_kind=adhoc

@@ -341,7 +341,7 @@ extension PacePresentationModel {
         reconcileActiveProvider()
     }
 
-    private func refreshAccountIfAvailable(_ accountID: AccountID) async throws {
+    func refreshAccountIfAvailable(_ accountID: AccountID) async throws {
         guard let refreshCoordinator else {
             return
         }

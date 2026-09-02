@@ -29,16 +29,23 @@ created on demand by `Scripts/create-signing-identity.sh` and is trusted only in
 this user's trust domain. It is not an Apple Developer ID and it does not
 support distribution or notarization.
 
-The identity exists because of the keychain. macOS stores an "Always Allow"
-decision against an application's designated requirement. Signing produces
-`identifier "com.amitray.Pace.dev" and certificate root H"63f2ec…"`, which does
-not change when the binary does, so an approval granted once holds across
-rebuilds. An ad-hoc signature's requirement is the binary's own CDHash, which
-made every rebuild a different application and discarded every approval.
+The identity keeps the application's designated requirement stable, which is
+what macOS keys the keychain item's application list, Service Management login
+items, and notification authorization on. It does not carry keychain approvals
+across rebuilds. `securityd` also keeps a partition list on each item, keyed by
+a partition ID that is `teamid:` only for Apple-issued certificates and
+`cdhash:` plus the binary's code directory hash for everything else, including
+this local certificate. "Always Allow" records that ID, so each rebuild is a
+new partition and needs one approval per item again. Only a Developer ID
+changes that.
 
-Each provider credential is a separate keychain item with its own access
-control, so each still needs one approval the first time. Pace reads these items
-and never writes them; the credentials stay owned by Claude Code and Cursor.
+Pace therefore never raises the keychain dialog on its own. Reads run with
+`SecKeychainSetUserInteractionAllowed` off, an account that macOS refuses
+reports "Keychain access needed", and the user grants access from that
+account's "Allow keychain access" action. Each provider credential is a
+separate keychain item with its own access control, so each needs one approval
+per build. Pace reads these items and never rewrites their access control; the
+credentials stay owned by Claude Code and Cursor.
 
 ## Current Mac coverage
 

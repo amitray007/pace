@@ -173,6 +173,11 @@ struct MenuPanelView: View {
                     .foregroundStyle(.secondary)
             }
 
+            if let account = model.selectedAccountAwaitingKeychain {
+                KeychainAccessButton(model: model, account: account)
+                    .font(.system(size: 10, weight: .medium))
+            }
+
             accountPicker
         }
     }

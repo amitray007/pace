@@ -162,3 +162,26 @@ struct AllAccountsRow: View {
         .focusable()
     }
 }
+
+/// The only account problem a surface can fix itself.
+///
+/// macOS will not release this account's credential without asking, and Pace
+/// never asks on its own, so the ask is offered as an action. Pressing it shows
+/// the macOS keychain dialog once for each of the account's credentials.
+struct KeychainAccessButton: View {
+    @Bindable var model: PacePresentationModel
+    let account: ProviderAccount
+
+    var body: some View {
+        Button("Allow keychain access...") {
+            Task { await model.authorizeKeychainAccess(for: account.id) }
+        }
+        .disabled(model.isProviderRuntimeBusy || model.isRefreshing || model.isManagingAccounts)
+        .help(
+            "macOS asks for your login password once for each credential. "
+                + "Choose Always Allow so it does not ask again for this build.",
+        )
+        .accessibilityLabel("Allow keychain access for \(model.displayName(for: account))")
+        .accessibilityHint("Shows the macOS keychain dialog once for each credential")
+    }
+}

@@ -3,13 +3,16 @@
 # Create the local self-signed code-signing identity that `make install` uses.
 #
 # Why this exists: an ad-hoc signature's designated requirement is the binary's
-# own CDHash, so every rebuild produces a different code identity. Keychain
-# "Always Allow" decisions are stored against that requirement, which means an
-# ad-hoc build has to re-ask for every credential after every build.
+# own CDHash, so every rebuild produces a different code identity. Signing with
+# a certificate instead gives a designated requirement based on the bundle
+# identifier and the certificate, which does not change when the binary does.
+# Service Management login items, notification authorization, and the
+# application list on a keychain item are keyed by that requirement.
 #
-# Signing with a certificate instead gives a designated requirement based on the
-# certificate's identifier and subject, which does not change when the binary
-# does. Approving a credential once then holds across rebuilds.
+# It does not make keychain approvals survive a rebuild. securityd classifies a
+# certificate that Apple did not issue by CDHash in each item's partition list,
+# so every build still needs one "Always Allow" per credential. Only an Apple
+# Developer ID, which earns a team-based partition, changes that.
 #
 # This certificate is self-signed and local. It is not an Apple Developer ID and
 # it does not enable distribution or notarization. It exists so a locally built

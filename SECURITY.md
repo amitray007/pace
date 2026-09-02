@@ -72,6 +72,10 @@ What that means for you:
   file has not changed since it was published, but it does not attest to who published it.
 - If the release pipeline or the tap repository were compromised, an installed build could be
   replaced without a signature check catching it.
+- Keychain approvals are per build. macOS records "Always Allow" for a Developer ID application
+  under its team, and for anything else under the binary's own code hash. Pace never raises the
+  keychain dialog on its own; you grant access from the account's "Allow keychain access" action,
+  and each update asks again once per credential.
 
 Build from source if that risk matters to you. The release workflow is in
 `.github/workflows/release.yml` and builds from a tagged commit, so you can compare.
