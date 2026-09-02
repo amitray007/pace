@@ -1,3 +1,4 @@
+import AppKit
 import PaceCore
 import SwiftUI
 
@@ -293,6 +294,16 @@ struct MenuPanelView: View {
                 Image(systemName: "gearshape")
             }
             .accessibilityLabel("Open Pace settings")
+
+            // Pace has no Dock icon, so without this the panel offers no way
+            // to quit and the only route is Activity Monitor.
+            Button {
+                NSApp.terminate(nil)
+            } label: {
+                Image(systemName: "power")
+            }
+            .keyboardShortcut("q", modifiers: .command)
+            .accessibilityLabel("Quit Pace")
         }
         .buttonStyle(.plain)
         .font(.system(size: 11, weight: .medium))

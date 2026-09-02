@@ -1,7 +1,7 @@
 import PaceCore
 import SwiftUI
 
-struct UsageStatusPresentation {
+struct UsageStatusPresentation: Equatable {
     enum Severity: Equatable {
         case error
         case neutral

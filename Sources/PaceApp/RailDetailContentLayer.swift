@@ -4,22 +4,22 @@ import SwiftUI
 
 private struct EdgeDetailPanel: View {
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
-    let providerID: ProviderID
-    let account: ProviderAccount?
-    let snapshots: [LimitSnapshot]
-    let status: AccountUsageStatus?
-    let increasedContrast: Bool
-    let nextRefreshAt: Date?
-    let isRefreshing: Bool
-    let referenceDate: Date
-    let accountName: String
+    let content: RailDetailContent
+
+    private var providerID: ProviderID {
+        content.providerID
+    }
+
+    private var snapshots: [LimitSnapshot] {
+        content.snapshots
+    }
+
+    private var presentation: UsageStatusPresentation {
+        content.presentation
+    }
 
     var body: some View {
         let style = ProviderStyle.resolve(providerID)
-        let presentation = status.map {
-            UsageStatusPresentation.resolve($0, referenceDate: referenceDate)
-        }
-            ?? .missing(isLoading: isRefreshing)
         VStack(alignment: .leading, spacing: 9) {
             // The reference header is only the provider mark and title. The
             // account identity and plan stay in the footer so the title line
@@ -62,8 +62,8 @@ private struct EdgeDetailPanel: View {
                 }
                 Spacer(minLength: 0)
                 RefreshCountdownView(
-                    nextRefreshAt: nextRefreshAt,
-                    isRefreshing: isRefreshing,
+                    nextRefreshAt: content.nextRefreshAt,
+                    isRefreshing: content.isRefreshing,
                     style: .sentence,
                 )
                 .lineLimit(1)
@@ -72,11 +72,13 @@ private struct EdgeDetailPanel: View {
             .font(.system(size: 9.5, weight: .medium))
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        // The title and the footer line sit directly against these edges, so
+        // this is what keeps them off the panel's rounded border.
+        .padding(.vertical, 16)
         .foregroundStyle(.white)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(
-            "\(style.name) usage for \(accountName). " +
+            "\(style.name) usage for \(content.accountName). " +
                 "\(presentation.title). \(presentation.detail)",
         )
     }
@@ -85,14 +87,15 @@ private struct EdgeDetailPanel: View {
     /// the bar beneath them, and the used percentage on its own line below the
     /// bar. Measured from `settings-claude-detail.png`.
     private func quotaRows() -> some View {
-        ForEach(snapshots.prefix(3)) { snapshot in
+        let rows = Array(zip(snapshots, content.resetTexts).prefix(3))
+        return ForEach(rows, id: \.0.id) { snapshot, resetText in
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(snapshot.label)
                         .font(.system(size: 10.5, weight: .semibold))
                         .lineLimit(1)
                     Spacer(minLength: 4)
-                    Text(resetText(for: snapshot))
+                    Text(resetText)
                         .font(.system(size: 10.5))
                         .foregroundStyle(.white.opacity(0.55))
                         .lineLimit(1)
@@ -128,30 +131,8 @@ private struct EdgeDetailPanel: View {
     }
 
     private var usesIncreasedContrast: Bool {
-        colorSchemeContrast == .increased || increasedContrast
+        colorSchemeContrast == .increased || content.increasedContrast
     }
-
-    private func resetText(for snapshot: LimitSnapshot) -> String {
-        QuotaResetText.description(
-            resetsAt: snapshot.resetsAt,
-            relativeTo: referenceDate,
-        )
-    }
-}
-
-struct RailDetailContent: Equatable {
-    let providerID: ProviderID
-    let account: ProviderAccount?
-    let snapshots: [LimitSnapshot]
-    let status: AccountUsageStatus?
-    let increasedContrast: Bool
-    let nextRefreshAt: Date?
-    let isRefreshing: Bool
-    /// Rounded to the minute. Reset wording is stated in minutes at its finest,
-    /// so a second-by-second value would make this unequal on every pass
-    /// without changing anything on screen.
-    let referenceDate: Date
-    let accountName: String
 }
 
 struct RailDetailContentLayerRepresentable: NSViewRepresentable {
@@ -191,9 +172,17 @@ private struct RailDetailContentState {
     let reducesMotion: Bool
 }
 
+/// Hosts the provider panels top-down so a panel shorter than the container
+/// stays anchored to the container's top edge without repositioning.
+private final class RailDetailContainerView: NSView {
+    override var isFlipped: Bool {
+        true
+    }
+}
+
 final class RailDetailContentLayerView: NSView {
-    private let contentContainerView = NSView()
-    private var contentViews: [ProviderID: NSHostingView<AnyView>] = [:]
+    private let contentContainerView = RailDetailContainerView()
+    private var contentViews: [ProviderID: NSHostingView<EdgeDetailPanel>] = [:]
     private var hasReceivedState = false
     private var renderedContents: [ProviderID: RailDetailContent] = [:]
     private var visibleProviderID: ProviderID?
@@ -289,13 +278,20 @@ final class RailDetailContentLayerView: NSView {
             let contentView = contentViews[providerID] ?? makeContentView(for: content)
             let contentChanged = renderedContents[providerID] != content
             if contentChanged {
-                contentView.rootView = AnyView(detailPanel(for: content))
+                contentView.rootView = EdgeDetailPanel(content: content)
                 renderedContents[providerID] = content
             }
-            let frameChanged = contentView.frame != contentContainerView.bounds
+            // Each panel is sized to its own content rather than to the
+            // container. The container follows the visible panel's height, so
+            // sizing every panel to it laid out and redrew all of them on each
+            // switch between providers with different quota counts.
+            let targetFrame = contentFrame(for: content)
+            let frameChanged = contentView.frame != targetFrame
             if frameChanged {
-                contentView.frame = contentContainerView.bounds
+                contentView.frame = targetFrame
             }
+            // Every panel is laid out and drawn ahead of time, so selecting a
+            // provider shows a finished panel instead of building one.
             if isNewContentView || contentChanged || frameChanged {
                 contentView.layoutSubtreeIfNeeded()
                 contentView.displayIfNeeded()
@@ -305,9 +301,9 @@ final class RailDetailContentLayerView: NSView {
 
     private func makeContentView(
         for content: RailDetailContent,
-    ) -> NSHostingView<AnyView> {
-        let contentView = NSHostingView(rootView: AnyView(detailPanel(for: content)))
-        contentView.autoresizingMask = [.width, .height]
+    ) -> NSHostingView<EdgeDetailPanel> {
+        let contentView = NSHostingView(rootView: EdgeDetailPanel(content: content))
+        contentView.autoresizingMask = []
         contentView.wantsLayer = true
         contentView.layer?.actions = ["opacity": NSNull()]
         contentContainerView.addSubview(contentView)
@@ -316,17 +312,12 @@ final class RailDetailContentLayerView: NSView {
         return contentView
     }
 
-    private func detailPanel(for content: RailDetailContent) -> EdgeDetailPanel {
-        EdgeDetailPanel(
-            providerID: content.providerID,
-            account: content.account,
-            snapshots: content.snapshots,
-            status: content.status,
-            increasedContrast: content.increasedContrast,
-            nextRefreshAt: content.nextRefreshAt,
-            isRefreshing: content.isRefreshing,
-            referenceDate: content.referenceDate,
-            accountName: content.accountName,
+    private func contentFrame(for content: RailDetailContent) -> CGRect {
+        CGRect(
+            x: 0,
+            y: 0,
+            width: EdgeRailGeometry.detailWidth,
+            height: content.panelHeight,
         )
     }
 
@@ -367,6 +358,7 @@ final class RailDetailContentLayerView: NSView {
                 ? RailMotion.reducedMotionFadeDuration
                 : RailMotion.Transition.detail.contentDuration
             fade.timingFunction = RailMotion.detailTimingFunction
+            fade.preferredFrameRateRange = RailMotion.preferredFrameRateRange
             layer.add(fade, forKey: "pace.contentCrossfade")
         }
     }
@@ -386,6 +378,7 @@ final class RailDetailContentLayerView: NSView {
         animation.toValue = targetPosition
         animation.duration = RailMotion.detailDuration
         animation.timingFunction = RailMotion.timingFunction
+        animation.preferredFrameRateRange = RailMotion.preferredFrameRateRange
         layer.add(animation, forKey: "pace.detailPosition")
     }
 
@@ -413,6 +406,7 @@ final class RailDetailContentLayerView: NSView {
             ? RailMotion.reducedMotionFadeDuration
             : RailMotion.contentDismissDuration
         animation.timingFunction = RailMotion.timingFunction
+        animation.preferredFrameRateRange = RailMotion.preferredFrameRateRange
         layer.add(animation, forKey: "pace.detailOpacity")
     }
 

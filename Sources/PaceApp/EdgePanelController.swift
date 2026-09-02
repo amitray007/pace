@@ -9,6 +9,7 @@ final class EdgePanelController {
     private var interactionController: RailInteractionController?
     private var screenParametersObserver: NSObjectProtocol?
     private var workspaceObservers: [NSObjectProtocol] = []
+    private var cachedFullScreenExclusion: FullScreenExclusion?
 
     init(
         model: PacePresentationModel,
@@ -32,6 +33,33 @@ final class EdgePanelController {
         observeScreenParameters()
         observeWorkspace()
         synchronizeVisibility()
+
+        // Writes the rail to a transparent PNG and exits. Capturing the rail
+        // off the screen photographs whatever sits behind its transparent
+        // canvas, which is everything the rail is drawn around.
+        if let path = environment["PACE_CAPTURE_RAIL"] {
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(4))
+                self?.captureRail(to: path)
+                NSApp.terminate(nil)
+            }
+        }
+    }
+
+    /// Renders the rail to a PNG with its transparency intact.
+    private func captureRail(to path: String) {
+        guard let view = panel.contentView else {
+            return
+        }
+        let bounds = view.bounds
+        guard let representation = view.bitmapImageRepForCachingDisplay(in: bounds) else {
+            return
+        }
+        view.cacheDisplay(in: bounds, to: representation)
+        guard let png = representation.representation(using: .png, properties: [:]) else {
+            return
+        }
+        try? png.write(to: URL(filePath: path))
     }
 
     isolated deinit {
@@ -117,7 +145,7 @@ final class EdgePanelController {
             queue: .main,
         ) { [weak self] _ in
             Task { @MainActor in
-                self?.synchronizeVisibility()
+                self?.synchronizeVisibility(recheckingFullScreen: true)
             }
         }
     }
@@ -138,14 +166,22 @@ final class EdgePanelController {
                 queue: .main,
             ) { [weak self] _ in
                 Task { @MainActor in
-                    self?.synchronizeVisibility()
+                    self?.synchronizeVisibility(recheckingFullScreen: true)
                 }
             }
         }
     }
 
-    private func synchronizeVisibility() {
-        let isFullScreenExcluded = isFullScreenExcluded
+    /// Brings the panel and its interaction state in line with the model.
+    ///
+    /// The full-screen check asks the window server for every on-screen
+    /// window, which takes milliseconds. It only changes when the frontmost
+    /// application, Space, or display set changes, so those notifications
+    /// recheck it and rail state changes reuse the last answer. Rechecking on
+    /// every reveal and provider switch put that call on the same run loop
+    /// pass that started the animation.
+    private func synchronizeVisibility(recheckingFullScreen: Bool = false) {
+        let isFullScreenExcluded = isFullScreenExcluded(recheck: recheckingFullScreen)
         interactionController?.screenAvailabilityChanged(
             isFullScreenExcluded: isFullScreenExcluded,
         )
@@ -158,12 +194,47 @@ final class EdgePanelController {
         interactionController?.synchronize()
     }
 
-    private var isFullScreenExcluded: Bool {
+    private struct FullScreenExclusion {
+        var hidesRailInFullScreen: Bool
+        var selectedDisplayID: String?
+        var isExcluded: Bool
+
+        func matches(hidesRailInFullScreen: Bool, selectedDisplayID: String?) -> Bool {
+            self.hidesRailInFullScreen == hidesRailInFullScreen &&
+                self.selectedDisplayID == selectedDisplayID
+        }
+    }
+
+    private func isFullScreenExcluded(recheck: Bool) -> Bool {
+        let hidesRailInFullScreen = model.preferences.hideRailInFullScreen
+        let selectedDisplayID = model.preferences.selectedDisplayID
+        let cached = cachedFullScreenExclusion
+        let cacheHolds = cached?.matches(
+            hidesRailInFullScreen: hidesRailInFullScreen,
+            selectedDisplayID: selectedDisplayID,
+        ) ?? false
+        if !recheck, cacheHolds, let cached {
+            return cached.isExcluded
+        }
+        let isExcluded = computeFullScreenExclusion(
+            hidesRailInFullScreen: hidesRailInFullScreen,
+            selectedDisplayID: selectedDisplayID,
+        )
+        cachedFullScreenExclusion = FullScreenExclusion(
+            hidesRailInFullScreen: hidesRailInFullScreen,
+            selectedDisplayID: selectedDisplayID,
+            isExcluded: isExcluded,
+        )
+        return isExcluded
+    }
+
+    private func computeFullScreenExclusion(
+        hidesRailInFullScreen: Bool,
+        selectedDisplayID: String?,
+    ) -> Bool {
         guard interactionController != nil,
-              model.preferences.hideRailInFullScreen,
-              let screen = PaceDisplayCatalog.selectedScreen(
-                  identifier: model.preferences.selectedDisplayID,
-              )
+              hidesRailInFullScreen,
+              let screen = PaceDisplayCatalog.selectedScreen(identifier: selectedDisplayID)
         else {
             return false
         }

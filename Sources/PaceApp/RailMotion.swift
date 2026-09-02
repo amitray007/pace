@@ -107,6 +107,19 @@ enum RailMotion {
         .timingCurve(0.24, 0.32, 0.39, 0.95, duration: duration)
     }
 
+    /// The frame rate the rail's animations ask for.
+    ///
+    /// On a ProMotion display Core Animation chooses a rate per animation, and
+    /// a short path morph does not always earn the top one on its own. Every
+    /// rail animation lasts well under half a second, so asking for the full
+    /// rate costs nothing measurable and keeps the morph from stepping at 60
+    /// on a 120 Hz panel. A 60 Hz display ignores the request.
+    static let preferredFrameRateRange = CAFrameRateRange(
+        minimum: 60,
+        maximum: 120,
+        preferred: 120,
+    )
+
     /// One transition's duration and curve. They are always chosen together, so
     /// they travel together.
     struct Transition {

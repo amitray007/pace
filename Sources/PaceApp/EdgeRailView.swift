@@ -66,7 +66,11 @@ enum EdgeRailGeometry {
     /// The panel is only as tall as its content. A fixed height leaves an empty
     /// band under an account that reports fewer quotas than the maximum, which
     /// the reference never shows.
-    static let detailChromeHeight: CGFloat = 72
+    /// Everything in the panel that is not a quota row: the header, the
+    /// divider, the footer line, and the vertical padding above and below.
+    /// Under-budgeting this does not clip anything, it squeezes the header and
+    /// footer against the rounded border instead.
+    static let detailChromeHeight: CGFloat = 86
     static let detailQuotaRowHeight: CGFloat = 43
     static let detailEmptyStateHeight: CGFloat = 62
     static let maximumDetailQuotaRows = 3
@@ -123,6 +127,7 @@ struct EdgeRailView: View {
             model.visibleProviderIDs.prefix(EdgeRailGeometry.maximumProviderRows),
         )
         let isExpanded = model.railPreviewState != .mini
+        let contents = detailContents(providerIDs: providerIDs)
         ZStack(alignment: .topLeading) {
             RailShellLayerRepresentable(
                 state: RailShellState(
@@ -132,7 +137,7 @@ struct EdgeRailView: View {
                     detailCenterY: detailCenterY(providerIDs: providerIDs),
                     detailHeight: detailHeight(
                         providerID: model.railPreviewState.detailProviderID,
-                        contents: detailContents(providerIDs: providerIDs),
+                        contents: contents,
                     ),
                     showsSettingsCircle: isSettingsHovered,
                     reducesMotion: accessibilityReduceMotion,
@@ -149,7 +154,7 @@ struct EdgeRailView: View {
                 .animation(contentAnimation(isVisible: isExpanded), value: isExpanded)
                 .accessibilityHidden(!isExpanded)
 
-            detailContent(providerIDs: providerIDs)
+            detailContent(providerIDs: providerIDs, contents: contents)
         }
         .scaleEffect(
             EdgeRailGeometry.displayScale(for: model.preferences),
@@ -235,7 +240,6 @@ struct EdgeRailView: View {
             let account = model.selectedAccount(for: contentProviderID)
             return RailDetailContent(
                 providerID: contentProviderID,
-                account: account,
                 snapshots: account.map { model.snapshots(for: $0.id) } ?? [],
                 status: account.map(model.usageStatus(for:)),
                 increasedContrast: usesIncreasedContrast,
@@ -250,9 +254,11 @@ struct EdgeRailView: View {
         }
     }
 
-    private func detailContent(providerIDs: [ProviderID]) -> some View {
+    private func detailContent(
+        providerIDs: [ProviderID],
+        contents: [RailDetailContent],
+    ) -> some View {
         let providerID = model.railPreviewState.detailProviderID
-        let contents = detailContents(providerIDs: providerIDs)
         let centerY = detailCenterY(providerIDs: providerIDs) ?? 92
         let panelHeight = detailHeight(providerID: providerID, contents: contents)
         return RailDetailContentLayerRepresentable(

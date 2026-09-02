@@ -286,6 +286,7 @@ final class RailShellLayerView: NSView {
             pathAnimation.toValue = path
             pathAnimation.duration = transition.duration
             pathAnimation.timingFunction = transition.timing
+            pathAnimation.preferredFrameRateRange = RailMotion.preferredFrameRateRange
             shapeLayer.add(pathAnimation, forKey: "pace.path")
         }
 
@@ -298,6 +299,7 @@ final class RailShellLayerView: NSView {
                 : transition.capped(at: transition.contentDuration)
             opacityAnimation.duration = fade.duration
             opacityAnimation.timingFunction = fade.timing
+            opacityAnimation.preferredFrameRateRange = RailMotion.preferredFrameRateRange
             shapeLayer.add(opacityAnimation, forKey: "pace.opacity")
         }
     }

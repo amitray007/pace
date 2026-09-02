@@ -1,0 +1,144 @@
+name: Release
+
+# Runs when a v* release is published. Builds the Release bundle at the tagged
+# commit, verifies and checksums the archive, attaches it to this repository's
+# release, and — gated on HOMEBREW_TAP_ENABLED — publishes the archive to
+# amitray007/homebrew-tap's own release and pushes the rendered cask there.
+#
+# Failure path: every step before "upload the archive to this release" is local
+# to the runner, so a failed run publishes nothing. The tap steps recreate their
+# tag, so a failed run can be re-run from the release page. Manual recovery:
+# re-run this workflow for the tag, or build locally with `make release-archive`
+# and follow the tap's AGENTS.md.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The v* release tag to build and publish
+        required: true
+        type: string
+
+permissions:
+  contents: write # upload the archive to this repository's release
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  macos:
+    name: build · verify · publish
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          # Build the released code, not the branch tip, on either trigger.
+          ref: ${{ inputs.tag || github.event.release.tag_name }}
+
+      - name: select Xcode
+        run: sudo xcode-select -switch /Applications/Xcode_26.app
+
+      - name: install xcodegen
+        run: brew install xcodegen
+
+      - name: resolve version from tag
+        id: version
+        run: |
+          set -euo pipefail
+          TAG='${{ inputs.tag || github.event.release.tag_name }}'
+          case "$TAG" in
+            v*) ;;
+            *) echo "::error::release tag '$TAG' is not a v* version tag"; exit 1 ;;
+          esac
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tap_tag=pace-v$VERSION" >> "$GITHUB_OUTPUT"
+          # The build number is the run number, so a rebuild of the same
+          # version is still a distinct, traceable artifact.
+          echo "build=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - name: focused verification
+        run: |
+          make lint
+          make test
+
+      # Builds Release, checks the bundle identifier, version, and minimum
+      # system version, zips it, and writes a SHA-256 beside it.
+      - name: build and package the release archive
+        id: package
+        run: |
+          set -euo pipefail
+          make release-archive \
+            RELEASE_VERSION='${{ steps.version.outputs.version }}' \
+            RELEASE_BUILD_NUMBER='${{ steps.version.outputs.build }}' \
+            | tee package.log
+          SHA="$(awk -F= '/^sha256=/{print $2}' package.log)"
+          ARCHIVE="$(awk -F= '/^archive=/{print $2}' package.log)"
+          test -n "$SHA" || { echo "::error::no sha256 in package output"; exit 1; }
+          test -f "$ARCHIVE" || { echo "::error::archive missing: $ARCHIVE"; exit 1; }
+          echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
+          echo "archive=$ARCHIVE" >> "$GITHUB_OUTPUT"
+
+      # Unpacks the archive that will actually ship and launches it, rather
+      # than trusting that the source built.
+      - name: smoke-test the produced artifact
+        run: |
+          make release-smoke \
+            RELEASE_VERSION='${{ steps.version.outputs.version }}' \
+            RELEASE_BUILD_NUMBER='${{ steps.version.outputs.build }}'
+
+      - name: upload the archive to this release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload 'v${{ steps.version.outputs.version }}' \
+            '${{ steps.package.outputs.archive }}' \
+            '${{ steps.package.outputs.archive }}.sha256' --clobber
+
+      - name: publish the archive to the homebrew-tap release
+        if: vars.HOMEBREW_TAP_ENABLED == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAP_TAG='${{ steps.version.outputs.tap_tag }}'
+          # Recreate the tag if a previous attempt left one behind.
+          if gh release view "$TAP_TAG" --repo amitray007/homebrew-tap >/dev/null 2>&1; then
+            gh release delete "$TAP_TAG" --repo amitray007/homebrew-tap --yes --cleanup-tag || \
+              gh release delete "$TAP_TAG" --repo amitray007/homebrew-tap --yes
+            gh api -X DELETE "repos/amitray007/homebrew-tap/git/refs/tags/$TAP_TAG" 2>/dev/null || true
+          fi
+          gh release create "$TAP_TAG" \
+            '${{ steps.package.outputs.archive }}' \
+            '${{ steps.package.outputs.archive }}.sha256' \
+            --repo amitray007/homebrew-tap \
+            --title "Pace ${{ steps.version.outputs.version }}" \
+            --notes "Pace ${{ steps.version.outputs.version }} — \`brew install --cask amitray007/tap/pace\`. Source: https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}"
+
+      - name: checkout homebrew-tap
+        if: vars.HOMEBREW_TAP_ENABLED == 'true'
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          repository: amitray007/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: render and push the cask to the tap
+        if: vars.HOMEBREW_TAP_ENABLED == 'true'
+        run: |
+          set -euo pipefail
+          sed -e "s|{{VERSION}}|${{ steps.version.outputs.version }}|g" \
+              -e "s|{{BUILD_NUMBER}}|${{ steps.version.outputs.build }}|g" \
+              -e "s|{{SHA256}}|${{ steps.package.outputs.sha256 }}|g" \
+              packaging/pace-cask.template.rb > homebrew-tap/Casks/pace.rb
+          # An unrendered placeholder would publish a broken cask.
+          ! grep -q '{{' homebrew-tap/Casks/pace.rb
+          cd homebrew-tap
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add Casks/pace.rb
+          git commit --no-verify -m "pace: bump to ${{ steps.version.outputs.version }}"
+          git push

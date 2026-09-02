@@ -1,13 +1,19 @@
 import AppKit
 
 final class RailInteractionPanel: NSPanel {
+    /// The label this panel was created with. Panels are reused across
+    /// geometry changes, so the controller checks this before deciding
+    /// whether an existing panel can simply be moved.
+    let targetAccessibilityLabel: String?
+
     init(
         frame: NSRect,
         level: NSWindow.Level?,
         accessibilityLabel: String?,
         onEvent: @escaping (NSEvent) -> Void,
-        onAccessibilityPress: @escaping () -> Void,
+        onAccessibilityPress: @escaping (NSPoint) -> Void,
     ) {
+        targetAccessibilityLabel = accessibilityLabel
         super.init(
             contentRect: frame,
             styleMask: [.borderless, .nonactivatingPanel],
@@ -44,13 +50,13 @@ final class RailInteractionPanel: NSPanel {
 
 private final class RailInteractionView: NSView {
     private let onEvent: (NSEvent) -> Void
-    private let onAccessibilityPress: () -> Void
+    private let onAccessibilityPress: (NSPoint) -> Void
 
     init(
         frame: NSRect,
         accessibilityLabel: String?,
         onEvent: @escaping (NSEvent) -> Void,
-        onAccessibilityPress: @escaping () -> Void,
+        onAccessibilityPress: @escaping (NSPoint) -> Void,
     ) {
         self.onEvent = onEvent
         self.onAccessibilityPress = onAccessibilityPress
@@ -116,7 +122,12 @@ private final class RailInteractionView: NSView {
     }
 
     override func accessibilityPerformPress() -> Bool {
-        onAccessibilityPress()
+        // Read the frame at press time. The panel may have been moved since
+        // it was created, so a captured centre would point at the old spot.
+        guard let window else {
+            return false
+        }
+        onAccessibilityPress(window.frame.center)
         return true
     }
 }

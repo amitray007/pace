@@ -3,8 +3,8 @@ import PaceCore
 
 @MainActor
 final class RailInteractionController {
-    private let model: PacePresentationModel
-    private weak var visualPanel: NSPanel?
+    let model: PacePresentationModel
+    weak var visualPanel: NSPanel?
     private var engine: RailActivationEngine
     private var globalMonitor: Any?
     private var timer: Timer?
@@ -65,10 +65,27 @@ final class RailInteractionController {
         ]
         globalMonitor = NSEvent
             .addGlobalMonitorForEvents(matching: eventMask) { [weak self] event in
-                Task { @MainActor in
-                    self?.handle(event)
-                }
+                Self.onMainActor { self?.handle(event) }
             }
+    }
+
+    /// Runs `work` on the main actor with the least delay available.
+    ///
+    /// Event monitors and main run loop timers already call back on the main
+    /// thread. Wrapping each callback in a `Task` queued it behind whatever
+    /// else the main actor had pending, which added a run loop turn between
+    /// the pointer arriving and the rail answering. When the callback is
+    /// already on the main thread it runs inline; otherwise it is queued.
+    private nonisolated static func onMainActor(
+        _ work: sending @escaping @MainActor () -> Void,
+    ) {
+        if Thread.isMainThread {
+            MainActor.assumeIsolated(work)
+        } else {
+            Task { @MainActor in
+                work()
+            }
+        }
     }
 
     private func removeEventMonitors() {
@@ -126,12 +143,6 @@ final class RailInteractionController {
     }
 
     /// How far the pointer is from the edge the rail lives on.
-    /// How many provider rows the rail is showing, which the hit regions are
-    /// laid out against.
-    private var railProviderCount: Int {
-        min(model.visibleProviderIDs.count, EdgeRailGeometry.maximumProviderRows)
-    }
-
     private func edgeDistance(to location: NSPoint) -> Double {
         guard let screen = visualPanel?.screen ?? NSScreen.main else {
             return 0
@@ -178,14 +189,24 @@ final class RailInteractionController {
         guard timer == nil else {
             return
         }
-        let timer = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.handleTimerTick()
-            }
+        let timer = Timer(timeInterval: Self.tickInterval, repeats: true) { [weak self] _ in
+            Self.onMainActor { self?.handleTimerTick() }
         }
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
     }
+
+    /// How often deadlines and polled input state are checked while the
+    /// pointer is on the handle or the rail is open.
+    ///
+    /// The dwell, provider hover, and dismissal deadlines only fire on a tick,
+    /// and so does a modifier pressed over a resting pointer. At the previous
+    /// 50 ms each of those landed up to 50 ms late, which is a third of the
+    /// reveal itself. One display frame keeps the error under what a 120 Hz
+    /// panel can show. The tick reads two event-state values and runs the
+    /// engine, so the extra wakeups are not measurable, and the timer only
+    /// exists during an interaction.
+    private static let tickInterval: TimeInterval = 1.0 / 120.0
 
     private func handleTimerTick() {
         let time = ProcessInfo.processInfo.systemUptime
@@ -212,28 +233,46 @@ final class RailInteractionController {
         // Interaction panels are real windows. Recreating them while nothing
         // moved makes the window server churn on every model refresh and
         // briefly stacks old and new panels, so identical targets keep their
-        // panels.
-        let isUnchanged = targets.count == targetPanels.count &&
-            zip(targets, targetPanels).allSatisfy { target, panel in
-                target.frame == panel.frame
+        // panels. When only the geometry moved, as it does on every provider
+        // switch, the same panels are moved instead of being replaced, which
+        // spares the window server three window creations per switch.
+        // Opening the detail adds one panel behind the two the rail already
+        // has, so panels are matched by position and only the difference is
+        // created or removed.
+        for (index, target) in targets.enumerated() {
+            if targetPanels.indices.contains(index) {
+                let panel = targetPanels[index]
+                if panel.targetAccessibilityLabel == target.accessibilityLabel {
+                    if panel.frame != target.frame {
+                        panel.setFrame(target.frame, display: false)
+                    }
+                    continue
+                }
+                panel.orderOut(nil)
+                targetPanels[index] = makeTargetPanel(for: target)
+            } else {
+                targetPanels.append(makeTargetPanel(for: target))
             }
-        if isUnchanged {
-            return
         }
-        removeTargetPanels()
-        for target in targets {
-            let targetPanel = RailInteractionPanel(
-                frame: target.frame,
-                level: visualPanel?.level,
-                accessibilityLabel: target.accessibilityLabel,
-            ) { [weak self] event in
-                self?.handle(event)
-            } onAccessibilityPress: { [weak self] in
-                self?.handleAccessibilityPress(at: target.frame.center)
-            }
-            targetPanel.orderFrontRegardless()
-            targetPanels.append(targetPanel)
+        while targetPanels.count > targets.count {
+            targetPanels.removeLast().orderOut(nil)
         }
+    }
+
+    private func makeTargetPanel(
+        for target: (frame: NSRect, accessibilityLabel: String?),
+    ) -> RailInteractionPanel {
+        let targetPanel = RailInteractionPanel(
+            frame: target.frame,
+            level: visualPanel?.level,
+            accessibilityLabel: target.accessibilityLabel,
+        ) { [weak self] event in
+            self?.handle(event)
+        } onAccessibilityPress: { [weak self] location in
+            self?.handleAccessibilityPress(at: location)
+        }
+        targetPanel.orderFrontRegardless()
+        return targetPanel
     }
 
     private func removeTargetPanels() {
@@ -247,189 +286,6 @@ final class RailInteractionController {
                 .primaryClick(region: pointerRegion(at: location)),
                 at: ProcessInfo.processInfo.systemUptime,
             ),
-        )
-    }
-}
-
-private extension RailInteractionController {
-    private var interactionTargets: [(frame: NSRect, accessibilityLabel: String?)] {
-        if model.railPreviewState == .mini {
-            return model.preferences.activationMode == .clickHandle
-                ? [(hotspotFrame, "Open Pace rail")]
-                : []
-        }
-        return [(railFrame, nil), (settingsFrame, nil)] +
-            (detailFrame.map { [($0, nil)] } ?? [])
-    }
-
-    private func pointerRegion(at location: NSPoint) -> RailPointerRegion {
-        if model.railPreviewState == .mini {
-            return collapsedPointerFrame.contains(location) ? .hotspot : .outside
-        }
-        if settingsFrame.contains(location) {
-            return .settings
-        }
-        for (index, frame) in providerFrames.enumerated() where frame.contains(location) {
-            return .rail(providerIndex: index)
-        }
-        if railFrame.contains(location) {
-            return .rail(providerIndex: nil)
-        }
-        if detailFrame?.contains(location) == true {
-            return .detail
-        }
-        if travelCorridorFrame?.contains(location) == true {
-            return .travelCorridor
-        }
-        return .outside
-    }
-
-    /// Converts a rect authored in the shell's top-down canvas coordinates
-    /// into the on-screen rect the pointer actually meets: flipped like the
-    /// layer view flips its paths, mirrored for the left edge, and scaled
-    /// around the screen edge. Hit regions must take the same trip the drawing
-    /// takes; the collapsed handle's hotspot once skipped the flip and sat
-    /// 150 pt below the visible handle, which made hovering it feel
-    /// impossible.
-    private func interactionFrame(authored rect: CGRect) -> NSRect {
-        guard let visualPanel else {
-            return .zero
-        }
-        let canvas = EdgeRailGeometry.canvasSize
-        let originX = model.preferences.railEdge == .right
-            ? rect.minX
-            : canvas.width - rect.maxX
-        return scaledInteractionFrame(NSRect(
-            x: visualPanel.frame.minX + originX,
-            y: visualPanel.frame.minY + canvas.height - rect.maxY,
-            width: rect.width,
-            height: rect.height,
-        ))
-    }
-
-    /// The collapsed handle's pointer target.
-    ///
-    /// Derived from the same rect the shell draws the handle from, so shrinking
-    /// the handle cannot leave the clickable area somewhere else. The target is
-    /// deliberately larger than the visible handle, which stays small.
-    private var hotspotFrame: NSRect {
-        interactionFrame(authored: RailShellMetrics.handleTargetRect)
-    }
-
-    /// The hover modes' pointer target: the edge band the rail opens into.
-    ///
-    /// Hover activation has no input window, so the larger band cannot block
-    /// clicks, scrolling, or drags. Click mode keeps the small handle target,
-    /// because that one backs a real input panel.
-    private var hoverHotspotFrame: NSRect {
-        interactionFrame(authored: RailShellMetrics.hoverTargetRect)
-    }
-
-    private var collapsedPointerFrame: NSRect {
-        model.preferences.activationMode == .clickHandle ? hotspotFrame : hoverHotspotFrame
-    }
-
-    private var railFrame: NSRect {
-        interactionFrame(authored: NSRect(
-            x: EdgeRailGeometry.railOriginX,
-            y: RailShellMetrics.topEdgeY,
-            width: EdgeRailGeometry.railWidth,
-            height: RailShellMetrics.bottomEdgeY - RailShellMetrics.topEdgeY,
-        ))
-    }
-
-    private var providerFrames: [NSRect] {
-        EdgeRailGeometry.providerTopY(count: railProviderCount).map { topPosition in
-            interactionFrame(authored: NSRect(
-                x: EdgeRailGeometry.railOriginX,
-                y: topPosition,
-                width: EdgeRailGeometry.railWidth,
-                height: 64,
-            ))
-        }
-    }
-
-    private var settingsFrame: NSRect {
-        let center = RailShellMetrics.settingsCircleCenter
-        return interactionFrame(authored: NSRect(
-            x: center.x - 23,
-            y: center.y - 23,
-            width: 46,
-            height: 46,
-        ))
-    }
-
-    /// The drawn detail panel's frame, sized the same way EdgeRailView sizes
-    /// it so the hit region hugs the drawn panel.
-    private var detailFrame: NSRect? {
-        guard let detailCenterY else {
-            return nil
-        }
-        let quotaCount = model.railPreviewState.detailProviderID
-            .flatMap { providerID in model.selectedAccount(for: providerID) }
-            .map { account in model.snapshots(for: account.id).count } ?? 0
-        let height = EdgeRailGeometry.detailHeight(quotaCount: quotaCount)
-        return interactionFrame(authored: NSRect(
-            x: 0,
-            y: EdgeRailGeometry.detailPanelY(centerY: detailCenterY, height: height),
-            width: EdgeRailGeometry.detailWidth,
-            height: height,
-        ))
-    }
-
-    private var travelCorridorFrame: NSRect? {
-        guard let detailFrame, let detailCenterY,
-              let providerIndex = EdgeRailGeometry.providerCentersY(count: railProviderCount)
-                  .firstIndex(of: detailCenterY),
-                  providerFrames.indices.contains(providerIndex)
-        else {
-            return nil
-        }
-        let centerY = providerFrames[providerIndex].midY
-        let minimumX = model.preferences.railEdge == .right ? detailFrame.maxX : railFrame.maxX
-        let maximumX = model.preferences.railEdge == .right ? railFrame.minX : detailFrame.minX
-        return NSRect(
-            x: minimumX,
-            y: centerY - 24,
-            width: max(maximumX - minimumX, 0),
-            height: 48,
-        )
-    }
-
-    private func scaledInteractionFrame(_ frame: NSRect) -> NSRect {
-        guard let visualPanel else {
-            return .zero
-        }
-        let scale = EdgeRailGeometry.displayScale(for: model.preferences)
-        let anchorX = model.preferences.railEdge == .right
-            ? visualPanel.frame.maxX
-            : visualPanel.frame.minX
-        let anchorY = visualPanel.frame.midY
-        return NSRect(
-            x: anchorX + (frame.minX - anchorX) * scale,
-            y: anchorY + (frame.minY - anchorY) * scale,
-            width: frame.width * scale,
-            height: frame.height * scale,
-        )
-    }
-
-    private var detailCenterY: CGFloat? {
-        guard let providerID = model.railPreviewState.detailProviderID,
-              let index = Array(model.visibleProviderIDs
-                  .prefix(EdgeRailGeometry.maximumProviderRows)).firstIndex(of: providerID),
-              EdgeRailGeometry.providerCentersY(count: railProviderCount).indices.contains(index)
-        else {
-            return nil
-        }
-        return EdgeRailGeometry.providerCentersY(count: railProviderCount)[index]
-    }
-
-    private static func configuration(for preferences: PacePreferences)
-    -> RailActivationConfiguration {
-        RailActivationConfiguration(
-            mode: preferences.activationMode,
-            dwellDelay: preferences.dwellDelay,
-            dismissalDelay: preferences.dismissalDelay,
         )
     }
 }

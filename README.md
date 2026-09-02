@@ -49,7 +49,7 @@ every refresh.
 click-through when collapsed, so it never blocks scrollbars, drags, or trackpad momentum.
 
 <div align="center">
-<img src="docs/media/edge-rail.png" alt="The Pace edge rail showing provider rings with an attached Claude usage panel" width="300">
+<img src="docs/media/edge-rail.png" alt="The Pace edge rail on the desktop: a ring per provider on the screen edge, with the Claude usage panel attached to the active ring" width="440">
 </div>
 
 ## Providers
