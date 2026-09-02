@@ -1,180 +1,129 @@
+<div align="center">
+
+<img src="docs/media/pace-icon.png" alt="" width="128">
+
 # Pace
 
-Pace is a local-first macOS utility for monitoring AI session, weekly, model-specific,
-credit, and spend limits without opening each provider's account page.
+**Know how much of your AI usage is left, without opening five dashboards.**
 
-It has two presentation modes backed by the same data:
+[![CI](https://github.com/amitray007/pace/actions/workflows/ci.yml/badge.svg)](https://github.com/amitray007/pace/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![macOS 15+](https://img.shields.io/badge/macOS-15%2B-black?logo=apple)](https://www.apple.com/macos/)
+[![Swift 6.2](https://img.shields.io/badge/Swift-6.2-F05138?logo=swift&logoColor=white)](https://swift.org)
 
-- a high-fidelity screen-edge rail based on
-  [Vinz's side-notch reference](https://x.com/hivinz_/status/2093651446927626294);
-- a conventional menu-bar panel based on the hierarchy in
-  [DHH's usage-panel reference](https://x.com/dhh/status/2090005543112851862).
+</div>
 
-The edge rail is the signature surface. Its silhouette, density, connected provider panel, hover
-behavior, and motion must achieve perceptual and behavioral parity with the reference. The menu bar
-is the dependable default surface. Users can enable either surface or both.
+Pace is a macOS menu-bar app that reads your session, weekly, and credit limits from Claude, Codex,
+Cursor, Grok, and GitHub Copilot, and shows them in one place. It reads the same credentials those
+tools already store on your Mac. Nothing leaves your machine except the requests to each provider.
 
-## Current status
+<div align="center">
+<img src="docs/media/menu-panel.png" alt="The Pace menu-bar panel showing Claude session, weekly, and Fable quotas" width="380">
+</div>
 
-Pace is the settled product name. Its native application foundation now includes provider-neutral
-accounts, normalized quota snapshots, deterministic simulated data, shared selection, refresh
-orchestration, and local persistence. Claude, Codex, Cursor, Grok, and GitHub Copilot now have
-production-separated adapters.
-
-The first static native surfaces now run against a dedicated visual-reference fixture. AppKit owns
-the menu-bar status item and click-through edge panel. Core Animation draws the rail, connector,
-settings attachment, and progress rings. The menu panel and rail share provider and account
-selection. Interruptible motion, pointer-safe activation, keyboard access, and honest simulated
-states are implemented; hardware interaction testing and final reference-media approval remain
-open.
-
-Launch at login is opt-in through the native Settings surface. macOS Service Management remains the
-source of truth, and Pace never opens Login Items or changes registration without a direct user
-action. A signed-build login-cycle check remains part of release validation.
-
-Notification policy evaluation is deterministic and provider-neutral. It detects per-account
-usage-threshold crossings, reset windows, and stale-data transitions without averaging accounts.
-The default policy is disabled, startup data does not create alerts, and quiet hours hold an event
-until their local end time. Native Settings controls persist the policy, and a local
-`UserNotifications` adapter schedules alert-only delivery after manual refreshes, account
-refreshes, and provider updates. Pace reads authorization at launch without prompting. It requests
-permission only after the user enables a rule or presses Allow Notifications. Signed-build
-permission and banner-delivery checks remain release validation.
-
-A production-separated Codex adapter and its original Swift spike read limits through the supported
-local app-server protocol without copying account tokens or calling private web endpoints. The
-adapter supports explicit isolated `CODEX_HOME` profiles, reuses one supervised process per
-profile, and forwards rate-limit updates into shared state. Request deadlines do not block Swift's
-cooperative executor, and disabling or removing an account stops its monitor and profile process.
-The Providers settings section now adds the current profile or an explicitly chosen profile folder.
-It never registers an ambient login automatically. A successful add supersedes the simulated Codex
-fixture in the active runtime and presentation. Pace retains every provider fixture as a
-deterministic local fallback.
-Disabling or removing the last enabled real account refreshes that retained fixture before Pace
-shows it again.
-
-The account core keeps discovery and registration separate. A discovery request never adds an
-account to Pace. The selected candidate must be added explicitly, can receive a local name, and can
-then be refreshed, disabled, re-enabled, renamed, or removed. The same real provider profile or
-Keychain source cannot be registered twice, even if its reported identity changes.
-
-For multiple Codex accounts, sign each account in through Codex with a separate `CODEX_HOME`, then
-choose that folder in Pace. Codex continues to own its credentials. Removing an account from Pace
-deletes only Pace's normalized usage and profile reference.
-
-The production Grok adapter reads one explicit `GROK_HOME` at a time. It accepts only a private,
-first-party xAI session, verifies the remote `/user` identity before requesting `/billing`, and
-polls at a conservative 15-minute baseline with provider retry intervals respected. Pace never
-starts or depends on a Grok process. Identity changes stop before quota retrieval and preserve the
-last good snapshot as stale.
-
-For multiple Grok accounts, authenticate each account with Grok in a separate `GROK_HOME`, then
-choose that folder in Pace. Grok owns login, logout, and credential rotation. Removing an account
-from Pace leaves `auth.json` and the profile directory unchanged.
-
-The production Claude compatibility adapter reads one explicit `CLAUDE_CONFIG_DIR` at a time and
-honors Claude Code's `CLAUDE_SECURESTORAGE_CONFIG_DIR` override. It persists the exact non-secret
-storage directory, Keychain service, and Keychain account binding. It verifies the remote account
-and organization before requesting usage, serializes requests across accounts, and polls at a
-conservative 15-minute baseline. Token rotation holds Claude Code's cross-process refresh and
-storage-write locks, reloads the provider-owned credential, and compares the refresh token before
-writing. A concurrent login is adopted or causes one clean restart. Pace never stores a Claude
-token in its own state.
-
-For multiple Claude accounts, authenticate each account through Claude Code with a separate
-`CLAUDE_CONFIG_DIR`, then choose that folder in Pace. Removing an account from Pace leaves its
-Keychain item, fallback file, and profile directory unchanged. If a provider rotates a refresh
-token but the final Keychain or file write fails, Pace requires Claude Code sign-in instead of
-claiming the old token remains valid.
-
-The production Cursor compatibility adapter reads the default Cursor Agent Keychain account or an
-explicit isolated Cursor Agent home. It matches the access-token subject to that profile's CLI
-identity, verifies the remote user and team before usage, and keeps refreshed access tokens only in
-memory. It never reads Cursor Desktop state or browser cookies and never writes provider
-credentials. Enabled accounts poll independently at a conservative 15-minute baseline.
-
-For multiple Cursor accounts, sign each additional account in through Cursor Agent from a separate
-home with `AGENT_CLI_CREDENTIAL_STORE=file`, then choose that home in Pace. Cursor Agent owns login,
-logout, and the durable credential files. Removing an account from Pace leaves the selected home
-and its `.cursor` files unchanged.
-
-The original Grok compatibility spike remains as reproducible source and response-shape evidence
-for the production adapter.
-
-The production GitHub Copilot compatibility adapter binds each Pace account to an explicit GitHub
-CLI username. It asks `gh auth token --user` for only that account, verifies its durable numeric
-identity with GitHub's documented `/user` API, and only then reads personal Copilot quota. Pace
-clears ambient token overrides, never changes the active GitHub CLI account, and does not depend on
-a running editor, Copilot CLI, or coding harness. Settings discovers healthy GitHub CLI accounts
-only after the user clicks Add. The user selects the account to register and can then rename,
-disable, re-enable, or remove it without changing GitHub CLI credentials.
-
-Run the feasibility spikes with the corresponding authenticated installation:
+## Install
 
 ```sh
-swift spikes/codex-rate-limits.swift
-swift run claude-usage-spike
-swift run cursor-usage-spike
-swift run grok-usage-spike
-swift run github-copilot-usage-spike
+brew install --cask amitray007/tap/pace
 ```
+
+Pace is not notarized by Apple, so the cask strips the quarantine flag and re-signs the bundle
+locally on install. See [Unsigned builds](#unsigned-builds).
+
+To build from source instead, see [Development](#development).
+
+## What it shows
+
+Each provider reports its own quota windows, and Pace shows the ones it actually returns rather
+than assuming every account has the same shape. A Claude account might report a 5-hour session
+alongside a weekly limit; a Cursor account reports included and API usage separately.
+
+Colour tracks how much is used, not which provider it belongs to: green below 50%, yellow to 90%,
+red above. So an exhausted quota looks urgent no matter whose it is.
+
+**Menu bar.** The status item can show up to two readings you pick — a provider and a specific
+quota each. It follows the menu bar's own appearance like the system's items do, and updates on
+every refresh.
+
+**Edge rail.** An optional ambient rail on the screen edge, with a ring per provider. It stays
+click-through when collapsed, so it never blocks scrollbars, drags, or trackpad momentum.
+
+<div align="center">
+<img src="docs/media/edge-rail.png" alt="The Pace edge rail showing provider rings with an attached Claude usage panel" width="300">
+</div>
+
+## Providers
+
+| Provider | Reads credentials from | Quota windows |
+| --- | --- | --- |
+| Claude | `Claude Code-credentials` in your keychain, or a Claude Code profile | Session, weekly, per-model |
+| Codex | The Codex app server, using `CODEX_HOME` | Rolling 5-hour and 7-day limits |
+| Cursor | `cursor-access-token` in your keychain | Included usage, API usage, per-model |
+| Grok | `auth.json` in your Grok profile directory | Weekly limit |
+| GitHub Copilot | The `gh` CLI you already have authenticated | Credits |
+
+Pace never asks for a password and never stores one. It reads the credential each provider's own
+tool has already saved, and macOS asks for your approval the first time it does. It does not read
+browser cookies and does not copy tokens between providers.
+
+Two of these use endpoints the provider has not documented publicly: GitHub's
+`copilot_internal/user` and Cursor's `DashboardService`. They can change or stop working without
+notice. Pace shows the failure rather than a stale number when they do.
+
+## Honest data
+
+The rule Pace follows: never show a number a provider did not return.
+
+- A quota with no reading shows `--`, not `0%`.
+- A missing reset time reads "Reset unavailable" rather than a guess.
+- Stale data stays visible and is labelled, instead of the panel emptying out.
+- Usage is never averaged across accounts. You pick an account, or Pace shows the most urgent quota.
+
+## Settings
+
+- **Launch at login**, through macOS Service Management. Pace never changes this without you
+  clicking it.
+- **Hide account addresses**, which replaces your email with the provider name everywhere. For
+  screenshots and screen sharing.
+- **Menu-bar readings**, up to two, each a provider plus a quota.
+- **Edge rail** placement, size, screen, and how it activates.
+- **Notifications** for usage thresholds, resets, and stale data. Off by default.
+
+## Privacy
+
+Usage snapshots and preferences are stored in `~/Library/Application Support/Pace/` as plain JSON.
+There is no telemetry, no analytics, and no account system. Pace talks to the providers you have
+connected and to nothing else.
 
 ## Development
 
-Pace uses Swift 6, Swift Testing, XcodeGen, SwiftFormat, and SwiftLint. Formatting and linting are
-resolved as pinned Swift package plugins, so they do not require global installation. XcodeGen is
-the only project-generation command.
+Requires macOS 15 or later and Xcode with Swift 6.2.
 
 ```sh
-make generate       # create Pace.xcodeproj
-make format         # format Swift sources
-make check          # format check, lint, tests, and macOS app build
-make benchmark      # measure the release-mode simulated refresh pipeline
-make release-preflight # build and verify the unsigned Release application bundle
-make release-archive # create and verify a deterministic unsigned ZIP and SHA-256 file
-make release-smoke  # extract and launch-test the packaged app without installing it
-make visual-benchmark VISUAL_CAPTURE=path/to/capture.png  # compare the rail silhouette
-make reference-fetch  # download the public reference media into ignored local storage
-make reference-frames # verify and extract the canonical visual-review frames
+make build      # debug build
+make test       # all test suites
+make check      # format, lint, test, build
+make install    # build Release, sign locally, install to /Applications
 ```
 
-Set `PACE_APPLICATION_SUPPORT_DIRECTORY` to an isolated directory when testing the normal app
-without reading or changing the user's saved Pace state.
+`make install` creates a self-signed certificate on first run so macOS keeps your keychain
+approvals between builds. An ad-hoc signature would change identity on every build and prompt every
+time.
 
-The current deployment target is macOS 15 for the core foundation. The oldest supported macOS
-version remains subject to the reference rail's AppKit and Core Animation verification.
-`make release-preflight` uses development version `0.1.0` and build number `1` by default. Override
-them with `RELEASE_VERSION` and `RELEASE_BUILD_NUMBER`. The command verifies the generated bundle
-but does not sign, archive, install, notarize, or publish it.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the layout and the rules the code follows.
 
-`make release-archive` runs the preflight, writes an immutable versioned ZIP plus `.sha256` file to
-`.build/release-artifacts`, verifies the checksum, tests the ZIP, extracts it, and verifies the
-extracted app again. Repeating the same version and build must produce the same bytes; the command
-refuses to replace a different artifact. It remains unsigned and local. It does not install,
-notarize, upload, or publish anything.
+## Unsigned builds
 
-`make release-smoke` rechecks the archive, extracts it to a temporary directory, launches that
-extracted app with isolated deterministic state, confirms its real 324 x 416 pt rail window appears,
-and requests a normal application exit. It does not copy the app into Applications, register login
-items, request permission, use provider credentials, or retain the temporary extracted app.
+Pace has no Apple Developer Program membership behind it, so releases are not signed with a
+Developer ID and not notarized. macOS therefore quarantines the download.
 
-## Documentation
+The Homebrew cask handles this: it removes the quarantine attribute and applies an ad-hoc signature
+during install. If you download the release archive by hand, you will need to do the same, or macOS
+will refuse to open it.
 
-- [Product requirements](docs/product.md)
-- [Visual design contract](docs/design.md)
-- [Reference media and measurements](docs/reference.md)
-- [Interaction and motion](docs/interactions.md)
-- [Technical architecture](docs/architecture.md)
-- [Delivery roadmap](docs/roadmap.md)
-- [Local readiness boundary](docs/readiness.md)
+This is worth understanding before you install: an unsigned build carries no cryptographic proof of
+who produced it. Build from source if that matters to you.
 
-## Product principles
+## License
 
-- Treat the product as an instrument, not an analytics dashboard.
-- Keep the menu bar reliable and the edge rail optional.
-- Never obstruct scrollbars, window resizing, or full-screen work.
-- Support multiple accounts while showing one provider at a time in detailed views.
-- Display provider-defined quota buckets instead of assuming fixed five-hour and weekly limits.
-- Show stale and unavailable data honestly.
-- Keep credentials and normalized usage snapshots on the device.
-- Validate visual and motion work in the running macOS application.
+[MIT](LICENSE).

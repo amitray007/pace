@@ -12,9 +12,15 @@ enum EdgeRailGeometry {
     /// The transparent canvas the rail is drawn inside.
     ///
     /// Its height follows the number of provider rows, plus the space the
-    /// contour and the settings arc need below the last ring.
+    /// contour and the settings arc need below the last ring. Its width is
+    /// derived from the parts it has to hold rather than stated: a literal
+    /// width silently disagreed with `railOriginX` when the detail panel grew,
+    /// which pushed the rail off the canvas and left the panel unattached.
     static var canvasSize: NSSize {
-        NSSize(width: 324, height: canvasHeight(providerCount: maximumProviderRows))
+        NSSize(
+            width: railOriginX + railWidth,
+            height: canvasHeight(providerCount: maximumProviderRows),
+        )
     }
 
     static func canvasHeight(providerCount: Int) -> CGFloat {
@@ -50,15 +56,19 @@ enum EdgeRailGeometry {
     }
 
     static let railWidth: CGFloat = 70
-    static let detailWidth: CGFloat = 226
+    /// Wide enough for a quota label and its reset time on one line without
+    /// either truncating. The reference panel is proportionally wider than the
+    /// rail it attaches to, and at the previous 226 the type had to be shrunk
+    /// far enough that the title, rows, and footer no longer read as one scale.
+    static let detailWidth: CGFloat = 262
     static let connectorWidth: CGFloat = 28
 
     /// The panel is only as tall as its content. A fixed height leaves an empty
     /// band under an account that reports fewer quotas than the maximum, which
     /// the reference never shows.
-    static let detailChromeHeight: CGFloat = 71
-    static let detailQuotaRowHeight: CGFloat = 38
-    static let detailEmptyStateHeight: CGFloat = 56
+    static let detailChromeHeight: CGFloat = 72
+    static let detailQuotaRowHeight: CGFloat = 43
+    static let detailEmptyStateHeight: CGFloat = 62
     static let maximumDetailQuotaRows = 3
     static let railOriginX = detailWidth + connectorWidth
     static let railTopY: CGFloat = 30

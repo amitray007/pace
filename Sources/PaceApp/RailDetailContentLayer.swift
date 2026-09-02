@@ -20,14 +20,14 @@ private struct EdgeDetailPanel: View {
             UsageStatusPresentation.resolve($0, referenceDate: referenceDate)
         }
             ?? .missing(isLoading: isRefreshing)
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 9) {
             // The reference header is only the provider mark and title. The
             // account identity and plan stay in the footer so the title line
             // never truncates an address.
-            HStack(spacing: 7) {
-                ProviderMark(providerID: providerID, color: .white, size: 12)
+            HStack(spacing: 8) {
+                ProviderMark(providerID: providerID, color: .white, size: 13)
                 Text("\(style.name) Usage")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.system(size: 13, weight: .bold))
                 Spacer(minLength: 0)
             }
 
@@ -36,9 +36,9 @@ private struct EdgeDetailPanel: View {
                     Image(systemName: presentation.symbolName)
                         .foregroundStyle(presentation.color)
                     Text(presentation.title)
-                        .font(.system(size: 8.5, weight: .semibold))
+                        .font(.system(size: 10, weight: .semibold))
                     Text(presentation.detail)
-                        .font(.system(size: 7.5))
+                        .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
@@ -69,10 +69,10 @@ private struct EdgeDetailPanel: View {
                 .lineLimit(1)
                 .foregroundStyle(.white.opacity(0.55))
             }
-            .font(.system(size: 8, weight: .medium))
+            .font(.system(size: 9.5, weight: .medium))
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .foregroundStyle(.white)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(
@@ -86,14 +86,14 @@ private struct EdgeDetailPanel: View {
     /// bar. Measured from `settings-claude-detail.png`.
     private func quotaRows() -> some View {
         ForEach(snapshots.prefix(3)) { snapshot in
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(snapshot.label)
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(.system(size: 10.5, weight: .semibold))
                         .lineLimit(1)
                     Spacer(minLength: 4)
                     Text(resetText(for: snapshot))
-                        .font(.system(size: 9))
+                        .font(.system(size: 10.5))
                         .foregroundStyle(.white.opacity(0.55))
                         .lineLimit(1)
                 }
@@ -113,10 +113,10 @@ private struct EdgeDetailPanel: View {
                             )
                     }
                 }
-                .frame(height: 3.5)
+                .frame(height: 4)
 
                 Text(usedText(for: snapshot))
-                    .font(.system(size: 9, weight: .semibold).monospacedDigit())
+                    .font(.system(size: 10.5, weight: .semibold).monospacedDigit())
                     .foregroundStyle(.white)
             }
         }
