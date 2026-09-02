@@ -170,7 +170,12 @@ struct PaceSettingsView: View {
                         "Modifier key",
                         selection: Binding(
                             get: { model.preferences.activationModifier },
-                            set: model.setActivationModifier,
+                            // Written as a closure rather than passing the
+                            // method directly: the reabstraction thunk Swift
+                            // 6.2 generates for that conversion crashes its
+                            // own IR generator (SmallVector overflow) when
+                            // building this file.
+                            set: { model.setActivationModifier($0) },
                         ),
                     ) {
                         ForEach(RailActivationModifier.allCases, id: \.self) { modifier in
