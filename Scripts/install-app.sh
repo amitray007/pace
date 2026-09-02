@@ -106,6 +106,11 @@ codesign --verify --deep --strict "$staged_path/$app_name"
 rm -rf "$installed_path"
 ditto "$staged_path/$app_name" "$installed_path"
 
+# ditto preserves the source bundle's directory timestamp. Mark the installed
+# bundle as changed so launchers invalidate any icon cached for the same bundle
+# identifier and version before Launch Services registers the replacement.
+touch "$installed_path"
+
 # Refresh Launch Services so the new copy is the one macOS resolves.
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
     -f "$installed_path" >/dev/null 2>&1 || true
