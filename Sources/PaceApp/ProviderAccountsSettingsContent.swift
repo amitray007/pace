@@ -25,6 +25,8 @@ struct ProviderAccountsSettingsContent: View {
             }
             .disabled(accountActionsAreDisabled)
 
+            pendingKeychainAction(for: .claude)
+
             Text(
                 "For another Claude account, sign in with a separate CLAUDE_CONFIG_DIR, "
                     + "then choose that folder. Add current also honors "
@@ -63,6 +65,8 @@ struct ProviderAccountsSettingsContent: View {
                 }
             }
             .disabled(accountActionsAreDisabled)
+
+            pendingKeychainAction(for: .cursor)
 
             Text(
                 "For another Cursor account, sign in with Cursor Agent from a separate home "
@@ -147,6 +151,13 @@ struct ProviderAccountsSettingsContent: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Choose one authenticated GitHub CLI account.")
+        }
+    }
+
+    @ViewBuilder
+    private func pendingKeychainAction(for providerID: ProviderID) -> some View {
+        if model.pendingProfileAuthorization?.providerID == providerID {
+            ProfileKeychainAccessButton(model: model, providerID: providerID)
         }
     }
 

@@ -140,17 +140,19 @@ extension PacePresentationModel {
         }
     }
 
-    private func addProviderProfile(
+    func addProviderProfile(
         at directory: URL,
         providerID: ProviderID,
         claudeProfile: ClaudeProfile? = nil,
         cursorProfile: CursorProfile? = nil,
+        allowsKeychainPrompts: Bool = false,
     ) async {
         guard !isReferencePreview, !isProviderRuntimeBusy, !isManagingAccounts, !isRefreshing,
               let store, let scenario = simulatedScenario
         else {
             return
         }
+        pendingProfileAuthorization = nil
         guard Self.directoryExists(directory) else {
             accountActionError = "The selected \(Self.providerName(providerID)) profile folder "
                 + "does not exist."
@@ -163,13 +165,12 @@ extension PacePresentationModel {
         await shutdownProviderRuntime()
 
         do {
-            try await onboardProviderProfile(
-                at: directory,
-                providerID: providerID,
-                claudeProfile: claudeProfile,
-                cursorProfile: cursorProfile,
-                store: store,
-            )
+            try await Self.performProfileOnboarding(allowsPrompts: allowsKeychainPrompts) {
+                try await self.onboardProviderProfile(
+                    at: directory, providerID: providerID, claudeProfile: claudeProfile,
+                    cursorProfile: cursorProfile, store: store,
+                )
+            }
             try await configureProviderRuntime(
                 store: store,
                 scenario: scenario,
@@ -178,6 +179,10 @@ extension PacePresentationModel {
             state = await store.currentState()
             activeProviderID = providerID
         } catch {
+            pendingProfileAuthorization = ProfileKeychainAuthorization(
+                error: error, providerID: providerID, directory: directory,
+                claudeProfile: claudeProfile, cursorProfile: cursorProfile,
+            )
             do {
                 try await configureProviderRuntime(
                     store: store,
@@ -190,6 +195,7 @@ extension PacePresentationModel {
                     + " Usage updates could not be restarted: "
                     + Self.accountErrorMessage(recoveryError, providerID: providerID)
             }
+            activeProviderID = providerID
         }
     }
 

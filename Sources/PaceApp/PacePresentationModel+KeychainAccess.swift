@@ -46,4 +46,36 @@ extension PacePresentationModel {
             accountActionError = Self.accountErrorMessage(error)
         }
     }
+
+    func authorizePendingProfile(_ request: ProfileKeychainAuthorization) async {
+        guard pendingProfileAuthorization == request else { return }
+        switch request {
+        case let .claude(profile):
+            await addProviderProfile(
+                at: profile.directory,
+                providerID: .claude,
+                claudeProfile: profile,
+                allowsKeychainPrompts: true,
+            )
+        case let .cursor(profile):
+            await addProviderProfile(
+                at: profile.homeDirectory,
+                providerID: .cursor,
+                cursorProfile: profile,
+                allowsKeychainPrompts: true,
+            )
+        }
+    }
+
+    /// Keep the permission window around only the selected profile operation.
+    static func performProfileOnboarding(
+        allowsPrompts: Bool,
+        operation: @Sendable () async throws -> Void,
+    ) async throws {
+        if allowsPrompts {
+            try await KeychainInteractionPolicy.allowingPrompts(operation)
+        } else {
+            try await operation()
+        }
+    }
 }

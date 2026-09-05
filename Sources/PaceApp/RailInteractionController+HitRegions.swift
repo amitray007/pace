@@ -73,7 +73,8 @@ extension RailInteractionController {
     /// the handle cannot leave the clickable area somewhere else. The target is
     /// deliberately larger than the visible handle, which stays small.
     private var hotspotFrame: NSRect {
-        interactionFrame(authored: RailShellMetrics.handleTargetRect)
+        interactionFrame(authored: RailShellMetrics
+            .handleTargetRect(providerRowCount: railProviderCount))
     }
 
     /// The hover modes' pointer target: the edge band the rail opens into.
@@ -82,7 +83,8 @@ extension RailInteractionController {
     /// clicks, scrolling, or drags. Click mode keeps the small handle target,
     /// because that one backs a real input panel.
     private var hoverHotspotFrame: NSRect {
-        interactionFrame(authored: RailShellMetrics.hoverTargetRect)
+        interactionFrame(authored: RailShellMetrics
+            .hoverTargetRect(providerRowCount: railProviderCount))
     }
 
     private var collapsedPointerFrame: NSRect {
@@ -94,7 +96,8 @@ extension RailInteractionController {
             x: EdgeRailGeometry.railOriginX,
             y: RailShellMetrics.topEdgeY,
             width: EdgeRailGeometry.railWidth,
-            height: RailShellMetrics.bottomEdgeY - RailShellMetrics.topEdgeY,
+            height: RailShellMetrics
+                .bottomEdgeY(providerRowCount: railProviderCount) - RailShellMetrics.topEdgeY,
         ))
     }
 
@@ -110,42 +113,28 @@ extension RailInteractionController {
     }
 
     private var settingsFrame: NSRect {
-        let center = RailShellMetrics.settingsCircleCenter
+        let circle = RailShellMetrics.settingsCircleRect(providerRowCount: railProviderCount)
+        let targetDiameter = max(max(circle.width, circle.height), 46)
+        let center = RailShellMetrics.settingsCircleCenter(providerRowCount: railProviderCount)
         return interactionFrame(authored: NSRect(
-            x: center.x - 23,
-            y: center.y - 23,
-            width: 46,
-            height: 46,
+            x: center.x - targetDiameter / 2,
+            y: center.y - targetDiameter / 2,
+            width: targetDiameter,
+            height: targetDiameter,
         ))
     }
 
-    /// The drawn detail panel's frame, sized the same way EdgeRailView sizes
-    /// it so the hit region hugs the drawn panel.
+    /// The renderer publishes the current card instead of its destination, so
+    /// the input window follows a moving or resizing detail without opening a
+    /// stale rectangle over the desktop.
     private var detailFrame: NSRect? {
-        guard let detailCenterY else {
-            return nil
-        }
-        let quotaCount = model.railPreviewState.detailProviderID
-            .flatMap { providerID in model.selectedAccount(for: providerID) }
-            .map { account in model.snapshots(for: account.id).count } ?? 0
-        let height = EdgeRailGeometry.detailHeight(quotaCount: quotaCount)
-        return interactionFrame(authored: NSRect(
-            x: 0,
-            y: EdgeRailGeometry.detailPanelY(centerY: detailCenterY, height: height),
-            width: EdgeRailGeometry.detailWidth,
-            height: height,
-        ))
+        bridge.detailRect.map(interactionFrame(authored:))
     }
 
     private var travelCorridorFrame: NSRect? {
-        guard let detailFrame, let detailCenterY,
-              let providerIndex = EdgeRailGeometry.providerCentersY(count: railProviderCount)
-                  .firstIndex(of: detailCenterY),
-                  providerFrames.indices.contains(providerIndex)
-        else {
-            return nil
-        }
-        let centerY = providerFrames[providerIndex].midY
+        guard let detailFrame, let detailCenterY = bridge.detailCenterY else { return nil }
+        let centerY =
+            interactionFrame(authored: CGRect(x: 0, y: detailCenterY, width: 0, height: 0)).minY
         let minimumX = model.preferences.railEdge == .right ? detailFrame.maxX : railFrame.maxX
         let maximumX = model.preferences.railEdge == .right ? railFrame.minX : detailFrame.minX
         return NSRect(
@@ -171,17 +160,6 @@ extension RailInteractionController {
             width: frame.width * scale,
             height: frame.height * scale,
         )
-    }
-
-    private var detailCenterY: CGFloat? {
-        guard let providerID = model.railPreviewState.detailProviderID,
-              let index = Array(model.visibleProviderIDs
-                  .prefix(EdgeRailGeometry.maximumProviderRows)).firstIndex(of: providerID),
-              EdgeRailGeometry.providerCentersY(count: railProviderCount).indices.contains(index)
-        else {
-            return nil
-        }
-        return EdgeRailGeometry.providerCentersY(count: railProviderCount)[index]
     }
 
     static func configuration(for preferences: PacePreferences)

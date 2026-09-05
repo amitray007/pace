@@ -54,6 +54,10 @@ let package = Package(
             name: "PaceProviderTests",
             dependencies: ["PaceProviders", "PaceCore"],
         ),
+        .testTarget(
+            name: "PaceAppTests",
+            dependencies: ["PaceApp", "PaceCore"],
+        ),
         .executableTarget(
             name: "PaceBenchmark",
             dependencies: ["PaceCore"],

@@ -45,11 +45,4 @@ struct RailDetailContent: Equatable {
         self.isRefreshing = isRefreshing
         self.accountName = accountName
     }
-
-    /// The panel height this content needs. Each hosted panel is sized to its
-    /// own content, so a change in the visible panel's height never touches
-    /// the other panels' frames.
-    var panelHeight: CGFloat {
-        EdgeRailGeometry.detailHeight(quotaCount: snapshots.count)
-    }
 }
