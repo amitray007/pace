@@ -2,29 +2,15 @@ import AppKit
 import CoreGraphics
 import Foundation
 
-/// Rail silhouette values, expressed as ratios of the rail's width so the
-/// shape stays identical at any scale.
-///
-/// Every ratio comes from a subpixel trace of the running reference
-/// application, where the rail body measures 139 px wide. Deriving the layout
-/// from one width means a scale preference changes size without changing the
-/// silhouette.
 enum RailShellMetrics {
-    /// The rail's width in canvas points at the default scale.
     static let railWidth = EdgeRailGeometry.railWidth
 
-    /// Ring diameter, 87 px on a 139 px rail.
     static let ringDiameterRatio: CGFloat = 0.6259
 
-    /// Distance between adjacent ring centres, 205 px on a 139 px rail.
     static let ringPitchRatio: CGFloat = 1.4748
 
-    /// Distance from the top of the straight body to the first ring's centre,
-    /// 52 px on a 139 px rail.
-    static let firstRingInsetRatio: CGFloat = 0.3705
+    static let firstRingInsetRatio: CGFloat = (22 + 69.5 * 44 / 117) / 70
 
-    /// The connector joining the detail panel to the active provider ring.
-    /// Measured at 61 px tall and 54 px deep on a 139 px rail.
     static var connectorHeight: CGFloat {
         railWidth * (61.0 / 139.0)
     }
@@ -33,39 +19,21 @@ enum RailShellMetrics {
         railWidth * (54.0 / 139.0)
     }
 
-    /// The reference apex holds its depth across two rows rather than coming to
-    /// a point, so the tip is rounded rather than sharp.
     static var connectorTipRadius: CGFloat {
         connectorHeight * 0.16
     }
 
-    /// Softens where the connector meets the panel, so the join reads as one
-    /// shape instead of a wedge stuck onto a card.
     static var connectorBaseRadius: CGFloat {
         connectorHeight * 0.12
     }
 
-    /// The resting settings control is a small arc tucked against the screen
-    /// edge below the rail, not a sweep across the rail's width.
-    ///
-    /// Measured in the running reference application, where the arc occupies
-    /// x 11 to 27 and y 5 to 30 below the body end on a 137 px rail: 0.08 to
-    /// 0.20 of the rail's width inward and 0.04 to 0.22 below it, so the
-    /// control stays well inside the rail's own footprint. The earlier values
-    /// were roughly four times that and swept past the rail's inner edge,
-    /// which made the arc read as a stray tendril rather than a control.
-    static let settingsArcRadiusRatio: CGFloat = 0.115
-    static let settingsArcStrokeRatio: CGFloat = 0.055
+    static let settingsArcRadiusRatio: CGFloat = (103 - 27) * 44 / 117 / 70
+    static let settingsArcStrokeRatio: CGFloat = 18 * 44 / 117 / 70
 
-    /// The arc's centre, inboard of the screen edge and below the rail body.
-    static let settingsArcCenterInsetRatio: CGFloat = 0.10
-    static let settingsArcCenterDropRatio: CGFloat = 0.16
+    static let settingsArcCenterInsetRatio: CGFloat = 103 * 44 / 117 / 70
+    static let settingsArcCenterDropRatio: CGFloat = 103 * 44 / 117 / 70
 
-    /// The hover state's filled circle.
-    ///
-    /// The resting arc is small and sits against the screen edge, so the hover
-    /// target has to be large enough to hit and to hold a legible gear.
-    static let settingsDiameterRatio: CGFloat = 0.42
+    static let settingsDiameterRatio: CGFloat = 124 * 44 / 117 / 70
 
     static var ringDiameter: CGFloat {
         railWidth * ringDiameterRatio
@@ -76,7 +44,7 @@ enum RailShellMetrics {
     }
 
     static var contourHeight: CGFloat {
-        RailContour.height(forWidth: railWidth)
+        103 * 44 / 117
     }
 
     static var settingsDiameter: CGFloat {
@@ -87,7 +55,6 @@ enum RailShellMetrics {
         railWidth * settingsArcRadiusRatio
     }
 
-    /// The hover glyph, sized against the filled circle it sits in.
     static var settingsGlyphSize: CGFloat {
         settingsDiameter * 0.44
     }
@@ -96,53 +63,39 @@ enum RailShellMetrics {
         railWidth * settingsArcStrokeRatio
     }
 
-    /// Centre of the quarter-circle the resting settings arc is drawn on.
-    static var settingsArcCenter: CGPoint {
+    static func settingsArcCenter(providerRowCount: Int) -> CGPoint {
         CGPoint(
             x: EdgeRailGeometry.canvasSize.width
                 - railWidth * settingsArcCenterInsetRatio,
-            y: bodyBottomY + railWidth * settingsArcCenterDropRatio,
+            y: bodyBottomY(providerRowCount: providerRowCount) + railWidth *
+                settingsArcCenterDropRatio,
         )
     }
 
-    /// How many provider rows the rail is currently drawing.
-    ///
-    /// The shell's paths are built from static geometry, so the row count lives
-    /// here rather than being threaded through every path function. The view
-    /// sets it before the shell draws.
-    static var providerRowCount = 3
-
-    /// The first ring's centre, which anchors the whole vertical layout.
     static var firstRingCenterY: CGFloat {
         EdgeRailGeometry.firstProviderCenterY
     }
 
-    /// Where the straight body starts, above the first ring.
     static var bodyTopY: CGFloat {
         firstRingCenterY - railWidth * firstRingInsetRatio
     }
 
-    /// Where the straight body ends, below the last ring by the same inset.
-    static var bodyBottomY: CGFloat {
+    static func bodyBottomY(providerRowCount: Int) -> CGFloat {
         let centers = EdgeRailGeometry.providerCentersY(count: providerRowCount)
-        return (centers.last ?? firstRingCenterY) + railWidth * firstRingInsetRatio
+        return (centers.last ?? firstRingCenterY) + 22 + 27 * 44 / 117 + 17 + 50.1 * 44 / 117
     }
 
-    /// Where the top contour meets the screen edge.
     static var topEdgeY: CGFloat {
         bodyTopY - contourHeight
     }
 
-    /// Where the bottom contour meets the screen edge.
-    static var bottomEdgeY: CGFloat {
-        bodyBottomY + contourHeight
+    static func bottomEdgeY(providerRowCount: Int) -> CGFloat {
+        bodyBottomY(providerRowCount: providerRowCount) + contourHeight
     }
 
-    /// The detached settings circle, centred on the rail and sitting below the
-    /// bottom contour's negative space.
-    static var settingsCircleRect: CGRect {
+    static func settingsCircleRect(providerRowCount: Int) -> CGRect {
         let diameter = settingsDiameter
-        let center = settingsArcCenter
+        let center = settingsArcCenter(providerRowCount: providerRowCount)
         return CGRect(
             x: center.x - diameter / 2,
             y: center.y - diameter / 2,
@@ -151,29 +104,20 @@ enum RailShellMetrics {
         )
     }
 
-    static var settingsCircleCenter: CGPoint {
-        CGPoint(x: settingsCircleRect.midX, y: settingsCircleRect.midY)
+    static func settingsCircleCenter(providerRowCount: Int) -> CGPoint {
+        let rect = settingsCircleRect(providerRowCount: providerRowCount)
+        return CGPoint(x: rect.midX, y: rect.midY)
     }
 
-    /// The collapsed handle.
-    ///
-    /// This is the only thing on screen while the rail is closed, so it stays
-    /// a hint rather than a bar sitting on the edge, while being large enough
-    /// to notice without looking for it. It is centred on the rail's own
-    /// vertical centre so opening the rail grows out of where the handle was.
     static let handleWidth: CGFloat = 11
     static let handleHeight: CGFloat = 76
 
-    /// The handle's rounded end. Half its width, so the inner edge is a
-    /// semicircle rather than a rectangle with clipped corners.
     static var handleRadius: CGFloat {
         handleWidth / 2
     }
 
-    /// The handle's frame, which the shell path and the pointer's hit region
-    /// both derive from so the visible and clickable areas cannot drift apart.
-    static var handleRect: CGRect {
-        let centerY = (bodyTopY + bodyBottomY) / 2
+    static func handleRect(providerRowCount: Int) -> CGRect {
+        let centerY = (bodyTopY + bodyBottomY(providerRowCount: providerRowCount)) / 2
         return CGRect(
             x: EdgeRailGeometry.canvasSize.width - handleWidth,
             y: centerY - handleHeight / 2,
@@ -182,27 +126,14 @@ enum RailShellMetrics {
         )
     }
 
-    /// The handle's edge hairline. White at low opacity reads as a highlight on
-    /// any wallpaper, where a fixed grey would vanish against a light one.
     static let handleHighlightColor = NSColor(white: 1, alpha: 0.32)
     static let handleHighlightWidth: CGFloat = 1
 
-    /// A pointer target smaller than this is hard to find deliberately, so the
-    /// hit region is grown around the handle without making it look larger.
-    ///
-    /// Height matters more than width here. Moving to a screen edge parks the
-    /// pointer against it, so the horizontal axis takes care of itself, but
-    /// finding a small band on a display over a thousand points tall means
-    /// aiming. The target stays larger than the visible handle so approaching
-    /// the right area is enough. Hover modes widen this further still, to the
-    /// whole stretch of edge the rail expands into.
     static let minimumHandleTargetWidth: CGFloat = 24
     static let minimumHandleTargetHeight: CGFloat = 132
 
-    /// The handle's hit region: the visible handle, expanded to a comfortable
-    /// target.
-    static var handleTargetRect: CGRect {
-        let rect = handleRect
+    static func handleTargetRect(providerRowCount: Int) -> CGRect {
+        let rect = handleRect(providerRowCount: providerRowCount)
         let width = max(rect.width, minimumHandleTargetWidth)
         let height = max(rect.height, minimumHandleTargetHeight)
         return CGRect(
@@ -213,17 +144,10 @@ enum RailShellMetrics {
         )
     }
 
-    /// The hover modes' target: the whole stretch of edge the open rail will
-    /// occupy, at the handle target's width.
-    ///
-    /// Hover activation installs no input window, so this band stays
-    /// click-through no matter how tall it is. Aiming anywhere along the edge
-    /// the rail expands into is deliberate enough; asking for the small handle
-    /// target meant hunting for an unmarked spot on a tall screen edge.
-    static var hoverTargetRect: CGRect {
-        let handle = handleTargetRect
+    static func hoverTargetRect(providerRowCount: Int) -> CGRect {
+        let handle = handleTargetRect(providerRowCount: providerRowCount)
         let top = min(topEdgeY, handle.minY)
-        let bottom = max(bottomEdgeY, handle.maxY)
+        let bottom = max(bottomEdgeY(providerRowCount: providerRowCount), handle.maxY)
         return CGRect(
             x: handle.minX,
             y: top,

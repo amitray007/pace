@@ -5,22 +5,32 @@ import PaceCore
 final class RailInteractionController {
     let model: PacePresentationModel
     weak var visualPanel: NSPanel?
+    let bridge: RailSurfaceBridge
     private var engine: RailActivationEngine
     private var globalMonitor: Any?
     private var timer: Timer?
     private var targetPanels: [RailInteractionPanel] = []
     private var isScreenExcluded = false
+    private var isSettingsHovered = false
 
-    init(model: PacePresentationModel, visualPanel: NSPanel) {
+    init(model: PacePresentationModel, visualPanel: NSPanel, bridge: RailSurfaceBridge) {
         self.model = model
         self.visualPanel = visualPanel
+        self.bridge = bridge
         engine = RailActivationEngine(configuration: Self.configuration(for: model.preferences))
+        bridge.geometryDidChange = { [weak self] in
+            guard let self, self.model.isRailVisible, !self.isScreenExcluded else {
+                return
+            }
+            synchronizeTargetPanels()
+        }
     }
 
     isolated deinit {
         removeEventMonitors()
         timer?.invalidate()
         targetPanels.forEach { $0.orderOut(nil) }
+        bridge.geometryDidChange = nil
     }
 
     func synchronize() {
@@ -32,6 +42,11 @@ final class RailInteractionController {
             removeEventMonitors()
         }
         synchronizeTargetPanels()
+        if model.railPreviewState == .mini || isScreenExcluded {
+            publishSettingsHover(false)
+        } else {
+            updateSettingsHover(at: NSEvent.mouseLocation)
+        }
         synchronizeTimer()
     }
 
@@ -99,6 +114,7 @@ final class RailInteractionController {
         let time = ProcessInfo.processInfo.systemUptime
         let location = NSEvent.mouseLocation
         let region = pointerRegion(at: location)
+        updateSettingsHover(for: region)
         let modifierIsActive = event.modifierFlags
             .contains(model.preferences.activationModifier.flag)
         perform(engine.handle(.modifierChanged(isActive: modifierIsActive), at: time))
@@ -122,6 +138,9 @@ final class RailInteractionController {
             perform(engine.handle(.mouseButtonsChanged(isDown: false), at: time))
         case .scrollWheel:
             perform(engine.handle(.scroll, at: time))
+            if region == .detail, event.window is RailInteractionPanel {
+                bridge.scrollDetail(with: event)
+            }
         default:
             break
         }
@@ -133,6 +152,7 @@ final class RailInteractionController {
         region: RailPointerRegion,
         at time: TimeInterval,
     ) {
+        updateSettingsHover(for: region)
         let sample = RailPointerSample(
             horizontalPosition: location.x,
             verticalPosition: location.y,
@@ -221,6 +241,11 @@ final class RailInteractionController {
             ),
         )
         perform(engine.handle(.tick, at: time))
+        // A pointer can stay parked over the settings target after the rail
+        // moves underneath it. Polling only updates the renderer affordance;
+        // it deliberately never feeds a pointer event into the activation
+        // engine or changes the rail's phase.
+        updateSettingsHover(at: NSEvent.mouseLocation)
         synchronizeTimer()
     }
 
@@ -278,6 +303,7 @@ final class RailInteractionController {
     private func removeTargetPanels() {
         targetPanels.forEach { $0.orderOut(nil) }
         targetPanels.removeAll(keepingCapacity: true)
+        publishSettingsHover(false)
     }
 
     private func handleAccessibilityPress(at location: NSPoint) {
@@ -287,6 +313,26 @@ final class RailInteractionController {
                 at: ProcessInfo.processInfo.systemUptime,
             ),
         )
+    }
+
+    private func updateSettingsHover(at location: NSPoint) {
+        guard model.railPreviewState != .mini, !isScreenExcluded else {
+            publishSettingsHover(false)
+            return
+        }
+        updateSettingsHover(for: pointerRegion(at: location))
+    }
+
+    private func updateSettingsHover(for region: RailPointerRegion) {
+        publishSettingsHover(region == .settings)
+    }
+
+    private func publishSettingsHover(_ hovered: Bool) {
+        guard isSettingsHovered != hovered else {
+            return
+        }
+        isSettingsHovered = hovered
+        bridge.setSettingsHovered(hovered)
     }
 }
 

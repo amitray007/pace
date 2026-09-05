@@ -23,18 +23,20 @@ struct RefreshCountdownView: View {
     let nextRefreshAt: Date?
     let isRefreshing: Bool
     var style: Style = .glyph
-
-    /// Drives the countdown.
-    ///
-    /// The timer is held in `@State` rather than created inline. A publisher
-    /// built in the view's initializer is replaced on every rebuild, so
-    /// switching provider tabs discarded the connected one and the countdown
-    /// stopped moving until the panel was reopened.
-    @State private var now = Date()
-    @State private var tick = Timer.publish(every: 1, on: .main, in: .common)
-        .autoconnect()
+    /// Hidden pre-rendered detail hosts stay static until selected.
+    var isActive = true
 
     var body: some View {
+        if isActive, nextRefreshAt != nil, !isRefreshing {
+            TimelineView(.periodic(from: .now, by: 1)) { timeline in
+                countdown(now: timeline.date)
+            }
+        } else {
+            countdown(now: Date())
+        }
+    }
+
+    private func countdown(now: Date) -> some View {
         HStack(spacing: 4) {
             if style == .glyph {
                 Image(systemName: "arrow.clockwise")
@@ -42,19 +44,18 @@ struct RefreshCountdownView: View {
             }
             if isRefreshing {
                 Text(refreshingText)
-            } else if let remaining {
+            } else if let remaining = remaining(at: now) {
                 Text(remaining)
                     .monospacedDigit()
             }
         }
-        .onReceive(tick) { now = $0 }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel)
+        .accessibilityLabel(accessibilityLabel(at: now))
     }
 
     /// The countdown text, or nil when nothing is scheduled.
-    private var remaining: String? {
-        switch schedule {
+    private func remaining(at now: Date) -> String? {
+        switch schedule(at: now) {
         case .none:
             nil
         case .due:
@@ -76,7 +77,7 @@ struct RefreshCountdownView: View {
         case waiting(String)
     }
 
-    private var schedule: Schedule {
+    private func schedule(at now: Date) -> Schedule {
         guard let nextRefreshAt else {
             return .none
         }
@@ -91,11 +92,11 @@ struct RefreshCountdownView: View {
         style == .glyph ? "Refreshing" : "Refreshing now"
     }
 
-    private var accessibilityLabel: String {
+    private func accessibilityLabel(at now: Date) -> String {
         if isRefreshing {
             return "Refreshing usage"
         }
-        switch schedule {
+        switch schedule(at: now) {
         case .none:
             return "No refresh scheduled"
         case .due:

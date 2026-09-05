@@ -34,12 +34,7 @@ struct MenuPanelView: View {
                         .controlSize(.small)
                         .frame(maxWidth: .infinity, minHeight: 120)
                 } else {
-                    ContentUnavailableView(
-                        "No account configured",
-                        systemImage: "person.crop.circle.badge.questionmark",
-                        description: Text("Add an account for this provider to see usage."),
-                    )
-                    .frame(minHeight: 120)
+                    MenuEmptyAccountView(model: model)
                 }
             } else if showsAllAccounts {
                 allAccountsContent

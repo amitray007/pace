@@ -1,137 +1,92 @@
 import CoreGraphics
 import Foundation
 
-/// The rail's shell paths. Each is authored top-down and flipped once by the
-/// layer view, so a smaller y is higher on screen.
+/// Paths are authored top-down. The surface applies edge and view transforms once.
 enum RailShellPaths {
-    /// The collapsed handle: a small pill flush with the screen edge, with only
-    /// its inner side rounded.
-    static func mini() -> CGPath {
-        let rect = RailShellMetrics.handleRect
-        let radius = min(
-            RailShellMetrics.handleRadius,
-            rect.height / 2,
-        )
-        let path = CGMutablePath()
-        path.move(to: CGPoint(x: rect.maxX, y: rect.minY))
-        path.addCompatibleLine(to: CGPoint(x: rect.minX + radius, y: rect.minY))
-        path.addCurve(
-            to: CGPoint(x: rect.minX, y: rect.minY + radius),
-            control1: CGPoint(x: rect.minX + radius * 0.45, y: rect.minY),
-            control2: CGPoint(x: rect.minX, y: rect.minY + radius * 0.45),
-        )
-        path.addCompatibleLine(to: CGPoint(x: rect.minX, y: rect.maxY - radius))
-        path.addCurve(
-            to: CGPoint(x: rect.minX + radius, y: rect.maxY),
-            control1: CGPoint(x: rect.minX, y: rect.maxY - radius * 0.45),
-            control2: CGPoint(x: rect.minX + radius * 0.45, y: rect.maxY),
-        )
-        path.addCompatibleLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-        path.addCompatibleLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-        path.closeSubpath()
-        return path
+    static func rail(providerRowCount: Int) -> CGPath {
+        reveal(progress: 1, providerRowCount: providerRowCount)
     }
 
-    /// The hairline along the collapsed handle's inner edge.
-    ///
-    /// Only the rounded inner side is stroked. The flat side sits against the
-    /// screen edge, where half the stroke would be off screen and the visible
-    /// half would read heavier than the rest of the line.
-    static func handleHighlight() -> CGPath {
-        let rect = RailShellMetrics.handleRect
-        let radius = min(RailShellMetrics.handleRadius, rect.height / 2)
-        let path = CGMutablePath()
-        path.move(to: CGPoint(x: rect.maxX, y: rect.minY))
-        path.addCompatibleLine(to: CGPoint(x: rect.minX + radius, y: rect.minY))
-        path.addCurve(
-            to: CGPoint(x: rect.minX, y: rect.minY + radius),
-            control1: CGPoint(x: rect.minX + radius * 0.45, y: rect.minY),
-            control2: CGPoint(x: rect.minX, y: rect.minY + radius * 0.45),
-        )
-        path.addCompatibleLine(to: CGPoint(x: rect.minX, y: rect.maxY - radius))
-        path.addCurve(
-            to: CGPoint(x: rect.minX + radius, y: rect.maxY),
-            control1: CGPoint(x: rect.minX, y: rect.maxY - radius * 0.45),
-            control2: CGPoint(x: rect.minX + radius * 0.45, y: rect.maxY),
-        )
-        path.addCompatibleLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-        return path
+    static func mini(providerRowCount: Int) -> CGPath {
+        reveal(progress: 0, providerRowCount: providerRowCount)
     }
 
-    static func rail() -> CGPath {
+    static func reveal(progress: Double, providerRowCount: Int) -> CGPath {
+        let mini = RailShellMetrics.handleRect(providerRowCount: providerRowCount)
+        let top = RailShellMetrics.topEdgeY
+        let bottom = RailShellMetrics.bottomEdgeY(providerRowCount: providerRowCount)
+        let edge = EdgeRailGeometry.canvasSize.width
+        let width = max(1, mini.width + (RailShellMetrics.railWidth - mini.width) * progress)
+        let height = max(1, mini.height + (bottom - top - mini.height) * progress)
+        let topY = mini.minY + (top - mini.minY) * progress
+        let rect = CGRect(x: edge - width, y: topY, width: width, height: height)
+        let corner = min(78.8 * 44 / 117, width / 2)
+        let flare = max(0, min(RailShellMetrics.contourHeight, height / 2, width - corner))
+        let radius = min(corner, (height - 2 * flare) / 2)
+        let bodyTop = topY + flare
+        let bodyBottom = rect.maxY - flare
         let path = CGMutablePath()
-        let leftX = EdgeRailGeometry.canvasSize.width - RailShellMetrics.railWidth
-        let rightX = EdgeRailGeometry.canvasSize.width
-        let width = RailShellMetrics.railWidth
-        let contourHeight = RailShellMetrics.contourHeight
-
-        // Start at the screen edge above the body and sweep in along the top
-        // contour.
-        path.move(to: CGPoint(x: rightX, y: RailShellMetrics.topEdgeY))
-        RailContour.append(
-            to: path,
-            placement: RailContour.Placement(
-                width: width,
-                height: contourHeight,
-                edgePoint: CGPoint(x: rightX, y: RailShellMetrics.topEdgeY),
-                inward: -1,
-                downward: 1,
-            ),
+        path.move(to: CGPoint(x: edge, y: topY))
+        path.addArc(
+            center: CGPoint(x: edge - flare, y: topY),
+            radius: flare,
+            startAngle: 0,
+            endAngle: .pi / 2,
+            clockwise: false,
         )
-
-        // Straight body.
-        path.addCompatibleLine(to: CGPoint(x: leftX, y: RailShellMetrics.bodyBottomY))
-
-        // Mirror the contour back out to the screen edge.
-        RailContour.appendReversed(
-            to: path,
-            placement: RailContour.Placement(
-                width: width,
-                height: contourHeight,
-                edgePoint: CGPoint(x: rightX, y: RailShellMetrics.bottomEdgeY),
-                inward: -1,
-                downward: -1,
-            ),
-        )
-
-        path.addCompatibleLine(to: CGPoint(x: rightX, y: RailShellMetrics.topEdgeY))
-        path.closeSubpath()
-        return path
-    }
-
-    /// The resting settings control.
-    ///
-    /// The running reference application draws a round-capped quarter-circle
-    /// arc below the rail rather than a filled circle. The arc runs from
-    /// straight up to straight left, echoing the rail contour's curvature, and
-    /// its separation from the rail is part of the silhouette. The filled
-    /// circle in the reference video is this control's hover state.
-    static func settings(showsCircle: Bool) -> CGPath {
-        if showsCircle {
-            let path = CGMutablePath()
-            path.addEllipse(in: RailShellMetrics.settingsCircleRect)
-            return path
-        }
-        let center = RailShellMetrics.settingsArcCenter
-        let arc = CGMutablePath()
-        // Paths here are authored top-down and flipped once for display, so a
-        // smaller y is higher on screen. The traced arc runs from straight up
-        // round to straight left, which is the quarter from -pi/2 to -pi.
-        arc.addArc(
-            center: center,
-            radius: RailShellMetrics.settingsArcRadius,
+        path.addLine(to: CGPoint(x: rect.minX + radius, y: bodyTop))
+        path.addArc(
+            center: CGPoint(x: rect.minX + radius, y: bodyTop + radius),
+            radius: radius,
             startAngle: -.pi / 2,
             endAngle: -.pi,
             clockwise: true,
         )
-        return CGPath(
-            __byStroking: arc,
-            transform: nil,
-            lineWidth: RailShellMetrics.settingsArcStroke,
+        path.addLine(to: CGPoint(x: rect.minX, y: bodyBottom - radius))
+        path.addArc(
+            center: CGPoint(x: rect.minX + radius, y: bodyBottom - radius),
+            radius: radius,
+            startAngle: .pi,
+            endAngle: .pi / 2,
+            clockwise: true,
+        )
+        path.addLine(to: CGPoint(x: edge - flare, y: bodyBottom))
+        path.addArc(
+            center: CGPoint(x: edge - flare, y: rect.maxY),
+            radius: flare,
+            startAngle: -.pi / 2,
+            endAngle: 0,
+            clockwise: false,
+        )
+        path.closeSubpath()
+        return path
+    }
+
+    static func handleHighlight(providerRowCount: Int) -> CGPath {
+        mini(providerRowCount: providerRowCount)
+    }
+
+    static func settings(showsCircle: Bool, providerRowCount: Int) -> CGPath {
+        if showsCircle {
+            return CGPath(
+                ellipseIn: RailShellMetrics.settingsCircleRect(providerRowCount: providerRowCount),
+                transform: nil,
+            )
+        }
+        let arc = CGMutablePath()
+        arc.addArc(
+            center: RailShellMetrics.settingsArcCenter(providerRowCount: providerRowCount),
+            radius: RailShellMetrics.settingsArcRadius,
+            startAngle: -.pi / 2,
+            endAngle: 0,
+            clockwise: false,
+        )
+        return arc.copy(
+            strokingWithWidth: RailShellMetrics.settingsArcStroke,
             lineCap: .round,
             lineJoin: .round,
             miterLimit: 10,
-        ) ?? arc
+        )
     }
 
     static func detail(centerY: CGFloat, panelHeight: CGFloat) -> CGPath {
@@ -217,37 +172,10 @@ enum RailShellPaths {
         )
         path.closeSubpath()
     }
-
-    static func collapsedDetail(centerY: CGFloat) -> CGPath {
-        let point = CGPoint(x: EdgeRailGeometry.railOriginX + 2, y: centerY)
-        let path = CGMutablePath()
-        path.move(to: point)
-        for _ in 0 ..< 8 {
-            path.addCompatibleLine(to: point)
-        }
-        path.closeSubpath()
-        path.move(to: point)
-        for _ in 0 ..< 3 {
-            path.addCompatibleLine(to: point)
-        }
-        path.closeSubpath()
-        return path
-    }
 }
 
 private extension CGMutablePath {
     func addCompatibleLine(to point: CGPoint) {
-        let start = currentPoint
-        addCurve(
-            to: point,
-            control1: CGPoint(
-                x: start.x + (point.x - start.x) / 3,
-                y: start.y + (point.y - start.y) / 3,
-            ),
-            control2: CGPoint(
-                x: start.x + (point.x - start.x) * 2 / 3,
-                y: start.y + (point.y - start.y) * 2 / 3,
-            ),
-        )
+        addLine(to: point)
     }
 }

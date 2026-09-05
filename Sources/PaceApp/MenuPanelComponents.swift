@@ -185,3 +185,47 @@ struct KeychainAccessButton: View {
         .accessibilityHint("Shows the macOS keychain dialog once for each credential")
     }
 }
+
+/// Retries the chosen profile when Keychain blocked account discovery.
+struct ProfileKeychainAccessButton: View {
+    @Bindable var model: PacePresentationModel
+    let providerID: ProviderID
+
+    var body: some View {
+        Button("Allow keychain access and add \(ProviderStyle.resolve(providerID).name)...") {
+            guard let request = model.pendingProfileAuthorization else { return }
+            guard request.providerID == providerID else { return }
+            Task { await model.authorizePendingProfile(request) }
+        }
+        .disabled(model.isProviderRuntimeBusy || model.isRefreshing || model.isManagingAccounts)
+        .help("macOS may ask for your login password to read this provider's credentials.")
+    }
+}
+
+struct MenuEmptyAccountView: View {
+    @Bindable var model: PacePresentationModel
+
+    var body: some View {
+        if model.pendingProfileAuthorization?.providerID == model.activeProviderID {
+            VStack(spacing: 12) {
+                ContentUnavailableView(
+                    "Keychain access needed",
+                    systemImage: "key",
+                    description: Text(
+                        "Allow access to identify and add your " +
+                            "\(ProviderStyle.resolve(model.activeProviderID).name) account.",
+                    ),
+                )
+                ProfileKeychainAccessButton(model: model, providerID: model.activeProviderID)
+            }
+            .padding(.vertical, 16)
+        } else {
+            ContentUnavailableView(
+                "No account configured",
+                systemImage: "person.crop.circle.badge.questionmark",
+                description: Text("Add an account for this provider to see usage."),
+            )
+            .frame(minHeight: 120)
+        }
+    }
+}

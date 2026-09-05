@@ -6,6 +6,8 @@ import SwiftUI
 final class EdgePanelController {
     private let model: PacePresentationModel
     private let panel: ClickThroughEdgePanel
+    private let surfaceBridge = RailSurfaceBridge()
+    private var motionCapture: RailMotionCapture?
     private var interactionController: RailInteractionController?
     private var screenParametersObserver: NSObjectProtocol?
     private var workspaceObservers: [NSObjectProtocol] = []
@@ -27,12 +29,17 @@ final class EdgePanelController {
         let enablesInteraction = environment["PACE_REFERENCE_PREVIEW"] == nil ||
             environment["PACE_REFERENCE_INTERACTION"] == "1"
         if enablesInteraction {
-            interactionController = RailInteractionController(model: model, visualPanel: panel)
+            interactionController = RailInteractionController(
+                model: model,
+                visualPanel: panel,
+                bridge: surfaceBridge,
+            )
         }
         observeModel()
         observeScreenParameters()
         observeWorkspace()
         synchronizeVisibility()
+        configureMotionCapture(environment: environment)
 
         // Writes the rail to a transparent PNG and exits. Capturing the rail
         // off the screen photographs whatever sits behind its transparent
@@ -44,6 +51,17 @@ final class EdgePanelController {
                 NSApp.terminate(nil)
             }
         }
+    }
+
+    private func configureMotionCapture(environment: [String: String]) {
+        guard environment["PACE_REFERENCE_PREVIEW"] != nil else { return }
+        guard let path = environment["PACE_CAPTURE_MOTION"] else { return }
+        guard let view = panel.contentView else { return }
+        motionCapture = RailMotionCapture(
+            view: view,
+            outputDirectory: URL(filePath: path),
+            duration: 11,
+        )
     }
 
     /// Renders the rail to a PNG with its transparency intact.
@@ -85,7 +103,10 @@ final class EdgePanelController {
         panel.isMovable = false
         panel.isOpaque = false
         panel.level = .floating
-        panel.contentView = NSHostingView(rootView: EdgeRailView(model: model))
+        panel.contentView = NSHostingView(rootView: EdgeRailView(
+            model: model,
+            bridge: surfaceBridge,
+        ))
         positionPanel()
     }
 

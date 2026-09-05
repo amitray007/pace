@@ -24,7 +24,11 @@ final class PaceAppDelegate: NSObject, NSApplicationDelegate {
         // the account's own "Allow keychain access" action instead.
         KeychainInteractionPolicy.disableAutomaticPrompts()
 
-        statusItemController = StatusItemController(model: model)
+        let railOnly = model.isReferencePreview &&
+            ProcessInfo.processInfo.environment["PACE_REFERENCE_RAIL_ONLY"] == "1"
+        if !railOnly {
+            statusItemController = StatusItemController(model: model)
+        }
         edgePanelController = EdgePanelController(model: model)
 
         Task {

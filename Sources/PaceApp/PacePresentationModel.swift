@@ -52,6 +52,7 @@ final class PacePresentationModel {
 
     var availableGitHubCopilotLogins: [String] = []
     var accountActionError: String?
+    var pendingProfileAuthorization: ProfileKeychainAuthorization?
     var isManagingAccounts = false
     var activeProviderID: ProviderID = .claude
     var railPreviewState: RailPreviewState

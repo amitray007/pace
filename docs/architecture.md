@@ -299,9 +299,28 @@ The collapsed panel ignores pointer events. Activation logic arms it only after 
 condition. Visible-shape hit testing prevents transparent window regions from blocking the
 application below.
 
-Core Animation layers own the rail path, connector, progress rings, and reference-critical motion.
-SwiftUI hosts provider content and settings where layout convenience does not weaken animation or
-hit-testing control.
+`RailSurfaceView` samples Apple's spring solver at 120 Hz into coordinated Core Animation
+keyframes. The shell, identical content mask, attached card, connector, provider rows, and settings
+control share one timeline. The compositor runs the visual animation without updating native views
+on every frame. Reversals inherit position and velocity. A display link updates input geometry
+only when an interaction controller is attached, and pauses at rest.
+
+SwiftUI content hosts persist by provider ID at their natural size. The card moves and clips around
+them, while provider changes crossfade their contents. Only the selected, visible detail runs its
+refresh countdown. Quota lists scroll beyond five visible rows.
+`RailSurfaceBridge` gives the input windows the current rendered card geometry and forwards wheel
+and settings-hover events on the main actor. The visual panel remains click-through.
+
+The motion constants follow CodeNotch's unfold (0.42/0.78), content (0.36/0.82), card glide
+(0.5/0.86), settings (0.36/0.7), and reading (0.9/0.9) response/damping pairs. Content crossfades use
+0.16 seconds. Reduced motion changes geometry directly and fades content in 0.1 seconds.
+
+For local visual checks, set `PACE_REFERENCE_PREVIEW=mini`, `PACE_REFERENCE_MOTION=1`, and
+`PACE_CAPTURE_MOTION` to a local output directory. This captures only the fixture rail's rendered
+layer for 11 seconds. PNG capture affects frame timing; use Instruments without capture enabled
+for performance measurements. Set `PACE_REFERENCE_RAIL_ONLY=1` to omit the status item in
+the fixture process, and `PACE_REFERENCE_MOTION_DELAY` to delay the sequence while Instruments
+attaches. These options apply only in reference-preview mode.
 
 ## Persistence and security
 
@@ -342,4 +361,4 @@ hit-testing control.
   crossover.
 - Verify two live Cursor Agent file profiles and live CLI-owned credential rotation without account
   crossover.
-- Measure reference paths, timings, and colors from the source media during the visual phase.
+- Verify display frame pacing against CodeNotch across supported refresh rates and interaction modes.
